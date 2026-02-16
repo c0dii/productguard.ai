@@ -29,7 +29,7 @@ export function ProductActions({ product }: ProductActionsProps) {
 
       if (response.ok) {
         const data = await response.json();
-        alert('Scan started! Redirecting to scan results...');
+        // Redirect directly to scan detail page to monitor progress
         router.push(`/dashboard/scans/${data.scan_id}`);
       } else {
         const error = await response.json();

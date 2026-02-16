@@ -3,7 +3,19 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['halputuievkcapwlatgp.supabase.co'],
+    // Allow Supabase storage and external product images from scraping
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'halputuievkcapwlatgp.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        // Allow any HTTPS external images for scraped product data
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
   // Configure for Stripe webhook raw body handling
   experimental: {

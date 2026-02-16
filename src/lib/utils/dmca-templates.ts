@@ -6,7 +6,9 @@ export interface DMCANoticeParams {
   copyrightHolder: string;
   copyrightHolderEmail: string;
   copyrightHolderAddress?: string;
+  copyrightHolderPhone?: string;
   productName: string;
+  productType?: string; // e.g., "Video Course", "Software", "Digital Product"
   productUrl: string;
   infringingUrl: string;
   platformName: string;
@@ -18,6 +20,27 @@ export interface DMCANoticeParams {
     copyright_date?: string;
     license_info?: string;
     ip_claims?: string;
+    first_published_date?: string;
+  };
+  infrastructure?: {
+    ip_address?: string;
+    hosting_provider?: string;
+    asn?: string;
+    asn_org?: string;
+    country?: string;
+    region?: string;
+    city?: string;
+    registrar?: string;
+    cdn?: string;
+    creation_date?: string;
+    expiration_date?: string;
+    abuse_contact?: string;
+  };
+  signature?: {
+    full_name: string;
+    date: string;
+    ip_address?: string;
+    timestamp?: string;
   };
 }
 
@@ -69,17 +92,26 @@ export function generateDMCANotice(params: DMCANoticeParams): string {
 
   // IP ownership section
   const getIPOwnershipSection = () => {
-    if (!params.ipOwnership) return '';
+    if (!params.ipOwnership && !params.productType) return '';
 
     let section = '\n\nINTELLECTUAL PROPERTY OWNERSHIP:\n';
 
-    if (params.ipOwnership.copyright_date) {
+    if (params.productType) {
+      section += `Type of Work: ${params.productType}\n`;
+    }
+
+    if (params.ipOwnership?.first_published_date || params.ipOwnership?.copyright_date) {
+      const pubDate = params.ipOwnership.first_published_date || params.ipOwnership.copyright_date;
+      section += `\nThis work is an original, proprietary creation first published on or about ${pubDate}, and is protected under U.S. and international copyright law. No license, assignment, or authorization has been granted to the infringing party.\n`;
+    }
+
+    if (params.ipOwnership?.copyright_date && !params.ipOwnership?.first_published_date) {
       section += `Copyright Date: ${params.ipOwnership.copyright_date}\n`;
     }
-    if (params.ipOwnership.license_info) {
+    if (params.ipOwnership?.license_info) {
       section += `License: ${params.ipOwnership.license_info}\n`;
     }
-    if (params.ipOwnership.ip_claims) {
+    if (params.ipOwnership?.ip_claims) {
       section += `Registration/Claims: ${params.ipOwnership.ip_claims}\n`;
     }
 
@@ -90,6 +122,56 @@ export function generateDMCANotice(params: DMCANoticeParams): string {
   const getEvidenceSection = () => {
     if (!params.additionalEvidence) return '';
     return `\n\nADDITIONAL EVIDENCE:\n${params.additionalEvidence}\n`;
+  };
+
+  // Infrastructure evidence section (NEW - strengthens legal case)
+  const getInfrastructureSection = () => {
+    if (!params.infrastructure) return '';
+
+    const infra = params.infrastructure;
+    const details: string[] = [];
+
+    if (infra.ip_address) {
+      details.push(`IP Address: ${infra.ip_address}`);
+    }
+    if (infra.hosting_provider) {
+      details.push(`Hosting Provider: ${infra.hosting_provider}`);
+    }
+    if (infra.asn) {
+      details.push(`Autonomous System Number (ASN): ${infra.asn}${infra.asn_org ? ` (${infra.asn_org})` : ''}`);
+    }
+    if (infra.city || infra.region || infra.country) {
+      const location = [infra.city, infra.region, infra.country].filter(Boolean).join(', ');
+      details.push(`Geographic Location: ${location}`);
+    }
+    if (infra.registrar) {
+      details.push(`Domain Registrar: ${infra.registrar}`);
+    }
+    if (infra.cdn) {
+      details.push(`Content Delivery Network: ${infra.cdn}`);
+    }
+    if (infra.creation_date) {
+      details.push(`Domain Created: ${new Date(infra.creation_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
+    }
+    if (infra.expiration_date) {
+      details.push(`Domain Expires: ${new Date(infra.expiration_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
+    }
+    if (infra.abuse_contact) {
+      details.push(`Abuse Contact: ${infra.abuse_contact}`);
+    }
+
+    if (details.length === 0) return '';
+
+    return `\n\nTECHNICAL EVIDENCE & INFRASTRUCTURE ANALYSIS:
+The infringing material is hosted on infrastructure controlled by:
+
+${details.join('\n')}
+
+This technical evidence establishes:
+• The exact server location and responsible parties
+• A clear chain of hosting responsibility for escalation purposes
+• Alternative contact paths if the primary recipient fails to respond
+• Jurisdictional information relevant to potential legal proceedings`;
   };
 
   // Specific requirements for exact recreations (trademark/brand removal)
@@ -145,8 +227,29 @@ I request confirmation of content removal within 24-48 hours.`;
     }
   };
 
+  // Signature section
+  const getSignatureSection = () => {
+    if (params.signature) {
+      return `ELECTRONIC SIGNATURE:
+/${params.signature.full_name}/
+
+Name: ${params.signature.full_name}
+Date: ${params.signature.date}${params.signature.ip_address ? `\nSignature IP Address: ${params.signature.ip_address} (logged for verification)` : ''}${params.signature.timestamp ? `\nTimestamp: ${params.signature.timestamp}` : ''}`;
+    }
+
+    // Fallback to basic signature
+    return `ELECTRONIC SIGNATURE:
+/${params.copyrightHolder}/
+
+Name: ${params.copyrightHolder}
+Email: ${params.copyrightHolderEmail}
+Date: ${today}`;
+  };
+
   return `
 DMCA TAKEDOWN NOTICE PURSUANT TO 17 U.S.C. § 512(c)
+
+Subject: DMCA Takedown Notice – Copyright Infringement of Protected Work
 
 Date: ${today}
 
@@ -158,54 +261,70 @@ ${getOpening()} the Digital Millennium Copyright Act (DMCA), 17 U.S.C. § 512(c)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-COPYRIGHT HOLDER INFORMATION:
-Name: ${params.copyrightHolder}
-Email: ${params.copyrightHolderEmail}
-${params.copyrightHolderAddress ? `Address: ${params.copyrightHolderAddress}` : ''}
+1. COPYRIGHT OWNER INFORMATION
 
-COPYRIGHTED WORK:
-Title: ${params.productName}
-Original Location: ${params.productUrl}${getIPOwnershipSection()}
+Copyright Owner (or Authorized Agent):
+${params.copyrightHolder}
+
+Email Address:
+${params.copyrightHolderEmail}
+${params.copyrightHolderAddress ? `\nMailing Address:\n${params.copyrightHolderAddress}` : ''}
+${params.copyrightHolderPhone ? `\nTelephone Number:\n${params.copyrightHolderPhone}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-INFRINGING MATERIAL:
+2. IDENTIFICATION OF THE COPYRIGHTED WORK
+
+I am the owner of the copyrighted work described below, or I am authorized to act on behalf of the owner.
+
+Title of Original Work:
+${params.productName}
+
+Original Publication URL:
+${params.productUrl}${getIPOwnershipSection()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. IDENTIFICATION OF THE INFRINGING MATERIAL
+
 ${getInfringementDetails()}
-${params.infringingUrl}${getEvidenceSection()}
+${params.infringingUrl}${getEvidenceSection()}${getInfrastructureSection()}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-DMCA COMPLIANCE STATEMENTS:
+4. GOOD FAITH STATEMENT (Statutory Requirement)
 
-GOOD FAITH STATEMENT:
 I have a good faith belief that the use of the copyrighted material described above is not authorized by the copyright owner, its agent, or the law.
 
-ACCURACY STATEMENT:
-I declare, under penalty of perjury under the laws of the United States of America, that the information in this notification is accurate and that I am the copyright owner or am authorized to act on behalf of the owner of an exclusive right that is allegedly infringed.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-ELECTRONIC SIGNATURE:
-${params.copyrightHolder}
-${params.copyrightHolderEmail}
-${today}${getLegalConsequences()}
+5. ACCURACY & AUTHORITY STATEMENT (Statutory Requirement)
+
+The information in this notice is accurate, and under penalty of perjury, I state that I am the copyright owner or am authorized to act on behalf of the owner of the exclusive rights that are allegedly infringed.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-REQUESTED ACTION:
+6. DEMAND FOR EXPEDITIOUS REMOVAL
+
+Pursuant to 17 U.S.C. § 512(c), I respectfully request the expeditious removal or disabling of access to the infringing material identified above.
+
 I hereby request that you immediately:
 1. Remove or disable access to the infringing material at the URL specified above
-2. Notify the user responsible for posting the infringing content
+2. Notify the user responsible for posting the infringing content as required by law
 3. Provide written confirmation of removal to ${params.copyrightHolderEmail}
 4. Preserve any relevant logs or records pursuant to 17 U.S.C. § 512(h)${getExactRecreationRequirements()}
 
 I expect prompt action on this notice in accordance with the DMCA's requirements for expeditious response.
 
-Please confirm receipt of this notice and provide an estimated timeline for removal.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Respectfully,
+7. RESERVATION OF RIGHTS
 
-${params.copyrightHolder}
-${params.copyrightHolderEmail}
-${today}
+Nothing in this notice constitutes a waiver of any rights or remedies available to the copyright owner, all of which are expressly reserved.${getLegalConsequences()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+8. ${getSignatureSection()}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Generated via ProductGuard.ai - Automated IP Protection Platform

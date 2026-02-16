@@ -3,6 +3,14 @@
     {
       "path": "/api/takedowns/check-urls",
       "schedule": "0 2 * * 0"
+    },
+    {
+      "path": "/api/cron/daily-workflows",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-workflows",
+      "schedule": "0 0 1 * *"
     }
   ]
 }

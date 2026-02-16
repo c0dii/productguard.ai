@@ -136,13 +136,63 @@ function buildSearchQueries(product: Product, keywordVariations: string[]): stri
   }
 
   // ============================================
+  // 0. AI-ENHANCED SEARCHES (if approved AI data exists)
+  // ============================================
+
+  const aiData = product.ai_extracted_data;
+  const isAIDataApproved = aiData && product.last_analyzed_at;
+
+  if (isAIDataApproved) {
+    console.log('[Google Scanner] Using approved AI-extracted data for enhanced queries');
+
+    // UNIQUE PHRASES - Exact match searches (most powerful for detecting copied content)
+    if (aiData.unique_phrases && aiData.unique_phrases.length > 0) {
+      // Use top 3 most unique phrases (avoid making too many queries)
+      const topPhrases = aiData.unique_phrases.slice(0, 3);
+      topPhrases.forEach((phrase) => {
+        queries.push(`"${phrase}"`); // Exact phrase match
+        queries.push(`"${phrase}" free`); // Phrase + piracy indicator
+        queries.push(`"${phrase}" download`); // Phrase + download
+      });
+    }
+
+    // BRAND IDENTIFIERS - Search for unauthorized brand use
+    if (aiData.brand_identifiers && aiData.brand_identifiers.length > 0) {
+      aiData.brand_identifiers.forEach((brand) => {
+        queries.push(`"${brand}" "${primaryKeyword}" -site:${getOfficialDomain(product)}`);
+        queries.push(`"${brand}" free download`);
+      });
+    }
+
+    // COPYRIGHTED TERMS - Exact match for trademarked/copyrighted content
+    if (aiData.copyrighted_terms && aiData.copyrighted_terms.length > 0) {
+      const topTerms = aiData.copyrighted_terms.slice(0, 3);
+      topTerms.forEach((term) => {
+        queries.push(`"${term}" cracked`);
+        queries.push(`"${term}" leaked`);
+        queries.push(`"${term}" torrent`);
+      });
+    }
+
+    // AI KEYWORDS - Merge with manual keywords for broader coverage
+    if (aiData.keywords && aiData.keywords.length > 0) {
+      const aiKeywords = aiData.keywords.slice(0, 5);
+      aiKeywords.forEach((keyword) => {
+        // Only add if not already in manual keywords
+        if (!product.keywords.includes(keyword)) {
+          queries.push(`"${keyword}" free download`);
+        }
+      });
+    }
+  }
+
+  // ============================================
   // 1. MARKETPLACE-SPECIFIC SEARCHES
   // ============================================
 
   // TradingView (huge source of indicator clones)
   queries.push(`site:tradingview.com "${primaryKeyword}"`);
   queries.push(`site:tradingview.com/script "${primaryKeyword}"`);
-  queries.push(`site:tradingview.com "squeeze pro"`); // Generic squeeze searches
 
   // MQL5 Marketplace (MetaTrader indicators)
   queries.push(`site:mql5.com/market "${primaryKeyword}"`);
@@ -202,12 +252,6 @@ function buildSearchQueries(product: Product, keywordVariations: string[]): stri
   if (product.brand_name) {
     queries.push(`"${product.brand_name}" "${primaryKeyword}" -site:${getOfficialDomain(product)}`);
     queries.push(`site:tradingview.com "${product.brand_name}"`);
-  }
-
-  // Simpler Trading specific (common in user's examples)
-  if (primaryKeyword.toLowerCase().includes('simpler trading') || product.brand_name?.toLowerCase().includes('simpler trading')) {
-    queries.push(`"simpler trading" squeeze`);
-    queries.push(`"john carter" squeeze`);
   }
 
   // ============================================

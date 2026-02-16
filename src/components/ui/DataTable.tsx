@@ -22,6 +22,7 @@ interface DataTableProps<TData> {
   showSearch?: boolean;
   searchPlaceholder?: string;
   className?: string;
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData>({
@@ -32,6 +33,7 @@ export function DataTable<TData>({
   showSearch = false,
   searchPlaceholder = 'Search...',
   className = '',
+  onRowClick,
 }: DataTableProps<TData>) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -136,7 +138,10 @@ export function DataTable<TData>({
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-pg-border hover:bg-pg-surface-light transition-colors"
+                    onClick={() => onRowClick?.(row.original)}
+                    className={`border-b border-pg-border hover:bg-pg-surface-light transition-colors ${
+                      onRowClick ? 'cursor-pointer' : ''
+                    }`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-3 text-sm text-pg-text">

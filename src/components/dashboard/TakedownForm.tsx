@@ -102,9 +102,13 @@ export function TakedownForm({
   const [ipClaims, setIpClaims] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  const [contactAddress, setContactAddress] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [ccEmails, setCcEmails] = useState('');
   const [copySelf, setCopySelf] = useState(true);
+  const [signatureName, setSignatureName] = useState('');
+  const [signatureConsent, setSignatureConsent] = useState(false);
 
   const selectedProductData = availableProducts.find((p) => p.id === selectedProduct);
 
@@ -225,6 +229,7 @@ export function TakedownForm({
   };
 
   const handleSubmit = async () => {
+    // Validation
     if (!selectedProduct || infringementTypes.length === 0) {
       alert('Please select a product and at least one infringement type');
       return;
@@ -232,6 +237,11 @@ export function TakedownForm({
 
     if (!recipientEmail) {
       alert('Please specify a recipient email for the DMCA notice');
+      return;
+    }
+
+    if (!signatureName || !signatureConsent) {
+      alert('You must provide your electronic signature and certify the information under penalty of perjury');
       return;
     }
 
@@ -248,6 +258,18 @@ export function TakedownForm({
         ccEmailList.push(...additionalCcs);
       }
 
+      // Get user's IP address for signature logging (best effort)
+      let userIpAddress = '';
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        userIpAddress = ipData.ip;
+      } catch (e) {
+        console.warn('Could not fetch IP for signature logging');
+      }
+
+      const signatureTimestamp = new Date().toISOString();
+
       const response = await fetch('/api/takedowns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -261,11 +283,26 @@ export function TakedownForm({
             copyright_date: copyrightDate,
             license_info: licenseInfo,
             ip_claims: ipClaims,
+            first_published_date: selectedProductData?.created_at,
           },
           contact_info: {
             name: contactName,
             email: contactEmail,
+            address: contactAddress,
+            phone: contactPhone,
           },
+          signature: {
+            full_name: signatureName,
+            date: new Date().toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            }),
+            ip_address: userIpAddress,
+            timestamp: signatureTimestamp,
+            consent_given: signatureConsent,
+          },
+          infrastructure: prefilledInfringement?.infrastructure || null,
           infringing_url: prefilledInfringement?.source_url,
           recipient_email: recipientEmail,
           cc_emails: ccEmailList,
@@ -409,6 +446,9 @@ export function TakedownForm({
           {/* Contact Information */}
           <div className="space-y-4 mb-6">
             <h3 className="text-lg font-semibold text-pg-text">Your Contact Information</h3>
+            <p className="text-sm text-pg-text-muted">
+              Required for DMCA compliance. This information will appear in the notice.
+            </p>
 
             <div>
               <label className="block text-sm font-medium text-pg-text mb-2">
@@ -434,6 +474,38 @@ export function TakedownForm({
                 className="input-field w-full"
                 placeholder="your@email.com"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-pg-text mb-2">
+                Mailing Address (Optional but Recommended)
+              </label>
+              <textarea
+                value={contactAddress}
+                onChange={(e) => setContactAddress(e.target.value)}
+                rows={3}
+                className="input-field w-full"
+                placeholder="123 Main Street&#10;City, State ZIP&#10;Country"
+              />
+              <p className="text-xs text-pg-text-muted mt-1">
+                Including your address strengthens your claim and provides alternative contact method
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-pg-text mb-2">
+                Phone Number (Optional but Recommended)
+              </label>
+              <input
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                className="input-field w-full"
+                placeholder="+1 (555) 123-4567"
+              />
+              <p className="text-xs text-pg-text-muted mt-1">
+                Recommended by DMCA best practices for urgent contact
+              </p>
             </div>
           </div>
 
@@ -713,6 +785,70 @@ export function TakedownForm({
             </div>
           </div>
 
+          {/* Signature Section */}
+          <div className="mb-8 p-6 rounded-lg bg-gradient-to-br from-pg-accent/5 to-blue-500/5 border-2 border-pg-accent/30">
+            <h3 className="text-lg font-semibold text-pg-text mb-2">✍️ Electronic Signature (Required)</h3>
+            <p className="text-sm text-pg-text-muted mb-4">
+              Your electronic signature legally certifies this notice under the DMCA and ESIGN Act.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-pg-text mb-2">
+                  Type Your Full Legal Name <span className="text-pg-danger">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={signatureName}
+                    onChange={(e) => setSignatureName(e.target.value)}
+                    className="input-field w-full text-lg font-serif italic"
+                    placeholder="Type your full name as it will appear"
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  />
+                  {signatureName && (
+                    <div className="mt-2 p-3 rounded bg-pg-surface border border-pg-border">
+                      <p className="text-xs text-pg-text-muted mb-1">Signature Preview:</p>
+                      <p className="text-xl font-serif italic text-pg-text">/{signatureName}/</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-pg-surface border border-pg-border">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={signatureConsent}
+                    onChange={(e) => setSignatureConsent(e.target.checked)}
+                    className="mt-1 rounded border-pg-border"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-pg-text mb-1">
+                      I certify under penalty of perjury <span className="text-pg-danger">*</span>
+                    </p>
+                    <p className="text-xs text-pg-text-muted leading-relaxed">
+                      I certify under penalty of perjury under the laws of the United States that:
+                      (1) I am authorized to act on behalf of the copyright owner,
+                      (2) the information provided is accurate,
+                      (3) I have a good faith belief the use is not authorized, and
+                      (4) this electronic signature is my legally binding signature.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="text-xs text-pg-text-muted bg-blue-500/10 p-3 rounded border border-blue-500/20">
+                <p className="font-semibold mb-1">🔒 Legal Validity</p>
+                <p>
+                  Your typed signature with consent checkbox constitutes a legally binding electronic
+                  signature under the ESIGN Act (15 U.S.C. § 7001). The signature timestamp and IP
+                  address will be logged for verification purposes.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Review Summary */}
           <div className="mb-6 p-6 rounded-lg bg-pg-bg border border-pg-border space-y-4">
             <h3 className="text-lg font-semibold text-pg-text">Review Your Submission</h3>
@@ -720,6 +856,9 @@ export function TakedownForm({
             <div>
               <p className="text-sm text-pg-text-muted">Product</p>
               <p className="text-pg-text font-semibold">{selectedProductData?.name}</p>
+              {selectedProductData?.type && (
+                <p className="text-sm text-pg-text-muted capitalize">Type: {selectedProductData.type}</p>
+              )}
             </div>
 
             <div>
@@ -749,11 +888,32 @@ export function TakedownForm({
             )}
 
             <div>
-              <p className="text-sm text-pg-text-muted">Contact</p>
-              <p className="text-pg-text font-semibold">
-                {contactName} ({contactEmail})
-              </p>
+              <p className="text-sm text-pg-text-muted">Contact Information</p>
+              <p className="text-pg-text font-semibold">{contactName}</p>
+              <p className="text-sm text-pg-text-muted">{contactEmail}</p>
+              {contactPhone && <p className="text-sm text-pg-text-muted">{contactPhone}</p>}
+              {contactAddress && (
+                <p className="text-sm text-pg-text-muted whitespace-pre-line mt-1">{contactAddress}</p>
+              )}
             </div>
+
+            {prefilledInfringement?.infrastructure && (
+              <div>
+                <p className="text-sm text-pg-text-muted">Infrastructure Evidence Available</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {prefilledInfringement.infrastructure.ip_address && (
+                    <Badge variant="default" className="text-xs">IP Address</Badge>
+                  )}
+                  {prefilledInfringement.infrastructure.hosting_provider && (
+                    <Badge variant="default" className="text-xs">Hosting Provider</Badge>
+                  )}
+                  {prefilledInfringement.infrastructure.registrar && (
+                    <Badge variant="default" className="text-xs">Registrar</Badge>
+                  )}
+                </div>
+                <p className="text-xs text-green-500 mt-1">✓ Technical evidence will be automatically included</p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between">
@@ -762,12 +922,17 @@ export function TakedownForm({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !signatureName || !signatureConsent}
               className="bg-pg-danger hover:bg-red-600"
             >
               {isSubmitting ? 'Submitting...' : '⚡ Submit DMCA Takedown'}
             </Button>
           </div>
+          {(!signatureName || !signatureConsent) && (
+            <p className="text-sm text-pg-warning mt-2 text-center">
+              ⚠️ You must provide your electronic signature and certify the information to submit
+            </p>
+          )}
         </Card>
       )}
     </div>

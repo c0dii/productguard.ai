@@ -141,20 +141,6 @@ export function InfringementListItem({
 
         {/* Right: Quick Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {!isResolved && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNotAThreat();
-              }}
-              disabled={isLoading}
-              className="text-xs"
-            >
-              Not a Threat
-            </Button>
-          )}
           <Link
             href={scanId ? `/dashboard/scans/${scanId}/infringements/${infringement.id}` : `/dashboard/infringements/${infringement.id}`}
             onClick={(e) => e.stopPropagation()}

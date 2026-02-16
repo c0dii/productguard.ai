@@ -24,6 +24,8 @@ export async function POST(request: Request) {
       additional_evidence,
       ip_ownership,
       contact_info,
+      signature,
+      infrastructure,
       infringing_url,
       recipient_email,
       cc_emails,
@@ -79,12 +81,14 @@ export async function POST(request: Request) {
     const targetUrl = infringing_url || infringement?.source_url || '';
     const platformRecipient = getRecommendedRecipient(targetUrl);
 
-    // Generate comprehensive DMCA notice
+    // Generate comprehensive DMCA notice with all enhanced fields
     const noticeContent = generateDMCANotice({
       copyrightHolder: contact_info.name,
       copyrightHolderEmail: contact_info.email,
-      copyrightHolderAddress: profile.company_name || undefined,
+      copyrightHolderAddress: contact_info.address || profile.company_name || undefined,
+      copyrightHolderPhone: contact_info.phone || undefined,
       productName: product.name,
+      productType: product.type || undefined,
       productUrl: product.url || '',
       infringingUrl: targetUrl,
       platformName: infringement?.platform || 'Unknown',
@@ -93,6 +97,8 @@ export async function POST(request: Request) {
       tone: tone,
       additionalEvidence: additional_evidence,
       ipOwnership: ip_ownership,
+      infrastructure: infrastructure || infringement?.infrastructure || undefined,
+      signature: signature || undefined,
     });
 
     // Create takedown record with comprehensive tracking

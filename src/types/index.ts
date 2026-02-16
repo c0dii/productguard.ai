@@ -98,6 +98,76 @@ export interface Profile {
   updated_at: string;
 }
 
+// ============================================================================
+// AI ANALYSIS TYPES
+// ============================================================================
+
+export interface ProductImage {
+  url: string; // Supabase storage URL or external URL
+  type: 'primary' | 'secondary' | 'uploaded';
+  uploaded_at: string;
+  size: number; // bytes
+  hash: string; // SHA256 for reverse image search
+  filename: string;
+}
+
+// ============================================================================
+// INTELLECTUAL PROPERTY TYPES
+// ============================================================================
+
+export type IPType = 'copyright' | 'trademark' | 'patent' | 'trade_secret' | 'license';
+
+export interface CopyrightInfo {
+  registration_number?: string | null;
+  year: string;
+  holder_name: string;
+}
+
+export interface TrademarkInfo {
+  name: string;
+  registration_number?: string | null;
+  country?: string | null;
+}
+
+export interface PatentInfo {
+  number: string;
+  type: 'utility' | 'design' | 'plant' | 'other';
+}
+
+export interface LicenseInfo {
+  type: string; // e.g., "All Rights Reserved", "CC BY-NC", custom
+  terms_url?: string | null;
+}
+
+export interface DMCAContact {
+  full_name: string;
+  company?: string | null;
+  email: string;
+  phone?: string | null;
+  address: string; // Required for sworn statements
+  is_copyright_owner: boolean;
+  relationship_to_owner?: string | null; // If not owner: "Authorized Agent", "Licensee", etc.
+}
+
+export interface ExtractionMetadata {
+  model: string; // e.g., "gpt-4o-mini"
+  analyzed_at: string; // ISO timestamp
+  confidence_scores: {
+    [key: string]: number; // confidence per extraction type (0-1)
+  };
+  processing_time_ms?: number;
+  tokens_used?: number;
+}
+
+export interface AIExtractedData {
+  brand_identifiers: string[]; // Trademarked names, company names, product names
+  unique_phrases: string[]; // Distinctive marketing copy, taglines
+  keywords: string[]; // Industry terms, product features, specifications
+  copyrighted_terms: string[]; // Terms with ©, ™, ® or explicitly copyrighted
+  content_fingerprint: string; // Hash or unique identifier for content matching
+  extraction_metadata: ExtractionMetadata;
+}
+
 export interface Product {
   id: string; // UUID
   user_id: string; // UUID, references profiles
@@ -123,9 +193,27 @@ export interface Product {
   file_hash: string | null;
   copyright_number: string | null;
   copyright_owner: string | null;
+
+  // Intellectual Property Protection
+  ip_types: IPType[] | null;
+  copyright_info: CopyrightInfo | null;
+  trademark_info: TrademarkInfo | null;
+  patent_info: PatentInfo | null;
+  license_info: LicenseInfo | null;
+
+  // DMCA Contact Information
+  dmca_contact: DMCAContact | null;
+
   tags: string[] | null;
   language: string | null;
   internal_notes: string | null;
+
+  // AI-powered analysis fields
+  full_text_content: string | null; // Complete page text for comparison
+  ai_extracted_data: AIExtractedData | null; // AI-extracted structured data
+  product_images: ProductImage[]; // Array of uploaded images
+  ai_analysis_version: number; // Version tracker for re-analysis
+  last_analyzed_at: string | null; // Cache invalidation timestamp
 }
 
 export interface ProductWithStats extends Product {
@@ -133,6 +221,22 @@ export interface ProductWithStats extends Product {
   pending_count?: number;
   active_count?: number;
   last_scan_at?: string | null;
+}
+
+export type ScanStageStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export interface ScanStage {
+  name: string;
+  display_name: string;
+  status: ScanStageStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  result_count?: number;
+}
+
+export interface ScanProgress {
+  current_stage: string | null;
+  stages: ScanStage[];
 }
 
 export interface Scan {
@@ -144,6 +248,8 @@ export interface Scan {
   completed_at: string | null;
   infringement_count: number;
   est_revenue_loss: number; // numeric(10,2)
+  scan_progress: ScanProgress | null;
+  last_updated_at: string;
   created_at: string;
 }
 

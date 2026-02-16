@@ -51,22 +51,23 @@ export function PendingVerificationList({ infringements, productId }: PendingVer
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-pg-text">Pending Verification ({infringements.length})</h2>
+        <h2 className="text-xl font-bold text-pg-text">Needs Review ({infringements.length})</h2>
         <Badge variant="warning" className="text-xs uppercase font-bold">
-          Action Required
+          Review Required
         </Badge>
       </div>
 
       <p className="text-sm text-pg-text-muted mb-4">
-        Review these potential infringements. <span className="text-pg-accent font-semibold">Verify</span> real threats or{' '}
-        <span className="text-pg-text">mark as false positives</span>.
+        Review these potential infringements. <span className="text-pg-accent font-semibold">Confirm</span> real threats or{' '}
+        <span className="text-pg-text">dismiss false alarms</span>.
       </p>
 
       <div className="space-y-3">
         {infringements.map((infringement) => (
           <div
             key={infringement.id}
-            className="p-4 rounded-lg bg-pg-bg border border-pg-border hover:border-pg-accent/50 transition-all"
+            onClick={() => router.push(`/dashboard/infringements/${infringement.id}`)}
+            className="p-4 rounded-lg bg-pg-bg border border-pg-border hover:border-pg-accent/50 transition-all cursor-pointer"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
@@ -113,12 +114,13 @@ export function PendingVerificationList({ infringements, productId }: PendingVer
                       <span className="font-semibold text-pg-text">{infringement.audience_size}</span>
                     </span>
                   )}
-                  <span className="flex items-center gap-1">
+                  {/* Temporarily disabled - revenue loss calculations need refinement */}
+                  {/* <span className="flex items-center gap-1">
                     <span className="opacity-70">Est. Loss:</span>
                     <span className="font-semibold text-pg-danger">
                       ${(infringement.est_revenue_loss || 0).toLocaleString()}
                     </span>
-                  </span>
+                  </span> */}
                   {infringement.infrastructure?.country && (
                     <span className="flex items-center gap-1">
                       <span className="opacity-70">📍</span>
@@ -132,20 +134,37 @@ export function PendingVerificationList({ infringements, productId }: PendingVer
               <div className="flex gap-2 shrink-0">
                 <Button
                   size="sm"
-                  onClick={() => handleVerify(infringement.id, 'verify')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleVerify(infringement.id, 'verify');
+                  }}
                   disabled={processingId === infringement.id}
                   className="text-xs px-3 py-2"
                 >
-                  {processingId === infringement.id ? '...' : '✓ Verify'}
+                  {processingId === infringement.id ? '...' : 'Confirm'}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => handleVerify(infringement.id, 'reject')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleVerify(infringement.id, 'reject');
+                  }}
                   disabled={processingId === infringement.id}
                   className="text-xs px-3 py-2 hover:bg-pg-danger/10 hover:text-pg-danger"
                 >
-                  {processingId === infringement.id ? '...' : '✗ Reject'}
+                  {processingId === infringement.id ? '...' : 'Dismiss'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/dashboard/infringements/${infringement.id}`);
+                  }}
+                  className="text-xs px-3 py-2"
+                >
+                  View Details →
                 </Button>
               </div>
             </div>
@@ -155,7 +174,7 @@ export function PendingVerificationList({ infringements, productId }: PendingVer
 
       {infringements.length >= 10 && (
         <p className="text-xs text-pg-text-muted mt-3 text-center">
-          Showing first 10 pending verifications. Verify these to see more.
+          Showing first 10 items. Review these to see more.
         </p>
       )}
     </Card>

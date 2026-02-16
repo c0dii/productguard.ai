@@ -201,32 +201,32 @@ const handleSave = async (productData: Partial<Product>) => {
 
 ```
 Basic Information:
-├─ Product Name: The Squeeze Pro Indicator
-├─ Brand Name: Simpler Trading
-├─ Type: Trading Indicator
-├─ Price: $697.00
+├─ Product Name: Premium Course Bundle
+├─ Brand Name: Example Learning Co.
+├─ Type: Online Course
+├─ Price: $497.00
 ├─ Release Date: 2024-01-15
 └─ Language: English
 
 Product Identity:
 ├─ Image: [uploaded product screenshot]
-├─ URL: https://simplertrading.com/squeeze-pro
-├─ Description: Professional trading indicator for...
-├─ Alternative Names: ["SqueezePro", "Squeeze-Pro", "SP Indicator"]
-└─ Unique IDs: ["SIMPLER-SP-001"]
+├─ URL: https://example-learning.com/premium-bundle
+├─ Description: Comprehensive online course bundle for...
+├─ Alternative Names: ["Premium Bundle", "Course Pack", "PB Course"]
+└─ Unique IDs: ["EXAMPLE-PB-001"]
 
 Search Configuration:
-├─ Keywords: ["squeeze indicator crack", "squeeze pro download"]
+├─ Keywords: ["premium course crack", "course bundle download"]
 ├─ Negative Keywords: ["review", "tutorial", "how to use"]
-└─ Price Threshold: 50% ($348.50+)
+└─ Price Threshold: 50% ($248.50+)
 
 Authorized Sales:
-├─ Whitelist Domains: ["simplertrading.com", "tradingview.com"]
-└─ Official Platforms: ["TradingView", "NinjaTrader Store"]
+├─ Whitelist Domains: ["example-learning.com", "teachable.com"]
+└─ Official Platforms: ["Teachable", "Udemy"]
 
 Legal & Organization:
 ├─ Copyright: TXu 2-123-456
-├─ Owner: Simpler Trading LLC
+├─ Owner: Example Learning LLC
 └─ Tags: ["active", "high-priority", "indicator"]
 ```
 

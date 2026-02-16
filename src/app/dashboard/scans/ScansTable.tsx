@@ -3,7 +3,7 @@
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import type { ColumnDef } from '@tanstack/react-table';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Scan {
   id: string;
@@ -23,12 +23,9 @@ const columns: ColumnDef<Scan>[] = [
     cell: ({ row }) => {
       const name = row.original.products?.name || 'Unknown Product';
       return (
-        <Link
-          href={`/dashboard/scans/${row.original.id}`}
-          className="font-semibold text-cyan-400 hover:text-cyan-300 hover:underline"
-        >
+        <span className="font-semibold text-cyan-400">
           {name}
-        </Link>
+        </span>
       );
     },
   },
@@ -94,20 +91,21 @@ const columns: ColumnDef<Scan>[] = [
       );
     },
   },
-  {
-    accessorKey: 'est_revenue_loss',
-    header: 'Est. Revenue Loss',
-    cell: ({ getValue }) => {
-      const loss = getValue() as number;
-      return loss > 0 ? (
-        <span className="font-semibold text-red-400">
-          ${loss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-      ) : (
-        <span className="text-pg-text-muted">$0.00</span>
-      );
-    },
-  },
+  // Temporarily disabled - revenue loss calculations need refinement
+  // {
+  //   accessorKey: 'est_revenue_loss',
+  //   header: 'Est. Revenue Loss',
+  //   cell: ({ getValue }) => {
+  //     const loss = getValue() as number;
+  //     return loss > 0 ? (
+  //       <span className="font-semibold text-red-400">
+  //         ${loss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+  //       </span>
+  //     ) : (
+  //       <span className="text-pg-text-muted">$0.00</span>
+  //     );
+  //   },
+  // },
 ];
 
 interface ScansTableProps {
@@ -115,6 +113,12 @@ interface ScansTableProps {
 }
 
 export default function ScansTable({ scans }: ScansTableProps) {
+  const router = useRouter();
+
+  const handleRowClick = (scan: Scan) => {
+    router.push(`/dashboard/scans/${scan.id}`);
+  };
+
   return (
     <DataTable
       columns={columns}
@@ -123,6 +127,7 @@ export default function ScansTable({ scans }: ScansTableProps) {
       showPagination
       showSearch
       searchPlaceholder="Search scans by product name, status..."
+      onRowClick={handleRowClick}
     />
   );
 }

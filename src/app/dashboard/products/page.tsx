@@ -195,8 +195,9 @@ export default function ProductsPage() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        alert('Scan started! Check the Scans page to see results.');
+      if (response.ok && data.scan_id) {
+        // Redirect to scan detail page to monitor progress
+        window.location.href = `/dashboard/scans/${data.scan_id}`;
       } else {
         alert(data.error || 'Failed to start scan');
       }

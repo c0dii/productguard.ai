@@ -9,6 +9,8 @@ import { scanForums } from './platforms/forums';
 import { evidenceCollector } from '@/lib/enforcement/evidence-collector';
 import { priorityScorer } from '@/lib/enforcement/priority-scorer';
 import { infrastructureProfiler } from '@/lib/enforcement/infrastructure-profiler';
+import { filterSearchResults, estimateFilteringCost } from '@/lib/ai/infringement-filter';
+import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } from '@/lib/ghl/events';
 import crypto from 'crypto';
 
 /**
@@ -52,13 +54,35 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     // Run all platform scanners in parallel
     const scanResults = await runPlatformScanners(product);
 
-    // Calculate total revenue loss
-    const totalRevenueLoss = scanResults.reduce((sum, result) => sum + result.est_revenue_loss, 0);
+    console.log(`[Scan Engine] Found ${scanResults.length} raw results from platforms`);
+
+    // AI-POWERED FILTERING: Remove false positives before processing
+    // Can be disabled via environment variable for testing
+    const useAIFilter = process.env.DISABLE_AI_FILTER !== 'true';
+    const aiConfidenceThreshold = parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.60'); // Lowered from 0.75 to 0.60 for better recall
+
+    let filteredResults = scanResults;
+
+    if (useAIFilter && scanResults.length > 0) {
+      filteredResults = await filterSearchResults(scanResults, product, aiConfidenceThreshold);
+
+      console.log(
+        `[Scan Engine] AI Filter: ${filteredResults.length}/${scanResults.length} results passed (${((filteredResults.length / scanResults.length) * 100).toFixed(1)}% pass rate)`
+      );
+      console.log(
+        `[Scan Engine] Estimated AI filtering cost: $${estimateFilteringCost(scanResults.length).toFixed(4)}`
+      );
+    } else {
+      console.log('[Scan Engine] AI filtering disabled, using all results');
+    }
+
+    // Calculate total revenue loss (from filtered results)
+    const totalRevenueLoss = filteredResults.reduce((sum, result) => sum + result.est_revenue_loss, 0);
 
     // Insert infringements into database with evidence and priority scoring
-    if (scanResults.length > 0) {
+    if (filteredResults.length > 0) {
       const infringementsWithScoring = await Promise.all(
-        scanResults.map(async (result) => {
+        filteredResults.map(async (result) => {
           // Collect evidence and infrastructure data in parallel
           const [evidence, infrastructure] = await Promise.all([
             evidenceCollector.collectEvidence(
@@ -201,12 +225,69 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        infringement_count: scanResults.length,
+        infringement_count: filteredResults.length,
         est_revenue_loss: totalRevenueLoss,
       })
       .eq('id', scanId);
 
-    console.log(`Scan ${scanId} completed: ${scanResults.length} infringements found`);
+    console.log(
+      `[Scan Engine] Scan ${scanId} completed: ${filteredResults.length} verified infringements found (${scanResults.length - filteredResults.length} false positives filtered out)`
+    );
+
+    // Track scan completion in GHL
+    try {
+      // Get user email
+      const { data: userData } = await supabase.auth.admin.getUserById(product.user_id);
+
+      if (userData?.user?.email) {
+        // Check if this is the first scan
+        const { data: scans } = await supabase
+          .from('scans')
+          .select('id')
+          .eq('user_id', product.user_id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: true })
+          .limit(2);
+
+        const isFirstScan = scans && scans.length === 1;
+
+        if (isFirstScan) {
+          // Track first scan
+          await trackFirstScan(
+            product.user_id,
+            userData.user.email,
+            scanId,
+            product.name,
+            filteredResults.length
+          );
+        } else {
+          // Track regular scan completion
+          await trackScanCompleted(
+            product.user_id,
+            userData.user.email,
+            scanId,
+            scans?.length || 1
+          );
+        }
+
+        // Track high severity infringements
+        const highSeverityResults = filteredResults.filter(r => r.severity_score >= 80);
+        for (const result of highSeverityResults) {
+          await trackHighSeverityInfringement(
+            product.user_id,
+            userData.user.email,
+            '', // Will be the infringement ID
+            result.source_url,
+            result.severity_score,
+            result.platform,
+            product.name
+          );
+        }
+      }
+    } catch (error) {
+      console.error('[Scan Engine] Error tracking events in GHL:', error);
+      // Don't fail the scan if GHL tracking fails
+    }
 
     // TODO: Send email notification via Resend (Phase 2)
   } catch (error) {

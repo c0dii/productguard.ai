@@ -128,7 +128,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Pending Verification</p>
           <p className="text-3xl font-bold text-pg-warning">{stats.pending_verification}</p>
@@ -141,10 +141,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm text-pg-text-muted mb-1">Resolved</p>
           <p className="text-3xl font-bold text-green-500">{stats.resolved}</p>
         </Card>
-        <Card>
+        {/* Temporarily disabled - revenue loss calculations need refinement */}
+        {/* <Card>
           <p className="text-sm text-pg-text-muted mb-1">Est. Revenue Loss</p>
           <p className="text-2xl font-bold text-pg-danger">${stats.total_est_loss.toLocaleString()}</p>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Pending Verifications Section */}

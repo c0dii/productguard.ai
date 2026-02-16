@@ -6,7 +6,10 @@ import Link from 'next/link';
 import { InfringementList } from '@/components/dashboard/InfringementList';
 import { ExportReportButton } from '@/components/dashboard/ExportReportButton';
 import { PendingVerificationList } from '@/components/dashboard/PendingVerificationList';
-import type { Infringement } from '@/types';
+import { ScanProgressTracker } from '@/components/dashboard/ScanProgressTracker';
+import { ScanSummary } from '@/components/dashboard/ScanSummary';
+import { generateScanSummary } from '@/lib/ai/scan-summarizer';
+import type { Infringement, Scan } from '@/types';
 
 export default async function ScanDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -64,6 +67,23 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
   const medium = activeInfringements?.filter((i) => i.risk_level === 'medium') || [];
   const low = activeInfringements?.filter((i) => i.risk_level === 'low') || [];
 
+  // Generate AI summary (only for completed scans)
+  let scanSummary = null;
+  if (scan.status === 'completed') {
+    try {
+      scanSummary = await generateScanSummary(
+        scan as Scan,
+        scan.products?.name || 'Product',
+        pendingInfringements?.length || 0,
+        activeInfringements?.length || 0,
+        critical.length,
+        high.length
+      );
+    } catch (error) {
+      console.error('Error generating scan summary:', error);
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -77,8 +97,22 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
         </p>
       </div>
 
+      {/* AI-Generated Summary - Only shown when scan is complete */}
+      {scanSummary && (
+        <div className="mb-6 sm:mb-8">
+          <ScanSummary summary={scanSummary} />
+        </div>
+      )}
+
+      {/* Scan Progress Tracker - Only show while scan is running */}
+      {(scan.status === 'running' || scan.status === 'pending') && (
+        <div className="mb-6 sm:mb-8">
+          <ScanProgressTracker scan={scan as Scan} />
+        </div>
+      )}
+
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Found</p>
           <p className="text-3xl font-bold text-pg-accent">{scan.infringement_count || 0}</p>
@@ -93,10 +127,11 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
             <p className="text-3xl font-bold text-pg-danger">{activeInfringements?.length || 0}</p>
           </Card>
         </Link>
-        <Card>
+        {/* Temporarily disabled - revenue loss calculations need refinement */}
+        {/* <Card>
           <p className="text-sm text-pg-text-muted mb-1">Est. Revenue Loss</p>
           <p className="text-3xl font-bold text-pg-danger">${totalRevenueLoss.toLocaleString()}</p>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Scan Status */}
