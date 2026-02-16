@@ -1,4 +1,4 @@
-import whoiser = require('whoiser');
+import * as whoiser from 'whoiser';
 import dns from 'dns/promises';
 import { InfrastructureProfile } from '@/types';
 
