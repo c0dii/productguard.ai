@@ -247,11 +247,11 @@ export class InfrastructureProfiler {
 
       // Look for abuse email patterns
       const abuseEmailMatch = whoisText.match(/abuse.*?([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
-      if (abuseEmailMatch) return abuseEmailMatch[1];
+      if (abuseEmailMatch) return abuseEmailMatch[1] || null;
 
       // Look for any email in the WHOIS data as fallback
       const emailMatch = whoisText.match(/([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i);
-      if (emailMatch) return emailMatch[1];
+      if (emailMatch) return emailMatch[1] || null;
 
       // Try to extract from structured data
       for (const [key, value] of Object.entries(whoisData)) {
@@ -302,7 +302,7 @@ export class InfrastructureProfiler {
       // Look for registrar in text format
       const whoisText = JSON.stringify(whoisData);
       const registrarMatch = whoisText.match(/[Rr]egistrar:\s*([^\n,"]+)/);
-      if (registrarMatch) return registrarMatch[1].trim();
+      if (registrarMatch) return registrarMatch[1]?.trim() || null;
 
       return null;
     } catch (error) {
@@ -320,7 +320,7 @@ export class InfrastructureProfiler {
     try {
       const whoisText = JSON.stringify(whoisData);
       const urlMatch = whoisText.match(/[Rr]egistrar URL:\s*(https?:\/\/[^\s,"]+)/);
-      if (urlMatch) return urlMatch[1].trim();
+      if (urlMatch) return urlMatch[1]?.trim() || null;
 
       // Try structured data
       for (const [key, value] of Object.entries(whoisData)) {
