@@ -3,19 +3,7 @@
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-
-interface ProductWithStats {
-  id: string;
-  name: string;
-  type: string;
-  price: number;
-  description: string | null;
-  created_at: string;
-  infringement_count?: number;
-  pending_count?: number;
-  active_count?: number;
-  last_scan_at?: string | null;
-}
+import type { ProductWithStats } from '@/types';
 
 interface ProductListViewProps {
   products: ProductWithStats[];

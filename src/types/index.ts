@@ -128,6 +128,13 @@ export interface Product {
   internal_notes: string | null;
 }
 
+export interface ProductWithStats extends Product {
+  infringement_count?: number;
+  pending_count?: number;
+  active_count?: number;
+  last_scan_at?: string | null;
+}
+
 export interface Scan {
   id: string; // UUID
   product_id: string; // UUID, references products

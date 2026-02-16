@@ -8,17 +8,10 @@ import { Badge } from '@/components/ui/Badge';
 import { EnhancedProductForm } from '@/components/dashboard/EnhancedProductForm';
 import { ProductListView } from '@/components/dashboard/ProductListView';
 import Link from 'next/link';
-import type { Product } from '@/types';
+import type { Product, ProductWithStats } from '@/types';
 
 type ViewMode = 'card' | 'list';
 type SortOption = 'recent' | 'oldest' | 'name-asc' | 'name-desc' | 'most-risk' | 'safest' | 'most-infringements';
-
-interface ProductWithStats extends Product {
-  infringement_count?: number;
-  pending_count?: number;
-  active_count?: number;
-  last_scan_at?: string | null;
-}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<ProductWithStats[]>([]);
