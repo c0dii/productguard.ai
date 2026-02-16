@@ -212,9 +212,9 @@ export default async function InfringementDetailPage({ params }: { params: Promi
               <Badge
                 variant={
                   infringement.status === 'active'
-                    ? 'danger'
+                    ? 'critical'
                     : infringement.status === 'takedown_sent'
-                    ? 'warning'
+                    ? 'medium'
                     : 'default'
                 }
                 className="capitalize"

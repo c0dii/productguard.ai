@@ -2,7 +2,7 @@ import { HTMLAttributes } from 'react';
 import type { RiskLevel, PlanTier } from '@/types';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: RiskLevel | PlanTier | 'default';
+  variant?: RiskLevel | PlanTier | 'default' | 'danger' | 'warning' | 'success';
 }
 
 export function Badge({ variant = 'default', children, className = '', ...props }: BadgeProps) {
@@ -15,6 +15,9 @@ export function Badge({ variant = 'default', children, className = '', ...props 
     starter: 'badge-plan-starter',
     pro: 'badge-plan-pro',
     business: 'badge-plan-business',
+    danger: 'badge-critical', // Alias for critical
+    warning: 'badge-medium', // Alias for medium
+    success: 'badge-low', // Alias for low (green styling)
     default: 'inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-pg-surface-light text-pg-text-muted border border-pg-border',
   };
 
