@@ -117,7 +117,7 @@ export default async function InfringementDetailPage({ params }: { params: Promi
                 <div>
                   <dt className="text-sm text-pg-text-muted">Priority</dt>
                   <dd className="mt-1">
-                    <Badge variant="warning" className="capitalize">{infringement.priority}</Badge>
+                    <Badge variant="default" className="capitalize">{infringement.priority}</Badge>
                   </dd>
                 </div>
               </div>
