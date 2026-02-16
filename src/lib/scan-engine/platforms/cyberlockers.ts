@@ -146,7 +146,7 @@ function isDirectFileLink(url: string, site: string): boolean {
   }
 
   if (site === 'mediafire.com') {
-    return urlLower.includes('/file/') || urlLower.match(/mediafire\.com\/\?/);
+    return urlLower.includes('/file/') || !!urlLower.match(/mediafire\.com\/\?/);
   }
 
   if (site === 'drive.google.com') {
@@ -158,7 +158,7 @@ function isDirectFileLink(url: string, site: string): boolean {
   }
 
   if (site === 'zippyshare.com') {
-    return urlLower.includes('/v/') || urlLower.match(/zippyshare\.com\/v\//);
+    return urlLower.includes('/v/') || !!urlLower.match(/zippyshare\.com\/v\//);
   }
 
   if (site === '4shared.com') {
