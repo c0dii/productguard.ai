@@ -24,7 +24,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<ProductWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductWithStats | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
@@ -171,7 +171,7 @@ export default function ProductsPage() {
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: ProductWithStats) => {
     setEditingProduct(product);
     setShowForm(true);
   };
