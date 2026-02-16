@@ -11,9 +11,10 @@ import type { EnforcementStatus } from '@/types';
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Verify authentication
@@ -26,7 +27,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const actionId = params.id;
+    const actionId = id;
     const body = await request.json();
 
     // Verify user owns the enforcement action
@@ -119,9 +120,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Verify authentication
@@ -134,7 +136,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const actionId = params.id;
+    const actionId = id;
 
     // Verify user owns the enforcement action and it's in draft status
     const { data: action, error: actionError } = await supabase
