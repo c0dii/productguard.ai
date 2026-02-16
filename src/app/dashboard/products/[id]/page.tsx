@@ -194,7 +194,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <div>
                 <dt className="text-pg-text-muted font-medium mb-2">Keywords</dt>
                 <dd className="flex flex-wrap gap-2">
-                  {product.keywords.map((kw, i) => (
+                  {product.keywords.map((kw: string, i: number) => (
                     <Badge key={i} variant="default" className="text-xs">
                       {kw}
                     </Badge>
