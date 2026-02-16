@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Techmin Nextjs - Admin Dashboard Template</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta content="A fully featured admin theme which can be used to build CRM, CMS, etc." name="description" />
+  <meta content="Techzaa" name="author" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <!-- App favicon -->
+  <link rel="shortcut icon" href="assets/images/favicon.ico">
+
+  <!-- App css -->
+  <link href="assets/css/icons.min.css" rel="stylesheet" type="text/css" />
+  <link href="assets/css/app.min.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+
+  <!-- Begin page -->
+  <div id="wrapper">
+
+    <!-- ============================================================== -->
+    <!-- Start Page Content here -->
+    <!-- ============================================================== -->
+
+    <div class="content-page">
+      <div class="content">
+
+        <!-- Topbar Start -->
+        <div class="navbar-custom">
+          <a href="index.html" class="logo text-center d-none d-md-inline-block mr-2">
+            <a href="index.html" class="logo-lg">
+              <img src="assets/images/logo.png" alt="" height="24">
+            </a>
+          </a>
+
+          <button type="button" class="btn btn-sm btn-dark d-inline-block d-lg-none button-menu-mobile">Menu</button>
+
+
+        </div>
+        <!-- end Topbar -->
+
+        <!-- Start Content-->
+        <div class="container-fluid">
+
+          <div class="page-wrapper">
+            <div class="left-sidebar">
+              <div class="slimscroll-menu">
+                <div class="list-group list-group-transparent mb-0">
+
+                  <span class="list-group-item disabled">
+                    Getting Started
+                  </span>
+
+                  <a href="index.html" class="list-group-item list-group-item-action active">
+                    <span class="mr-2">
+                      <i class="mdi mdi-flag-variant-outline"></i>
+                    </span>Introduction
+                  </a>
+
+                  <a href="setup.html" class="list-group-item list-group-item-action ">
+                    <span class="mr-2">
+                      <i class="mdi mdi-apps"></i>
+                    </span>Setup
+                  </a>
+
+                  <a href="customization.html" class="list-group-item list-group-item-action ">
+                    <span class="mr-2">
+                      <i class="mdi mdi-square-edit-outline"></i>
+                    </span>Customization
+                  </a>
+
+
+                  <span class="list-group-item disabled">
+                    Other
+                  </span>
+
+                  <a href="changelog.html" class="list-group-item list-group-item-action ">
+                    <span class="mr-2">
+                      <i class="mdi mdi-book-open-page-variant"></i>
+                    </span>Changelog
+                  </a>
+
+                </div>
+              </div>
+            </div>
+            <!-- end left-sidebar-->
+
+            <div class="page-content">
+              <div class="card m-b-30">
+                <div class="card-body">
+                  <div class="p-lg-3">
+                    <h3 class="mt-0 mb-2 font-weight-bold">Introduction</h3>
+
+                    <hr />
+
+                    <p>TechminNext is a fully featured premium admin template built on top of awesome
+                      <strong class="text-danger"> Nextjs 14.2.7 & React 18 & Bootstrap 5.3.1</strong>. It's crafted
+                      using
+                      modern web technologies
+                      <strong class="text-danger">HTML5 </strong>and <strong class="text-danger"> CSS3</strong>. The
+                      theme includes beautiful
+                      dashboard, many
+                      ready to use hand crafted components, UI elements, widgets, pages, etc. The
+                      components could
+                      be used very easily on any page. The theme is fully responsive and
+                      customizable.
+                    </p>
+                    <p>
+                      We really care for our buyers and so in case if you are having any question
+                      or feedback, please feel free to get back to
+                      us via support.
+                    </p>
+                  </div>
+
+                  <div class="p-lg-3">
+                    <h4 class="mt-0 mb-2 font-weight-bold">Structure</h4>
+
+                    <p>Extract the zip file you received after purchase and you would find the exact
+                      below
+                      files and folders:
+                    </p>
+
+                    <pre>
+
+ ├── src
+ │   ├── app
+ │   │   ├── (admin) -all admin pages
+ │   │   ├── (other) 
+ │   │   ├── api
+ │   │   ├── favicon.ico
+ │   │   └── layout.tsx
+ │   ├── assets   - the reusable assets used in different demos
+ │   │   ├── data
+ │   │   ├── images
+ │   │   └── scss
+ │   ├── components
+ │   ├── context
+ │   ├── helpers
+ │   ├── hooks
+ │   ├── types
+ │   ├── utils
+ │   ├── global.d.ts
+ │   ├── middleware.ts
+ ├── bun.lockb
+ ├── package-lock.json
+ ├── package.json
+ ├── tsconfig.json
+ └── yarn.lock
+   </pre>
+                  </div>
+                  <div class="p-lg-3">
+                    <h4 class="mt-0 mb-2 font-weight-bold">Credits/Plugins</h4>
+
+                    <tr>
+                      <td>Forms validation - Parsley </td>
+                      <td>-</td>
+                      <td>parsley.min.js</td>
+                      <td>form-validation.init.js</td>
+                    </tr>
+                    <tr>
+                      <td>Forms validation - Parsley </td>
+                      <td>-</td>
+                      <td>parsley.min.js</td>
+                      <td>form-validation.init.js</td>
+                    </tr>p>
+                    Here is the list of Plugins (with a link to the official documentation) which
+                    helped us to make Techmin better.
+                    </p>
+
+                    <div class="table-responsive">
+                      <table class="table mb-0">
+                        <thead>
+                          <tr>
+                            <th>Plugins</th>
+                            <th>Url</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>Bootstrap</td>
+                            <td><a href="http://getbootstrap.com/" target="_blank">http://getbootstrap.com/</a></td>
+                          </tr>
+                          <tr>
+                            <td>React Bootstrap</td>
+                            <td><a href="https://react-bootstrap.netlify.app/"
+                                target="_blank">https://react-bootstrap.netlify.app/</a></td>
+                          </tr>
+                          <tr>
+                            <td>Iconify Icon</td>
+                            <td><a href="https://www.npmjs.com/package/@iconify/react"
+                                target="_blank">https://www.npmjs.com/package/@iconify/react</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Apex Charts</td>
+                            <td><a href="https://www.npmjs.com/package/react-apexcharts" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/react-apexcharts</a></td>
+                          </tr>
+                          <tr>
+                            <td>React Flatpickr</td>
+                            <td><a href="https://www.npmjs.com/package/react-flatpickr" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/react-flatpickr</a></td>
+                          </tr>
+                          <tr>
+                            <td>jsvectormap</td>
+                            <td><a href="https://www.npmjs.com/package/jsvectormap" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/jsvectormap</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Nouislider</td>
+                            <td><a href="https://www.npmjs.com/package/nouislider-react" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/nouislider-react</a></td>
+                          </tr>
+                          <tr>
+                            <td>Quill Editor</td>
+                            <td><a href="https://www.npmjs.com/package/react-quill" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/react-quill</a></td>
+                          </tr>
+                          <tr>
+                            <td>Chart.js</td>
+                            <td><a href="https://www.chartjs.org/" target="_blank">https://www.chartjs.org/</a></td>
+                          </tr>
+                          <tr>
+                            <td>Dropzone</td>
+                            <td><a href="https://www.npmjs.com/package/react-dropzone" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/react-dropzone</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Simplebar</td>
+                            <td><a href="https://www.npmjs.com/package/simplebar-react" class="text-primary"
+                                target="_blank">https://www.npmjs.com/package/simplebar-react</a>
+                            </td>
+                          </tr>
+              
+                          <tr>
+                            <td>Google Map React</td>
+                            <td><a href="https://www.npmjs.com/package/google-map-react"
+                                target="_blank">https://www.npmjs.com/package/google-map-react</a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>Moment</td>
+                            <td><a href="https://momentjs.com/" target="_blank">https://momentjs.com/</a></td>
+                          </tr>
+                        
+
+                        </tbody>
+                      </table>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <!-- end page-wrapper-->
+
+          <div class="row">
+            <div class="col-md-2">
+
+            </div>
+
+            <div class="col-md-10">
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <!-- content -->
+      <!-- Footer Start -->
+      <footer class="footer">
+        <div class="container-fluid">
+          <div class="row">
+            <div class="col-md-6">
+              2024 © Techmin - by Techzaa
+            </div>
+            <div class="col-md-6">
+              <div class="text-md-right footer-links d-none d-sm-block">
+                <a href="#" target="_blank">About</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+      <!-- end Footer -->
+
+    </div>
+    <!-- ============================================================== -->
+    <!-- End Page content -->
+    <!-- ============================================================== -->
+  </div>
+  <!-- END wrapper -->
+
+  <!-- bundle -->
+  <script src="assets/js/app.min.js"></script>
+
+</body>
+
+</html>

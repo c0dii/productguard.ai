@@ -1,0 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark mode colors (default) */
+    --color-bg: 11 15 26; /* #0B0F1A */
+    --color-surface: 17 24 39; /* #111827 */
+    --color-surface-light: 26 34 54; /* #1A2236 */
+    --color-accent: 0 212 170; /* #00D4AA */
+    --color-danger: 255 71 87; /* #FF4757 */
+    --color-warning: 255 184 48; /* #FFB830 */
+    --color-text: 232 236 241; /* #E8ECF1 */
+    --color-text-muted: 123 140 168; /* #7B8CA8 */
+    --color-border: 30 42 63; /* #1E2A3F */
+    --color-border-light: 42 58 82; /* #2A3A52 */
+  }
+
+  [data-theme='light'] {
+    --color-bg: 249 250 251; /* #F9FAFB */
+    --color-surface: 255 255 255; /* #FFFFFF */
+    --color-surface-light: 243 244 246; /* #F3F4F6 */
+    --color-accent: 0 170 136; /* #00AA88 (slightly darker for readability) */
+    --color-danger: 220 38 38; /* #DC2626 */
+    --color-warning: 245 158 11; /* #F59E0B */
+    --color-text: 17 24 39; /* #111827 */
+    --color-text-muted: 107 114 128; /* #6B7280 */
+    --color-border: 229 231 235; /* #E5E7EB */
+    --color-border-light: 209 213 219; /* #D1D5DB */
+  }
+
+  body {
+    @apply bg-pg-bg text-pg-text;
+    font-family: 'DM Sans', sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  * {
+    @apply border-pg-border;
+  }
+}
+
+@layer components {
+  /* Button with glow effect */
+  .btn-glow {
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200;
+    @apply bg-pg-accent text-pg-bg;
+    box-shadow: 0 0 20px rgba(0, 212, 170, 0.3);
+  }
+
+  .btn-glow:hover {
+    box-shadow: 0 0 30px rgba(0, 212, 170, 0.5);
+    @apply scale-105;
+  }
+
+  .btn-glow:active {
+    @apply scale-95;
+  }
+
+  /* Card container */
+  .card {
+    @apply bg-pg-surface border border-pg-border rounded-xl p-6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Card with glow effect */
+  .card-glow {
+    @apply bg-pg-surface border border-pg-accent rounded-xl p-6;
+    box-shadow: 0 0 30px rgba(0, 212, 170, 0.12);
+  }
+
+  /* Risk level badges */
+  .badge-critical {
+    @apply inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold;
+    @apply bg-pg-danger-dim text-pg-danger border border-pg-danger;
+  }
+
+  .badge-high {
+    @apply inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold;
+    background: rgba(255, 107, 53, 0.12);
+    color: #FF6B35;
+    border: 1px solid rgba(255, 107, 53, 0.3);
+  }
+
+  .badge-medium {
+    @apply inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold;
+    @apply bg-pg-warning-dim text-pg-warning border border-pg-warning;
+  }
+
+  .badge-low {
+    @apply inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold;
+    background: rgba(123, 140, 168, 0.12);
+    @apply text-pg-text-muted border border-pg-text-muted;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-lg;
+    @apply bg-pg-surface-light border border-pg-border-light;
+    @apply text-pg-text placeholder:text-pg-text-muted;
+    @apply focus:outline-none focus:border-pg-accent focus:ring-2 focus:ring-pg-accent focus:ring-opacity-20;
+    @apply transition-all duration-200;
+  }
+
+  .input-field:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  /* Plan tier badges */
+  .badge-plan-scout {
+    @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium;
+    @apply bg-pg-text-muted bg-opacity-10 text-pg-text-muted border border-pg-text-muted border-opacity-30;
+  }
+
+  .badge-plan-starter {
+    @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium;
+    @apply bg-blue-500 bg-opacity-10 text-blue-400 border border-blue-400 border-opacity-30;
+  }
+
+  .badge-plan-pro {
+    @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium;
+    @apply bg-pg-accent bg-opacity-10 text-pg-accent border border-pg-accent border-opacity-30;
+  }
+
+  .badge-plan-business {
+    @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium;
+    @apply bg-purple-500 bg-opacity-10 text-purple-400 border border-purple-400 border-opacity-30;
+  }
+}
+
+@layer utilities {
+  /* Theme-specific visibility */
+  [data-theme='light'] .dark-only {
+    display: none !important;
+  }
+
+  [data-theme='dark'] .light-only {
+    display: none !important;
+  }
+
+  /* Custom scrollbar */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-pg-surface;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-pg-border-light rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-pg-accent;
+  }
+
+  /* Animations */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.6s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.8s ease-out;
+  }
+
+  .animate-slide-up-delay {
+    animation: slide-up 0.8s ease-out 0.1s both;
+  }
+
+  .animate-slide-up-delay-2 {
+    animation: slide-up 0.8s ease-out 0.2s both;
+  }
+
+  .animate-slide-up-delay-3 {
+    animation: slide-up 0.8s ease-out 0.3s both;
+  }
+
+  .animate-slide-up-delay-4 {
+    animation: slide-up 0.8s ease-out 0.4s both;
+  }
+}
