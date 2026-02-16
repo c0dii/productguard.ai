@@ -181,8 +181,8 @@ function extractTorrentStats(snippet: string): { seeders: number; leechers: numb
   const seederMatch = snippet.match(/(\d+[\d,]*)\s*seeders?/i);
   const leecherMatch = snippet.match(/(\d+[\d,]*)\s*leechers?/i);
 
-  const seeders = seederMatch ? parseInt(seederMatch[1].replace(/,/g, ''), 10) : 0;
-  const leechers = leecherMatch ? parseInt(leecherMatch[1].replace(/,/g, ''), 10) : 0;
+  const seeders = (seederMatch && seederMatch[1]) ? parseInt(seederMatch[1].replace(/,/g, ''), 10) : 0;
+  const leechers = (leecherMatch && leecherMatch[1]) ? parseInt(leecherMatch[1].replace(/,/g, ''), 10) : 0;
 
   // If no stats found, use conservative estimates
   if (seeders === 0 && leechers === 0) {

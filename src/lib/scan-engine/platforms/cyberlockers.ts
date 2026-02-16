@@ -231,12 +231,12 @@ function isPiracyResult(title: string, snippet: string): boolean {
 function estimateDownloads(snippet: string, site: string): number {
   // Try to extract download count from snippet
   const downloadMatch = snippet.match(/(\d+[\d,]*)\s*downloads?/i);
-  if (downloadMatch) {
+  if (downloadMatch && downloadMatch[1]) {
     return parseInt(downloadMatch[1].replace(/,/g, ''), 10);
   }
 
   const viewMatch = snippet.match(/(\d+[\d,]*)\s*views?/i);
-  if (viewMatch) {
+  if (viewMatch && viewMatch[1]) {
     // Assume 30% of views convert to downloads
     return Math.round(parseInt(viewMatch[1].replace(/,/g, ''), 10) * 0.3);
   }

@@ -298,18 +298,18 @@ export class PriorityScorer {
 
     // Handle K/M suffixes
     const kMatch = cleaned.match(/([0-9.]+)k/i);
-    if (kMatch) {
+    if (kMatch && kMatch[1]) {
       return Math.round(parseFloat(kMatch[1]) * 1000);
     }
 
     const mMatch = cleaned.match(/([0-9.]+)m/i);
-    if (mMatch) {
+    if (mMatch && mMatch[1]) {
       return Math.round(parseFloat(mMatch[1]) * 1000000);
     }
 
     // Remove commas and parse
     const numMatch = cleaned.match(/([0-9,]+)/);
-    if (numMatch) {
+    if (numMatch && numMatch[1]) {
       return parseInt(numMatch[1].replace(/,/g, ''), 10);
     }
 
