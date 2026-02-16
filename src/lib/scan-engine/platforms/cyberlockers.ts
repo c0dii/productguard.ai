@@ -174,7 +174,7 @@ function isDirectFileLink(url: string, site: string): boolean {
   }
 
   if (site === 'anonfiles.com') {
-    return urlLower.match(/anonfiles\.com\/[a-zA-Z0-9]+\//);
+    return !!urlLower.match(/anonfiles\.com\/[a-zA-Z0-9]+\//);
   }
 
   if (site === 'sendspace.com') {

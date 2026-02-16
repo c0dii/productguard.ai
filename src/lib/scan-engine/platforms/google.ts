@@ -130,6 +130,11 @@ function buildSearchQueries(product: Product, keywordVariations: string[]): stri
   // Use primary keyword (original name or first variation)
   const primaryKeyword = keywordVariations[0];
 
+  // Guard: If no keyword variations, return empty queries
+  if (!primaryKeyword) {
+    return queries;
+  }
+
   // ============================================
   // 1. MARKETPLACE-SPECIFIC SEARCHES
   // ============================================
