@@ -1,4 +1,3 @@
-import whoiser from 'whoiser';
 import dns from 'dns/promises';
 import { InfrastructureProfile } from '@/types';
 
@@ -137,7 +136,9 @@ export class InfrastructureProfiler {
    */
   private async performWhoisLookup(domain: string): Promise<any> {
     try {
-      const whoisResult = await whoiser(domain, { follow: 2, timeout: 5000 });
+      // Dynamic import for CommonJS compatibility
+      const whoiser = (await import('whoiser')).default || (await import('whoiser'));
+      const whoisResult = await (whoiser as any)(domain, { follow: 2, timeout: 5000 });
       return whoisResult;
     } catch (error) {
       console.error('[Infrastructure Profiler] WHOIS lookup failed:', error);
