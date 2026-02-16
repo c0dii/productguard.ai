@@ -126,6 +126,10 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
           const urlNormalized = normalizeUrl(result.source_url);
           const now = new Date().toISOString();
 
+          // Extract WHOIS data from infrastructure profile
+          const whoisFullRecord = (infrastructure.whois_data as any)?._fullRecord || null;
+          const whoisDomain = whoisFullRecord?.domain || null;
+
           return {
             scan_id: scanId,
             product_id: product.id,
@@ -162,6 +166,22 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
 
             // Infrastructure profile (populated via WHOIS and DNS lookups)
             infrastructure,
+
+            // WHOIS data (dedicated columns for queryability)
+            whois_domain: whoisDomain,
+            whois_registrant_org: whoisFullRecord?.registrant_organization || null,
+            whois_registrant_country: whoisFullRecord?.registrant_country || null,
+            whois_registrant_country_code: whoisFullRecord?.registrant_country_code || null,
+            whois_registrar_name: whoisFullRecord?.registrar_name || infrastructure.registrar || null,
+            whois_registrar_abuse_email: whoisFullRecord?.registrar_abuse_email || infrastructure.abuse_contact || null,
+            whois_registrar_abuse_phone: whoisFullRecord?.registrar_abuse_phone || null,
+            whois_created_date: whoisFullRecord?.created_date || infrastructure.creation_date || null,
+            whois_updated_date: whoisFullRecord?.updated_date || null,
+            whois_expires_date: whoisFullRecord?.expires_date || infrastructure.expiration_date || null,
+            whois_name_servers: whoisFullRecord?.name_servers || infrastructure.nameservers || [],
+            whois_status: whoisFullRecord?.status || null,
+            whois_domain_age_days: whoisFullRecord?.estimated_domain_age_days || null,
+            whois_fetched_at: whoisFullRecord ? now : null,
 
             // Status tracking
             status: 'pending_verification' as const, // Changed from 'active' - user must verify first

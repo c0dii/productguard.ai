@@ -295,6 +295,22 @@ export interface Infringement {
   // Infrastructure profile (WHOIS, hosting, CDN data for smart routing)
   infrastructure: InfrastructureProfile;
 
+  // WHOIS data (dedicated columns for querying and analytics)
+  whois_domain: string | null;
+  whois_registrant_org: string | null;
+  whois_registrant_country: string | null;
+  whois_registrant_country_code: string | null;
+  whois_registrar_name: string | null;
+  whois_registrar_abuse_email: string | null;
+  whois_registrar_abuse_phone: string | null;
+  whois_created_date: string | null;
+  whois_updated_date: string | null;
+  whois_expires_date: string | null;
+  whois_name_servers: string[] | null;
+  whois_status: string | null;
+  whois_domain_age_days: number | null;
+  whois_fetched_at: string | null;
+
   // Status tracking
   detected_at: string;
   status: InfringementStatus;

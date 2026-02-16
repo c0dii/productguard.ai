@@ -1,5 +1,6 @@
 import dns from 'dns/promises';
 import { InfrastructureProfile } from '@/types';
+import { lookupWhois } from '@/lib/whois/whois-client';
 
 /**
  * Infrastructure Profiler
@@ -132,15 +133,41 @@ export class InfrastructureProfiler {
   }
 
   /**
-   * Perform WHOIS lookup
+   * Perform WHOIS lookup using WhoisXML API
    */
   private async performWhoisLookup(domain: string): Promise<any> {
     try {
-      // Dynamic import for CommonJS compatibility
-      const whoiserModule = await import('whoiser');
-      const whoiser = (whoiserModule as any).default || whoiserModule;
-      const whoisResult = await whoiser(domain, { follow: 2, timeout: 5000 });
-      return whoisResult;
+      // Use WhoisXML API for structured, reliable data
+      const whoisRecord = await lookupWhois(`https://${domain}`);
+
+      if (whoisRecord) {
+        // Return in a format compatible with existing extractors
+        return {
+          [domain]: {
+            'Registrar': whoisRecord.registrar_name,
+            'Registrar Abuse Contact Email': whoisRecord.registrar_abuse_email,
+            'Registrar URL': null, // Not in our API response
+            'Creation Date': whoisRecord.created_date,
+            'Expiration Date': whoisRecord.expires_date,
+            'Registrant Country': whoisRecord.registrant_country,
+            'Admin Email': whoisRecord.registrar_abuse_email, // Use abuse email as fallback
+            'Tech Email': whoisRecord.registrar_abuse_email, // Use abuse email as fallback
+          },
+          // Store the full structured record for later use
+          _fullRecord: whoisRecord,
+        };
+      }
+
+      // Fallback to whoiser if WhoisXML API fails or is not configured
+      try {
+        const whoiserModule = await import('whoiser');
+        const whoiser = (whoiserModule as any).default || whoiserModule;
+        const whoisResult = await whoiser(domain, { follow: 2, timeout: 5000 });
+        return whoisResult;
+      } catch (fallbackError) {
+        console.warn('[Infrastructure Profiler] Fallback WHOIS also failed');
+        return null;
+      }
     } catch (error) {
       console.error('[Infrastructure Profiler] WHOIS lookup failed:', error);
       return null;

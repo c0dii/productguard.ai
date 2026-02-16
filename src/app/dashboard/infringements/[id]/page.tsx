@@ -259,6 +259,96 @@ export default async function InfringementDetailPage({ params }: { params: Promi
                 </div>
               )}
 
+              {/* Domain Registration (WHOIS) Details */}
+              {infringement.whois_domain && (
+                <div className="p-4 rounded-lg bg-pg-bg border border-pg-border space-y-3">
+                  <h3 className="text-sm font-semibold text-pg-text mb-3">📋 Domain Registration (WHOIS)</h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <dt className="text-xs text-pg-text-muted">Domain</dt>
+                      <dd className="text-sm text-pg-text font-mono mt-1">{infringement.whois_domain}</dd>
+                    </div>
+                    {infringement.whois_domain_age_days && (
+                      <div>
+                        <dt className="text-xs text-pg-text-muted">Domain Age</dt>
+                        <dd className="text-sm text-pg-text mt-1">{Math.floor(infringement.whois_domain_age_days / 365)} years</dd>
+                      </div>
+                    )}
+                  </div>
+
+                  {(infringement.whois_registrant_org || infringement.whois_registrant_country) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {infringement.whois_registrant_org && (
+                        <div>
+                          <dt className="text-xs text-pg-text-muted">Registered To</dt>
+                          <dd className="text-sm text-pg-text font-semibold mt-1">{infringement.whois_registrant_org}</dd>
+                        </div>
+                      )}
+                      {infringement.whois_registrant_country && (
+                        <div>
+                          <dt className="text-xs text-pg-text-muted">Registrant Country</dt>
+                          <dd className="text-sm text-pg-text mt-1">{infringement.whois_registrant_country}</dd>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {infringement.whois_registrar_name && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <dt className="text-xs text-pg-text-muted">Registrar</dt>
+                        <dd className="text-sm text-pg-text font-semibold mt-1">{infringement.whois_registrar_name}</dd>
+                      </div>
+                      {infringement.whois_registrar_abuse_email && (
+                        <div>
+                          <dt className="text-xs text-pg-text-muted">Abuse Contact</dt>
+                          <dd className="text-sm text-pg-accent mt-1">
+                            <a href={`mailto:${infringement.whois_registrar_abuse_email}`} className="hover:underline">
+                              {infringement.whois_registrar_abuse_email}
+                            </a>
+                          </dd>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(infringement.whois_created_date || infringement.whois_expires_date) && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {infringement.whois_created_date && (
+                        <div>
+                          <dt className="text-xs text-pg-text-muted">Registered On</dt>
+                          <dd className="text-sm text-pg-text mt-1">{new Date(infringement.whois_created_date).toLocaleDateString('en-US', { dateStyle: 'medium' })}</dd>
+                        </div>
+                      )}
+                      {infringement.whois_expires_date && (
+                        <div>
+                          <dt className="text-xs text-pg-text-muted">Expires On</dt>
+                          <dd className="text-sm text-pg-text mt-1">{new Date(infringement.whois_expires_date).toLocaleDateString('en-US', { dateStyle: 'medium' })}</dd>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {infringement.whois_name_servers && infringement.whois_name_servers.length > 0 && (
+                    <div>
+                      <dt className="text-xs text-pg-text-muted">Name Servers</dt>
+                      <dd className="text-sm text-pg-text font-mono mt-1">
+                        {infringement.whois_name_servers.slice(0, 4).map((ns, i) => (
+                          <div key={i}>{ns}</div>
+                        ))}
+                      </dd>
+                    </div>
+                  )}
+
+                  {infringement.whois_fetched_at && (
+                    <div className="text-xs text-pg-text-muted pt-2 border-t border-pg-border">
+                      WHOIS data fetched: {new Date(infringement.whois_fetched_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <dt className="text-sm text-pg-text-muted">First Detected</dt>

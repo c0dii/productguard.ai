@@ -132,6 +132,16 @@ ${infringement.evidence?.matched_excerpts?.length ? `- Matched Content: "${infri
 ${infringement.infrastructure?.country ? `- Hosted in: ${infringement.infrastructure.country}` : ''}
 ${infringement.infrastructure?.hosting_provider ? `- Hosting Provider: ${infringement.infrastructure.hosting_provider}` : ''}
 
+**DOMAIN REGISTRATION (WHOIS):**
+${infringement.whois_domain ? `- Domain: ${infringement.whois_domain}` : ''}
+${infringement.whois_registrant_org ? `- Registered To: ${infringement.whois_registrant_org}` : ''}
+${infringement.whois_registrant_country ? `- Registrant Country: ${infringement.whois_registrant_country}` : ''}
+${infringement.whois_registrar_name ? `- Domain Registrar: ${infringement.whois_registrar_name}` : ''}
+${infringement.whois_registrar_abuse_email ? `- Registrar Abuse Contact: ${infringement.whois_registrar_abuse_email}` : ''}
+${infringement.whois_registrar_abuse_phone ? `- Registrar Abuse Phone: ${infringement.whois_registrar_abuse_phone}` : ''}
+${infringement.whois_created_date ? `- Domain Created: ${new Date(infringement.whois_created_date).toLocaleDateString()}` : ''}
+${infringement.whois_domain_age_days ? `- Domain Age: ~${Math.floor(infringement.whois_domain_age_days / 365)} years` : ''}
+
 **SENDER (Copyright Holder/Agent):**
 - Name: ${userContact.full_name}
 ${userContact.company ? `- Company: ${userContact.company}` : ''}
