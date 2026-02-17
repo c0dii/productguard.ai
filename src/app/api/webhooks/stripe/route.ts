@@ -4,6 +4,11 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/server';
 import type { PlanTier, SubscriptionStatus } from '@/types';
+import {
+  trackSubscriptionStarted,
+  trackSubscriptionCancelled,
+  trackSubscriptionUpgraded,
+} from '@/lib/ghl/events';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -81,6 +86,17 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(`✅ Subscription created for user ${userId}: ${planTier}`);
+
+        // Track in GHL
+        try {
+          const { data: userData } = await supabase.auth.admin.getUserById(userId);
+          if (userData?.user?.email) {
+            await trackSubscriptionStarted(userId, userData.user.email, planTier);
+          }
+        } catch (ghlError) {
+          console.error('[GHL Events] Error tracking subscription started:', ghlError);
+        }
+
         break;
       }
 
@@ -135,6 +151,25 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(`✅ Subscription updated for user ${userId}: ${status}${subscription.cancel_at_period_end ? ' (canceling at period end)' : ''}`);
+
+        // Track plan upgrade in GHL (only if plan actually changed and subscription is active)
+        if (status === 'active' && !subscription.cancel_at_period_end) {
+          try {
+            const { data: userData } = await supabase.auth.admin.getUserById(userId);
+            const { data: existingSub } = await supabase
+              .from('subscriptions')
+              .select('plan_tier')
+              .eq('stripe_subscription_id', subscription.id)
+              .single();
+
+            if (userData?.user?.email && existingSub && existingSub.plan_tier !== planTier) {
+              await trackSubscriptionUpgraded(userId, userData.user.email, existingSub.plan_tier, planTier);
+            }
+          } catch (ghlError) {
+            console.error('[GHL Events] Error tracking subscription upgrade:', ghlError);
+          }
+        }
+
         break;
       }
 
@@ -168,6 +203,18 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(`✅ Subscription canceled for user ${userId}`);
+
+        // Track in GHL
+        try {
+          const { data: userData } = await supabase.auth.admin.getUserById(userId);
+          const cancelledPlan = (subscription.metadata.plan_tier || 'starter') as string;
+          if (userData?.user?.email) {
+            await trackSubscriptionCancelled(userId, userData.user.email, cancelledPlan);
+          }
+        } catch (ghlError) {
+          console.error('[GHL Events] Error tracking subscription cancelled:', ghlError);
+        }
+
         break;
       }
 

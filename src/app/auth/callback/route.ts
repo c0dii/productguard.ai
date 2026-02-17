@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { trackUserSignup } from '@/lib/ghl/events';
+import { trackUserSignup, trackUserReEngaged } from '@/lib/ghl/events';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function GET(request: Request) {
@@ -40,6 +40,22 @@ export async function GET(request: Request) {
         } catch (error) {
           console.error('[Auth Callback] Error tracking signup:', error);
           // Don't block signup if GHL tracking fails
+        }
+      } else {
+        // Returning user — track re-engagement if they've been inactive (7+ days)
+        const lastSignIn = data.user.last_sign_in_at ? new Date(data.user.last_sign_in_at) : null;
+        if (lastSignIn) {
+          const daysSinceLastLogin = Math.floor(
+            (now.getTime() - lastSignIn.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          if (daysSinceLastLogin >= 7 && data.user.email) {
+            try {
+              await trackUserReEngaged(data.user.id, data.user.email);
+              console.log(`[Auth Callback] Re-engagement tracked for ${data.user.email} (${daysSinceLastLogin} days inactive)`);
+            } catch (error) {
+              console.error('[Auth Callback] Error tracking re-engagement:', error);
+            }
+          }
         }
       }
 

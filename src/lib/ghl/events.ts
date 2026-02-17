@@ -493,3 +493,68 @@ export async function trackInfringementResolved(
     },
   });
 }
+
+export async function trackSubscriptionStarted(
+  userId: string,
+  email: string,
+  planTier: string
+) {
+  const client = getGHLClient();
+  if (!client) return;
+
+  await trackEvent({
+    type: 'user.subscription_started',
+    userId,
+    email,
+    data: { planTier, startedAt: new Date().toISOString() },
+    tags: [GHL_TAGS.ACTIVE_USER],
+    customFields: {
+      [GHL_CUSTOM_FIELDS.SUBSCRIPTION_STATUS]: planTier,
+    },
+  });
+
+  // Remove trial tag, add active
+  try {
+    const contactResponse = await client.findContactByEmail(email);
+    if (contactResponse) {
+      await client.removeTags(contactResponse.contact.id, [GHL_TAGS.TRIAL_USER]);
+    }
+  } catch (error) {
+    console.error('[GHL Events] Error updating subscription tags:', error);
+  }
+}
+
+export async function trackSubscriptionCancelled(
+  userId: string,
+  email: string,
+  planTier: string
+) {
+  await trackEvent({
+    type: 'user.subscription_cancelled',
+    userId,
+    email,
+    data: { planTier, cancelledAt: new Date().toISOString() },
+    tags: [GHL_TAGS.CANCELLED_USER],
+    customFields: {
+      [GHL_CUSTOM_FIELDS.SUBSCRIPTION_STATUS]: 'cancelled',
+    },
+  });
+}
+
+export async function trackSubscriptionUpgraded(
+  userId: string,
+  email: string,
+  oldPlan: string,
+  newPlan: string
+) {
+  await trackEvent({
+    type: 'user.subscription_upgraded',
+    userId,
+    email,
+    data: { oldPlan, newPlan, upgradedAt: new Date().toISOString() },
+    tags: [GHL_TAGS.ACTIVE_USER],
+    customFields: {
+      [GHL_CUSTOM_FIELDS.SUBSCRIPTION_STATUS]: newPlan,
+    },
+  });
+}
