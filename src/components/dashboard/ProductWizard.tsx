@@ -591,6 +591,7 @@ function Step3Review({
   setData: React.Dispatch<React.SetStateAction<WizardData>>;
 }) {
   const ai = data.ai_extracted_data;
+  const isFallbackOnly = ai?.extraction_metadata?.model === 'scrape-fallback';
 
   if (!ai) {
     return (
@@ -625,10 +626,17 @@ function Step3Review({
   return (
     <div>
       <h3 className="text-lg font-semibold text-pg-text mb-1">Review AI Analysis</h3>
-      <p className="text-sm text-pg-text-muted mb-4">
-        We found these identifiers from your product page. Remove anything that doesn&apos;t look right.
-        These are used to detect pirated copies of your content.
-      </p>
+      {isFallbackOnly ? (
+        <p className="text-sm text-pg-text-muted mb-4">
+          Basic details were extracted from your product page. AI-powered deep analysis was not available.
+          You can still proceed — our scanner will use the data below along with your product name.
+        </p>
+      ) : (
+        <p className="text-sm text-pg-text-muted mb-4">
+          We found these identifiers from your product page. Remove anything that doesn&apos;t look right.
+          These are used to detect pirated copies of your content.
+        </p>
+      )}
 
       {/* Product preview */}
       {(data.product_image_url || data.description) && (
@@ -697,7 +705,9 @@ function Step3Review({
        ai.unique_phrases?.length === 0 && ai.keywords?.length === 0 && (
         <div className="mt-4 p-4 rounded-lg bg-pg-surface-light border border-pg-border text-center">
           <p className="text-sm text-pg-text-muted">
-            All items removed. The scanner will still use your product name and type for detection.
+            {isFallbackOnly
+              ? 'No identifiers could be extracted from this page. The scanner will use your product name and type for detection. You can add keywords in the next step.'
+              : 'All items removed. The scanner will still use your product name and type for detection.'}
           </p>
         </div>
       )}

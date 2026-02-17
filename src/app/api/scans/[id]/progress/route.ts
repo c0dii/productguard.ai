@@ -30,6 +30,36 @@ export async function GET(
       return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
     }
 
+    // Auto-recover stale scans: if running for >10 minutes, mark as failed
+    if (scan.status === 'running') {
+      const { data: fullScan } = await supabase
+        .from('scans')
+        .select('started_at')
+        .eq('id', id)
+        .single();
+
+      if (fullScan?.started_at) {
+        const elapsedMs = Date.now() - new Date(fullScan.started_at).getTime();
+        const STALE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+        if (elapsedMs > STALE_THRESHOLD_MS) {
+          console.warn(`[Progress] Scan ${id} stale (${Math.round(elapsedMs / 1000)}s), marking as failed`);
+          await supabase
+            .from('scans')
+            .update({
+              status: 'failed',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+          return NextResponse.json({
+            ...scan,
+            status: 'failed',
+          });
+        }
+      }
+    }
+
     return NextResponse.json(scan);
   } catch (error) {
     console.error('Error fetching scan progress:', error);

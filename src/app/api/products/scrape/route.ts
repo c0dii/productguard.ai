@@ -111,9 +111,28 @@ export async function POST(request: Request) {
           extractedData.description = aiData.product_description;
         }
       } catch (aiError) {
-        console.error('AI analysis failed, continuing with basic scraping:', aiError);
-        // Continue without AI data if it fails
+        console.error('[Scrape] AI analysis failed, continuing with basic scraping:', aiError);
       }
+    } else if (useAI && !process.env.OPENAI_API_KEY) {
+      console.warn('[Scrape] OPENAI_API_KEY not set — skipping AI analysis');
+    }
+
+    // Fallback: construct ai_extracted_data from scraped content when AI didn't run
+    if (!aiData) {
+      aiData = {
+        brand_identifiers: [] as string[],
+        unique_phrases: [] as string[],
+        keywords: extractedData.keywords || [],
+        copyrighted_terms: [] as string[],
+        product_description: extractedData.description || null,
+        content_fingerprint: null,
+        extraction_metadata: {
+          model: 'scrape-fallback',
+          analyzed_at: new Date().toISOString(),
+          confidence_scores: {},
+          processing_time_ms: 0,
+        },
+      };
     }
 
     return NextResponse.json({

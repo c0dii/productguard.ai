@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { scanProduct } from '@/lib/scan-engine';
 import { PLAN_LIMITS, type PlanTier } from '@/types';
+
+// Allow up to 5 minutes for the scan to complete in the background
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {
@@ -121,9 +124,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create scan' }, { status: 500 });
     }
 
-    // Trigger scan in background (don't await)
-    scanProduct(scan.id, product).catch((error) => {
-      console.error('Scan failed:', error);
+    // Run scan in background using after() to keep the function alive
+    after(async () => {
+      try {
+        await scanProduct(scan.id, product);
+      } catch (error) {
+        console.error('Scan failed:', error);
+      }
     });
 
     return NextResponse.json(

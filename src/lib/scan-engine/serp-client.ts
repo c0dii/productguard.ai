@@ -76,7 +76,9 @@ export class SerpClient {
       this.lastCallTime = Date.now();
       this.budgetUsed++;
 
-      const response = await fetch(url.toString());
+      const response = await fetch(url.toString(), {
+        signal: AbortSignal.timeout(15000), // 15s timeout per API call
+      });
 
       if (!response.ok) {
         console.error(`[SerpClient] API error ${response.status} for: ${params.query}`);

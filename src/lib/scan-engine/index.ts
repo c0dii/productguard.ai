@@ -88,6 +88,7 @@ function generateUrlHash(url: string): string {
 export async function scanProduct(scanId: string, product: Product): Promise<void> {
   const supabase = createAdminClient();
   const scanStartTime = Date.now();
+  const MAX_SCAN_DURATION_MS = 240_000; // 4 minute hard cap (leave 1 min buffer for maxDuration=300)
 
   try {
     // Get current scan info to determine if this is a re-run
@@ -126,6 +127,8 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       supabase,
       scanId,
       stages,
+      scanStartTime,
+      MAX_SCAN_DURATION_MS,
     );
 
     console.log(`[Scan Engine] Found ${scanResults.length} raw results from tiered search`);
@@ -638,6 +641,8 @@ async function runTieredSearch(
   supabase: ReturnType<typeof createAdminClient>,
   scanId: string,
   stages: ScanStage[],
+  scanStartTime: number = Date.now(),
+  maxDurationMs: number = 240_000,
 ): Promise<InfringementResult[]> {
   const apiKey = process.env.SERPAPI_KEY;
   if (!apiKey || apiKey === 'xxxxx') {
@@ -646,6 +651,8 @@ async function runTieredSearch(
     const telegramResults = await scanTelegram(product, intelligence);
     return telegramResults;
   }
+
+  const isTimedOut = () => Date.now() - scanStartTime > maxDurationMs;
 
   const client = new SerpClient(apiKey, 50);
   const allResults: InfringementResult[] = [];
@@ -753,6 +760,13 @@ async function runTieredSearch(
   await updateScanProgress(supabase, scanId, stages, 'marketplace_scan');
 
   // ── TIER 3: Signal-Based Deep Dive ───────────────────────────────
+  if (isTimedOut()) {
+    console.log(`[Scan Engine] Time limit reached after Tier 2, skipping Tier 3 and Telegram`);
+    setStageStatus(stages, 'marketplace_scan', 'completed', 0);
+    setStageStatus(stages, 'platform_scan', 'completed', 0);
+    return allResults;
+  }
+
   if (client.remaining > 0 && allFoundUrls.length > 0) {
     const { tier3 } = generateQueries(product, intelligence, allFoundUrls);
 
@@ -809,6 +823,12 @@ async function runTieredSearch(
   await updateScanProgress(supabase, scanId, stages, 'platform_scan');
 
   // ── TELEGRAM BOT API (supplementary channel search) ──────────────
+  if (isTimedOut()) {
+    console.log(`[Scan Engine] Time limit reached, skipping Telegram`);
+    setStageStatus(stages, 'platform_scan', 'completed', 0);
+    return allResults;
+  }
+
   try {
     const telegramResults = await scanTelegram(product, intelligence);
     if (telegramResults.length > 0) {
