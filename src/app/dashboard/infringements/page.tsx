@@ -15,11 +15,18 @@ export default async function InfringementsPage() {
   }
 
   // Fetch ALL infringements for this user
-  const { data: allInfringements } = await supabase
-    .from('infringements')
-    .select('*, products(name, price)')
-    .eq('user_id', user.id)
-    .order('severity_score', { ascending: false });
+  const [{ data: allInfringements }, { data: allProducts }] = await Promise.all([
+    supabase
+      .from('infringements')
+      .select('*, products(name, price)')
+      .eq('user_id', user.id)
+      .order('severity_score', { ascending: false }),
+    supabase
+      .from('products')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .order('name'),
+  ]);
 
   // Calculate stats (3 groups matching the tab structure)
   const needsAttentionCount = allInfringements?.filter((i) => ['pending_verification', 'active'].includes(i.status)).length || 0;
@@ -61,7 +68,7 @@ export default async function InfringementsPage() {
       </div>
 
       {/* Client Component with Filtering */}
-      <InfringementsPageClient infringements={allInfringements || []} totalRevenueLoss={0} />
+      <InfringementsPageClient infringements={allInfringements || []} allProducts={allProducts || []} totalRevenueLoss={0} />
     </div>
   );
 }

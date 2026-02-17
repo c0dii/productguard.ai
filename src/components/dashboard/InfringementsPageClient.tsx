@@ -28,6 +28,7 @@ interface Infringement {
 
 interface InfringementsPageClientProps {
   infringements: Infringement[];
+  allProducts: Array<{ id: string; name: string }>;
   totalRevenueLoss: number;
 }
 
@@ -60,23 +61,24 @@ const STATUS_FILTERS: { key: FilterOption; label: string; statuses: string[]; ac
   },
 ];
 
-export function InfringementsPageClient({ infringements, totalRevenueLoss }: InfringementsPageClientProps) {
+export function InfringementsPageClient({ infringements, allProducts, totalRevenueLoss }: InfringementsPageClientProps) {
   const [filter, setFilter] = useState<FilterOption>('actionable');
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
 
-  // Extract unique products from infringements
+  // All products with infringement counts (shows all products, even those with 0 infringements)
   const availableProducts = useMemo(() => {
-    const products = new Map<string, string>();
+    const counts = new Map<string, number>();
     infringements.forEach((inf) => {
-      if (inf.product_id && inf.products?.name) {
-        products.set(inf.product_id, inf.products.name);
+      if (inf.product_id) {
+        counts.set(inf.product_id, (counts.get(inf.product_id) || 0) + 1);
       }
     });
-    return Array.from(products.entries())
+    return allProducts
+      .map((p) => [p.id, p.name, counts.get(p.id) || 0] as [string, string, number])
       .sort((a, b) => a[1].localeCompare(b[1]));
-  }, [infringements]);
+  }, [infringements, allProducts]);
 
   // Extract unique platforms from infringement URLs, sorted by count (top 20 + Other)
   const availablePlatforms = useMemo(() => {
@@ -156,7 +158,7 @@ export function InfringementsPageClient({ infringements, totalRevenueLoss }: Inf
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-4">
         {/* Product Filter */}
-        {availableProducts.length > 1 && (
+        {availableProducts.length > 0 && (
           <div>
             <label htmlFor="product-filter" className="block text-sm font-medium text-pg-text-muted mb-2">
               Filter by Product
@@ -168,14 +170,11 @@ export function InfringementsPageClient({ infringements, totalRevenueLoss }: Inf
               className="input-field w-full sm:w-72"
             >
               <option value="all">All Products ({availableProducts.length})</option>
-              {availableProducts.map(([productId, productName]) => {
-                const count = infringements.filter((i) => i.product_id === productId).length;
-                return (
-                  <option key={productId} value={productId}>
-                    {productName} ({count})
-                  </option>
-                );
-              })}
+              {availableProducts.map(([productId, productName, count]) => (
+                <option key={productId} value={productId}>
+                  {productName} ({count})
+                </option>
+              ))}
             </select>
           </div>
         )}

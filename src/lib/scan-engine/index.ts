@@ -1,11 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server';
-import type { Product, InfringementResult } from '@/types';
-import { scanGoogle } from './platforms/google';
+import type { Product, InfringementResult, ScanStage } from '@/types';
+import { SerpClient } from './serp-client';
+import { generateQueries, type GeneratedQuery } from './query-generator';
+import { scoreResult } from './scoring';
 import { scanTelegram } from './platforms/telegram';
-import { scanCyberlockers } from './platforms/cyberlockers';
-import { scanTorrents } from './platforms/torrents';
-import { scanDiscord } from './platforms/discord';
-import { scanForums } from './platforms/forums';
 import { evidenceCollector } from '@/lib/enforcement/evidence-collector';
 import { priorityScorer } from '@/lib/enforcement/priority-scorer';
 import { infrastructureProfiler } from '@/lib/enforcement/infrastructure-profiler';
@@ -14,6 +12,53 @@ import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } fro
 import { fetchIntelligenceForScan, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 import { notifyHighSeverityInfringement, notifyScanComplete } from '@/lib/notifications/email';
 import crypto from 'crypto';
+
+/**
+ * Default scan stages matching what ScanProgressTracker expects.
+ * We update these in the DB as the scan progresses.
+ */
+const SCAN_STAGES: ScanStage[] = [
+  { name: 'initialization', display_name: 'Search Initialization', status: 'pending', started_at: null, completed_at: null },
+  { name: 'keyword_search', display_name: 'Keyword Discovery', status: 'pending', started_at: null, completed_at: null },
+  { name: 'trademark_search', display_name: 'Trademark Protection Scan', status: 'pending', started_at: null, completed_at: null },
+  { name: 'phrase_matching', display_name: 'Content Signature Analysis', status: 'pending', started_at: null, completed_at: null },
+  { name: 'marketplace_scan', display_name: 'Marketplace Intelligence', status: 'pending', started_at: null, completed_at: null },
+  { name: 'platform_scan', display_name: 'Platform Network Scan', status: 'pending', started_at: null, completed_at: null },
+  { name: 'finalization', display_name: 'Results Compilation', status: 'pending', started_at: null, completed_at: null },
+];
+
+/**
+ * Update scan progress in the database.
+ * Mutates the stages array in-place for convenience, then writes to DB.
+ */
+async function updateScanProgress(
+  supabase: ReturnType<typeof createAdminClient>,
+  scanId: string,
+  stages: ScanStage[],
+  currentStage: string,
+) {
+  await supabase
+    .from('scans')
+    .update({
+      scan_progress: { current_stage: currentStage, stages },
+    })
+    .eq('id', scanId);
+}
+
+function setStageStatus(
+  stages: ScanStage[],
+  name: string,
+  status: ScanStage['status'],
+  resultCount?: number,
+) {
+  const stage = stages.find((s) => s.name === name);
+  if (!stage) return;
+  const now = new Date().toISOString();
+  stage.status = status;
+  if (status === 'in_progress') stage.started_at = now;
+  if (status === 'completed') stage.completed_at = now;
+  if (resultCount !== undefined) stage.result_count = resultCount;
+}
 
 /**
  * Normalize URL for consistent deduplication
@@ -56,6 +101,10 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     const runNumber = (currentScan?.run_count || 0) + 1;
 
     // Update scan status to running
+    const stages = SCAN_STAGES.map((s) => ({ ...s })); // Deep copy
+    setStageStatus(stages, 'initialization', 'completed');
+    setStageStatus(stages, 'keyword_search', 'in_progress');
+
     await supabase
       .from('scans')
       .update({
@@ -63,16 +112,27 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         started_at: new Date().toISOString(),
         last_run_at: new Date().toISOString(),
         run_count: runNumber,
+        scan_progress: { current_stage: 'keyword_search', stages },
       })
       .eq('id', scanId);
 
     // Fetch intelligence data for query optimization (non-blocking)
     const intelligence = await fetchIntelligenceForScan(supabase, product.id);
 
-    // Run all platform scanners in parallel (with intelligence data)
-    const scanResults = await runPlatformScanners(product, intelligence);
+    // ── TIERED SEARCH via SerpClient ──────────────────────────────────
+    const scanResults = await runTieredSearch(
+      product,
+      intelligence,
+      supabase,
+      scanId,
+      stages,
+    );
 
-    console.log(`[Scan Engine] Found ${scanResults.length} raw results from platforms`);
+    console.log(`[Scan Engine] Found ${scanResults.length} raw results from tiered search`);
+
+    // Progress: All search tiers + Telegram complete, starting AI filtering
+    setStageStatus(stages, 'phrase_matching', 'in_progress');
+    await updateScanProgress(supabase, scanId, stages, 'phrase_matching');
 
     // DELTA DETECTION: Fetch existing URL hashes for this product
     const { data: existingInfringements } = await supabase
@@ -150,6 +210,11 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       console.log('[Scan Engine] AI filtering disabled, using all new results');
     }
 
+    // Progress: AI filtering complete
+    setStageStatus(stages, 'phrase_matching', 'completed', filteredResults.length);
+    setStageStatus(stages, 'finalization', 'in_progress');
+    await updateScanProgress(supabase, scanId, stages, 'finalization');
+
     // DEDUPLICATION: Remove duplicate URLs within the same scan batch
     // Different platform scanners may find the same URL, causing unique constraint violations
     const seenUrlHashes = new Set<string>();
@@ -167,6 +232,8 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         `[Scan Engine] Deduplication: Removed ${filteredResults.length - deduplicatedResults.length} duplicate URLs within scan batch`
       );
     }
+
+    // Progress: Deduplication complete, evidence collection happening during insert
 
     // Calculate total revenue loss (from deduplicated results)
     const totalRevenueLoss = deduplicatedResults.reduce((sum, result) => sum + result.est_revenue_loss, 0);
@@ -313,6 +380,10 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       }
     }
 
+    // Progress: Results inserted
+    setStageStatus(stages, 'finalization', 'completed', actualInsertedCount);
+    await updateScanProgress(supabase, scanId, stages, 'finalization');
+
     // Update last_seen_at and seen_count for known URLs that were re-discovered
     if (knownUrls > 0) {
       const now = new Date().toISOString();
@@ -379,7 +450,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       api_calls_saved: apiCallsSaved,
       ai_filtering_saved: aiFilteringSaved,
       duration_seconds: durationSeconds,
-      platforms_searched: ['google', 'telegram', 'cyberlockers', 'torrents', 'discord', 'forums'],
+      platforms_searched: ['tiered-search', 'telegram-bot-api'],
       search_queries_used: product.keywords || [],
     });
 
@@ -551,35 +622,206 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
 }
 
 /**
- * Run all platform scanners and aggregate results
+ * Run tiered search using SerpClient + Telegram Bot API.
+ *
+ * Tier 1: Broad Discovery (8-12 queries @ num=30)
+ * Tier 2: Targeted Platform (10-20 queries @ num=10)
+ * Tier 3: Signal-Based Deep Dive (0-10 queries @ num=10)
+ * + Telegram Bot API channel search
+ *
+ * Updates scan progress stages as each tier completes.
+ * Hard cap: 50 SerpAPI calls per scan via SerpClient budget.
  */
-async function runPlatformScanners(product: Product, intelligence: IntelligenceData): Promise<InfringementResult[]> {
-  const allResults: InfringementResult[] = [];
-
-  try {
-    // Run all scanners in parallel (pass intelligence data to Google and Telegram)
-    const [googleResults, telegramResults, cyberlockerResults, torrentResults, discordResults, forumResults] =
-      await Promise.all([
-        scanGoogle(product, intelligence),
-        scanTelegram(product, intelligence),
-        scanCyberlockers(product),
-        scanTorrents(product),
-        scanDiscord(product),
-        scanForums(product),
-      ]);
-
-    // Aggregate all results
-    allResults.push(
-      ...googleResults,
-      ...telegramResults,
-      ...cyberlockerResults,
-      ...torrentResults,
-      ...discordResults,
-      ...forumResults
-    );
-  } catch (error) {
-    console.error('Platform scanner error:', error);
+async function runTieredSearch(
+  product: Product,
+  intelligence: IntelligenceData,
+  supabase: ReturnType<typeof createAdminClient>,
+  scanId: string,
+  stages: ScanStage[],
+): Promise<InfringementResult[]> {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey || apiKey === 'xxxxx') {
+    console.log('[Scan Engine] No SerpAPI key configured, skipping tiered search');
+    // Still run Telegram Bot API
+    const telegramResults = await scanTelegram(product, intelligence);
+    return telegramResults;
   }
 
+  const client = new SerpClient(apiKey, 50);
+  const allResults: InfringementResult[] = [];
+  const allFoundUrls: string[] = [];
+
+  // Generate Tier 1 + Tier 2 queries (Tier 3 needs Tier 1/2 URLs)
+  const { tier1, tier2 } = generateQueries(product, intelligence);
+
+  // ── TIER 1: Broad Discovery ──────────────────────────────────────
+  console.log(`[Scan Engine] Tier 1: ${tier1.length} broad queries (budget: ${client.remaining})`);
+
+  const tier1Responses = await client.searchBatch(
+    tier1.map((q) => ({ query: q.query, num: q.num }))
+  );
+
+  for (let i = 0; i < tier1Responses.length; i++) {
+    const response = tier1Responses[i];
+    const queryInfo = tier1[i];
+    if (!response || !queryInfo) continue;
+
+    for (const result of response.organic_results) {
+      const scored = scoreResult(
+        {
+          url: result.link,
+          title: result.title,
+          snippet: result.snippet,
+          position: result.position,
+          query: response.query,
+          queryCategory: queryInfo.category,
+          tier: queryInfo.tier,
+        },
+        product
+      );
+
+      if (!scored.isFalsePositive) {
+        allFoundUrls.push(result.link);
+        allResults.push({
+          platform: scored.platform,
+          source_url: result.link,
+          risk_level: scored.risk_level,
+          type: scored.type,
+          audience_size: scored.audience_size,
+          est_revenue_loss: scored.est_revenue_loss,
+        });
+      }
+    }
+  }
+
+  console.log(`[Scan Engine] Tier 1 complete: ${allResults.length} results (${client.used} API calls used)`);
+
+  // Progress: Tier 1 (Keyword Discovery) complete
+  setStageStatus(stages, 'keyword_search', 'completed', allResults.length);
+  setStageStatus(stages, 'trademark_search', 'in_progress');
+  await updateScanProgress(supabase, scanId, stages, 'trademark_search');
+
+  // ── TIER 2: Targeted Platform ────────────────────────────────────
+  console.log(`[Scan Engine] Tier 2: ${tier2.length} platform queries (budget: ${client.remaining})`);
+
+  const tier2Responses = await client.searchBatch(
+    tier2.map((q) => ({ query: q.query, num: q.num }))
+  );
+
+  const tier2StartCount = allResults.length;
+
+  for (let i = 0; i < tier2Responses.length; i++) {
+    const response = tier2Responses[i];
+    const queryInfo = tier2[i];
+    if (!response || !queryInfo) continue;
+
+    for (const result of response.organic_results) {
+      const scored = scoreResult(
+        {
+          url: result.link,
+          title: result.title,
+          snippet: result.snippet,
+          position: result.position,
+          query: response.query,
+          queryCategory: queryInfo.category,
+          tier: queryInfo.tier,
+        },
+        product
+      );
+
+      if (!scored.isFalsePositive) {
+        allFoundUrls.push(result.link);
+        allResults.push({
+          platform: scored.platform,
+          source_url: result.link,
+          risk_level: scored.risk_level,
+          type: scored.type,
+          audience_size: scored.audience_size,
+          est_revenue_loss: scored.est_revenue_loss,
+        });
+      }
+    }
+  }
+
+  console.log(
+    `[Scan Engine] Tier 2 complete: +${allResults.length - tier2StartCount} results (${client.used} API calls used)`
+  );
+
+  // Progress: Tier 2 (Trademark Protection) complete
+  setStageStatus(stages, 'trademark_search', 'completed', allResults.length - tier2StartCount);
+  setStageStatus(stages, 'marketplace_scan', 'in_progress');
+  await updateScanProgress(supabase, scanId, stages, 'marketplace_scan');
+
+  // ── TIER 3: Signal-Based Deep Dive ───────────────────────────────
+  if (client.remaining > 0 && allFoundUrls.length > 0) {
+    const { tier3 } = generateQueries(product, intelligence, allFoundUrls);
+
+    if (tier3.length > 0) {
+      console.log(`[Scan Engine] Tier 3: ${tier3.length} deep-dive queries (budget: ${client.remaining})`);
+
+      const tier3Responses = await client.searchBatch(
+        tier3.map((q) => ({ query: q.query, num: q.num }))
+      );
+
+      const tier3StartCount = allResults.length;
+
+      for (let i = 0; i < tier3Responses.length; i++) {
+        const response = tier3Responses[i];
+        const queryInfo = tier3[i];
+        if (!response || !queryInfo) continue;
+
+        for (const result of response.organic_results) {
+          const scored = scoreResult(
+            {
+              url: result.link,
+              title: result.title,
+              snippet: result.snippet,
+              position: result.position,
+              query: response.query,
+              queryCategory: queryInfo.category,
+              tier: queryInfo.tier,
+            },
+            product
+          );
+
+          if (!scored.isFalsePositive) {
+            allResults.push({
+              platform: scored.platform,
+              source_url: result.link,
+              risk_level: scored.risk_level,
+              type: scored.type,
+              audience_size: scored.audience_size,
+              est_revenue_loss: scored.est_revenue_loss,
+            });
+          }
+        }
+      }
+
+      console.log(`[Scan Engine] Tier 3 complete: +${allResults.length - tier3StartCount} results`);
+    }
+  }
+
+  console.log(`[Scan Engine] SerpAPI budget: ${client.used}/50 calls used`);
+
+  // Progress: Search tiers complete
+  setStageStatus(stages, 'marketplace_scan', 'completed', allResults.length);
+  setStageStatus(stages, 'platform_scan', 'in_progress');
+  await updateScanProgress(supabase, scanId, stages, 'platform_scan');
+
+  // ── TELEGRAM BOT API (supplementary channel search) ──────────────
+  try {
+    const telegramResults = await scanTelegram(product, intelligence);
+    if (telegramResults.length > 0) {
+      console.log(`[Scan Engine] Telegram Bot API: +${telegramResults.length} results`);
+      allResults.push(...telegramResults);
+    }
+  } catch (error) {
+    console.error('[Scan Engine] Telegram scanner error (non-blocking):', error);
+  }
+
+  // Progress: Telegram complete
+  setStageStatus(stages, 'platform_scan', 'completed', allResults.length);
+
+  console.log(`[Scan Engine] Total raw results: ${allResults.length}`);
   return allResults;
 }

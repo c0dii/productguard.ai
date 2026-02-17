@@ -486,8 +486,76 @@ function Step2Url({
       )}
 
       {scrapeComplete && !isScraping && (
-        <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm text-green-400">
-          Product details extracted successfully! Review them in the next step.
+        <div className="mb-4 space-y-3">
+          {/* Success header */}
+          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm text-green-400">
+            Product details extracted successfully! Review them below and in the next step.
+          </div>
+
+          {/* Rich extraction summary */}
+          <div className="p-4 rounded-xl bg-pg-surface-light border border-pg-border space-y-3">
+            <div className="flex items-start gap-3">
+              {data.product_image_url && (
+                <img
+                  src={data.product_image_url}
+                  alt={data.name}
+                  className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-pg-text">Extracted Details</p>
+                {data.name && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-pg-accent font-medium">Name:</span>
+                    <span className="text-sm text-pg-text">{data.name}</span>
+                  </div>
+                )}
+                {data.type && (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-pg-accent font-medium">Type:</span>
+                    <span className="text-sm text-pg-text capitalize">{data.type}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {data.description && (
+              <div>
+                <span className="text-xs text-pg-accent font-medium">Description:</span>
+                <p className="text-xs text-pg-text-muted mt-1 line-clamp-3">{data.description}</p>
+              </div>
+            )}
+
+            {/* AI data counts */}
+            {data.ai_extracted_data && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-pg-border">
+                {(data.ai_extracted_data.brand_identifiers?.length ?? 0) > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-pg-accent/10 text-pg-accent">
+                    {data.ai_extracted_data.brand_identifiers.length} brand identifiers
+                  </span>
+                )}
+                {(data.ai_extracted_data.unique_phrases?.length ?? 0) > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-400">
+                    {data.ai_extracted_data.unique_phrases.length} unique phrases
+                  </span>
+                )}
+                {(data.ai_extracted_data.copyrighted_terms?.length ?? 0) > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-orange-500/10 text-orange-400">
+                    {data.ai_extracted_data.copyrighted_terms.length} copyrighted terms
+                  </span>
+                )}
+                {data.keywords?.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-pg-surface text-pg-text-muted border border-pg-border">
+                    {data.keywords.length} keywords
+                  </span>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-pg-text-muted">
+              Click &quot;Next&quot; to review and edit the AI-extracted data.
+            </p>
+          </div>
         </div>
       )}
 
@@ -509,23 +577,6 @@ function Step2Url({
           className="input-field w-full max-w-xs"
         />
       </div>
-
-      {/* Auto-filled preview */}
-      {scrapeComplete && data.product_image_url && (
-        <div className="mt-4 p-3 rounded-lg bg-pg-surface-light border border-pg-border flex items-center gap-3">
-          <img
-            src={data.product_image_url}
-            alt={data.name}
-            className="w-12 h-12 rounded-lg object-cover"
-          />
-          <div>
-            <p className="text-sm font-medium text-pg-text">{data.name}</p>
-            {data.description && (
-              <p className="text-xs text-pg-text-muted line-clamp-1">{data.description}</p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

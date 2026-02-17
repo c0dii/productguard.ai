@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import type { Scan, ScanProgress, ScanStage } from '@/types';
 
 interface ScanProgressTrackerProps {
@@ -62,7 +61,6 @@ const DEFAULT_STAGES: ScanStage[] = [
 ];
 
 export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
-  const router = useRouter();
   const [progress, setProgress] = useState<ScanProgress>(
     scan.scan_progress || { current_stage: null, stages: DEFAULT_STAGES }
   );
@@ -85,7 +83,8 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
           // Stop polling if scan is complete
           if (data.status === 'completed' || data.status === 'failed') {
             setIsPolling(false);
-            router.refresh(); // Refresh the page to show final results
+            // Full page reload to guarantee server data is re-fetched
+            window.location.reload();
           }
         }
       } catch (error) {
@@ -94,7 +93,7 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
     }, 3000); // Poll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [isPolling, scan.id, progress, router]);
+  }, [isPolling, scan.id, progress]);
 
   // Elapsed time counter
   useEffect(() => {
