@@ -322,6 +322,39 @@ export interface ScanHistory {
   updated_at: string;
 }
 
+// ============================================================================
+// SCAN LOG TYPES
+// ============================================================================
+
+export type ScanLogLevel = 'info' | 'warn' | 'error' | 'fatal';
+
+export type ScanLogStage =
+  | 'initialization' | 'keyword_search' | 'trademark_search'
+  | 'marketplace_scan' | 'platform_scan' | 'phrase_matching'
+  | 'finalization' | 'notification' | 'cleanup';
+
+export type ScanErrorCode =
+  | 'TIMEOUT' | 'API_LIMIT' | 'SERP_ERROR' | 'SERP_429'
+  | 'AI_FILTER_FAIL' | 'DB_INSERT_FAIL' | 'DB_BATCH_FAIL'
+  | 'TELEGRAM_FAIL' | 'EVIDENCE_FAIL' | 'GHL_FAIL' | 'EMAIL_FAIL' | 'UNKNOWN';
+
+export interface ScanLogEntry {
+  id: string;
+  scan_id: string;
+  product_id: string;
+  user_id: string;
+  log_level: ScanLogLevel;
+  stage: ScanLogStage;
+  message: string;
+  error_code: ScanErrorCode | null;
+  error_details: Record<string, unknown> | null;
+  scan_params: Record<string, unknown> | null;
+  metrics: Record<string, unknown> | null;
+  self_healed: boolean;
+  heal_action: string | null;
+  created_at: string;
+}
+
 export interface ProductScanStatus {
   product_id: string;
   product_name: string;

@@ -19,6 +19,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     { href: '/admin/users', label: '👥 Users' },
     { href: '/admin/subscriptions', label: '💳 Subscriptions' },
     { href: '/admin/scans', label: '🔍 Scans' },
+    { href: '/admin/scan-logs', label: '📝 Scan Logs' },
     { href: '/admin/infringements', label: '⚠️ Infringements' },
     { href: '/admin/takedowns', label: '📧 Takedowns' },
     { href: '/admin/dmca-logs', label: '📋 DMCA Logs' },

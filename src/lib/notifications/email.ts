@@ -327,3 +327,186 @@ export async function notifyTakedownSuccess(
     return false;
   }
 }
+
+// ============================================================================
+// Admin Scan Error Alerts
+// ============================================================================
+
+interface ScanErrorPayload {
+  scanId: string;
+  productName: string;
+  productId: string;
+  errorCode: string;
+  errorMessage: string;
+  stage: string;
+  scanParams: Record<string, unknown>;
+  recentLogs: Array<{ log_level: string; stage: string; message: string; error_code?: string | null }>;
+}
+
+function getSuggestedSteps(errorCode: string, message: string): string[] {
+  const steps: string[] = [];
+
+  switch (errorCode) {
+    case 'TIMEOUT':
+      steps.push('Check SerpAPI status page for service disruptions');
+      steps.push('Review scan duration settings (MAX_SCAN_DURATION_MS)');
+      steps.push('Check if product has excessive keywords generating too many queries');
+      break;
+    case 'API_LIMIT':
+    case 'SERP_429':
+      steps.push('Check SerpAPI account quota and billing');
+      steps.push('Review SERPAPI_KEY environment variable');
+      steps.push('Consider reducing scan budget or query count');
+      break;
+    case 'SERP_ERROR':
+      steps.push('Check SerpAPI status page');
+      steps.push('Verify SERPAPI_KEY is valid');
+      steps.push('Review query format for malformed requests');
+      break;
+    case 'AI_FILTER_FAIL':
+      steps.push('Check OpenAI API billing and quota');
+      steps.push('Verify OPENAI_API_KEY environment variable');
+      steps.push('Review AI confidence threshold setting');
+      break;
+    case 'DB_BATCH_FAIL':
+    case 'DB_INSERT_FAIL':
+      steps.push('Check Supabase service status');
+      steps.push('Review database connection pool limits');
+      steps.push('Check for schema/constraint violations in recent data');
+      break;
+    case 'TELEGRAM_FAIL':
+      steps.push('Check Telegram Bot API token');
+      steps.push('Verify TELEGRAM_BOT_TOKEN environment variable');
+      steps.push('Review Telegram rate limits');
+      break;
+    case 'GHL_FAIL':
+      steps.push('Check GoHighLevel API credentials');
+      steps.push('Verify GHL webhook endpoints');
+      break;
+    case 'EMAIL_FAIL':
+      steps.push('Check Resend API key and billing');
+      steps.push('Verify RESEND_API_KEY environment variable');
+      steps.push('Review sender domain verification');
+      break;
+    default:
+      steps.push('Review full error stack trace');
+      steps.push('Check Vercel function logs for additional context');
+      steps.push('Verify all environment variables are set correctly');
+  }
+
+  if (message.toLowerCase().includes('network') || message.toLowerCase().includes('fetch')) {
+    steps.push('Check network connectivity from Vercel deployment');
+  }
+
+  return steps;
+}
+
+/**
+ * Send admin alert when a scan encounters a fatal error.
+ * Sends to ADMIN_ALERT_EMAIL (not user preferences — this is system-level).
+ */
+export async function notifyScanError(payload: ScanErrorPayload): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[Notifications] RESEND_API_KEY not configured, skipping scan error alert');
+    return false;
+  }
+
+  const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+  if (!adminEmail) {
+    console.warn('[Notifications] ADMIN_ALERT_EMAIL not configured, skipping scan error alert');
+    return false;
+  }
+
+  try {
+    const suggestedSteps = getSuggestedSteps(payload.errorCode, payload.errorMessage);
+
+    const logTrail = payload.recentLogs.map((log) => {
+      const badge = log.log_level === 'error' || log.log_level === 'fatal'
+        ? '🔴' : log.log_level === 'warn' ? '🟡' : '🟢';
+      return `${badge} [${log.stage}] ${log.message}${log.error_code ? ` (${log.error_code})` : ''}`;
+    }).join('<br />');
+
+    const paramsHtml = Object.entries(payload.scanParams)
+      .map(([key, value]) => `<strong>${key}:</strong> ${String(value)}`)
+      .join('<br />');
+
+    const { error } = await resend.emails.send({
+      from: `ProductGuard System <${FROM_EMAIL}>`,
+      to: adminEmail,
+      subject: `[SCAN FATAL] ${payload.errorCode} in ${payload.stage} — ${payload.productName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); padding: 24px; border-radius: 12px; color: white; margin-bottom: 20px;">
+            <h1 style="margin: 0 0 8px 0; font-size: 20px;">Scan Fatal Error</h1>
+            <p style="margin: 0; opacity: 0.8; font-size: 14px;">Automatic alert — immediate investigation recommended</p>
+          </div>
+
+          <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Scan ID</td>
+                <td style="padding: 8px 0; font-family: monospace; font-size: 13px;">${payload.scanId}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Product</td>
+                <td style="padding: 8px 0; font-weight: 600;">${payload.productName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Error Code</td>
+                <td style="padding: 8px 0; font-weight: 600; color: #ef4444;">${payload.errorCode}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Stage</td>
+                <td style="padding: 8px 0;">${payload.stage}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Error</td>
+                <td style="padding: 8px 0; font-size: 13px; color: #dc2626; word-break: break-all;">${payload.errorMessage}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background: #fefce8; border: 1px solid #facc15; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #854d0e;">Suggested Investigation Steps</h3>
+            <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #713f12;">
+              ${suggestedSteps.map(s => `<li style="margin-bottom: 4px;">${s}</li>`).join('')}
+            </ul>
+          </div>
+
+          ${logTrail ? `
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #374151;">Recent Log Trail</h3>
+            <div style="font-family: monospace; font-size: 12px; line-height: 1.6; color: #4b5563;">
+              ${logTrail}
+            </div>
+          </div>` : ''}
+
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; color: #374151;">Scan Parameters</h3>
+            <div style="font-family: monospace; font-size: 12px; line-height: 1.6; color: #4b5563;">
+              ${paramsHtml}
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${APP_URL}/admin/scan-logs"
+               style="display: inline-block; background: #ef4444; color: #fff; font-weight: 600; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px;">
+              View Scan Logs Dashboard
+            </a>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('[Notifications] Failed to send scan error alert:', error);
+      return false;
+    }
+
+    console.log(`[Notifications] Scan error alert sent to ${adminEmail}`);
+    return true;
+  } catch (error) {
+    console.error('[Notifications] Error sending scan error alert:', error);
+    return false;
+  }
+}

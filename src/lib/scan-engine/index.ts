@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import type { Product, InfringementResult, ScanStage } from '@/types';
 import { SerpClient } from './serp-client';
+import { ScanLogger } from './scan-logger';
 import { generateQueries, type GeneratedQuery } from './query-generator';
 import { scoreResult } from './scoring';
 import { scanTelegram } from './platforms/telegram';
@@ -10,7 +11,7 @@ import { infrastructureProfiler } from '@/lib/enforcement/infrastructure-profile
 import { filterSearchResults, estimateFilteringCost } from '@/lib/ai/infringement-filter';
 import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } from '@/lib/ghl/events';
 import { fetchIntelligenceForScan, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
-import { notifyHighSeverityInfringement, notifyScanComplete } from '@/lib/notifications/email';
+import { notifyHighSeverityInfringement, notifyScanComplete, notifyScanError } from '@/lib/notifications/email';
 import crypto from 'crypto';
 
 /**
@@ -89,6 +90,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
   const supabase = createAdminClient();
   const scanStartTime = Date.now();
   const MAX_SCAN_DURATION_MS = 240_000; // 4 minute hard cap (leave 1 min buffer for maxDuration=300)
+  let logger: ScanLogger | undefined;
 
   try {
     // Get current scan info to determine if this is a re-run
@@ -100,6 +102,17 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
 
     const isFirstRun = !currentScan?.run_count || currentScan.run_count === 1;
     const runNumber = (currentScan?.run_count || 0) + 1;
+
+    // Initialize structured logger
+    logger = new ScanLogger(scanId, product.id, product.user_id, product, {
+      serpBudget: 50,
+      maxDurationMs: MAX_SCAN_DURATION_MS,
+      aiFilterEnabled: process.env.DISABLE_AI_FILTER !== 'true',
+      aiConfidenceThreshold: parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.60'),
+      runNumber,
+    });
+
+    logger.info('initialization', `Scan started (Run #${runNumber}, first=${isFirstRun})`);
 
     // Update scan status to running
     const stages = SCAN_STAGES.map((s) => ({ ...s })); // Deep copy
@@ -129,9 +142,13 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       stages,
       scanStartTime,
       MAX_SCAN_DURATION_MS,
+      logger,
     );
 
-    console.log(`[Scan Engine] Found ${scanResults.length} raw results from tiered search`);
+    logger.info('keyword_search', `Found ${scanResults.length} raw results from tiered search`, {
+      results_count: scanResults.length,
+      elapsed_ms: Date.now() - scanStartTime,
+    });
 
     // Progress: All search tiers + Telegram complete, starting AI filtering
     setStageStatus(stages, 'phrase_matching', 'in_progress');
@@ -147,7 +164,9 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       (existingInfringements || []).map((inf) => inf.url_hash).filter((hash): hash is string => hash !== null)
     );
 
-    console.log(`[Scan Engine] Delta Detection: Found ${existingUrlHashes.size} existing URLs in database`);
+    logger.info('phrase_matching', `Delta Detection: Found ${existingUrlHashes.size} existing URLs in database`, {
+      existing_url_count: existingUrlHashes.size,
+    });
 
     // Filter out known URLs BEFORE expensive processing
     const newResults = scanResults.filter((result) => {
@@ -157,9 +176,10 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
 
     const knownUrls = scanResults.length - newResults.length;
 
-    console.log(
-      `[Scan Engine] Delta Detection: ${newResults.length} new URLs, ${knownUrls} already tracked`
-    );
+    logger.info('phrase_matching', `Delta Detection: ${newResults.length} new URLs, ${knownUrls} already tracked`, {
+      new_urls: newResults.length,
+      known_urls: knownUrls,
+    });
 
     // WHITELIST URL FILTERING: Remove user-approved URLs before expensive processing
     const whitelistUrls = product.whitelist_urls || [];
@@ -177,7 +197,9 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       });
       const whitelistSkipped = newResults.length - whitelistFiltered.length;
       if (whitelistSkipped > 0) {
-        console.log(`[Scan Engine] Whitelist: Skipped ${whitelistSkipped} user-approved URLs`);
+        logger.info('phrase_matching', `Whitelist: Skipped ${whitelistSkipped} user-approved URLs`, {
+          whitelist_skipped: whitelistSkipped,
+        });
       }
     }
 
@@ -198,19 +220,18 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     if (useAIFilter && resultsToProcess.length > 0) {
       filteredResults = await filterSearchResults(resultsToProcess, product, aiConfidenceThreshold, intelligence);
 
-      console.log(
-        `[Scan Engine] AI Filter: ${filteredResults.length}/${resultsToProcess.length} NEW results passed (${resultsToProcess.length > 0 ? ((filteredResults.length / resultsToProcess.length) * 100).toFixed(1) : 0}% pass rate)`
-      );
-      console.log(
-        `[Scan Engine] Estimated AI filtering cost: $${estimateFilteringCost(resultsToProcess.length).toFixed(4)}`
-      );
-      console.log(
-        `[Scan Engine] Delta Detection saved $${estimateFilteringCost(aiFilteringSaved).toFixed(4)} in AI costs`
-      );
+      const passRate = resultsToProcess.length > 0 ? ((filteredResults.length / resultsToProcess.length) * 100).toFixed(1) : '0';
+      logger.info('phrase_matching', `AI Filter: ${filteredResults.length}/${resultsToProcess.length} NEW results passed (${passRate}% pass rate)`, {
+        ai_passed: filteredResults.length,
+        ai_total: resultsToProcess.length,
+        pass_rate: parseFloat(passRate),
+        ai_cost_usd: parseFloat(estimateFilteringCost(resultsToProcess.length).toFixed(4)),
+        ai_savings_usd: parseFloat(estimateFilteringCost(aiFilteringSaved).toFixed(4)),
+      });
     } else if (resultsToProcess.length === 0) {
-      console.log('[Scan Engine] No new URLs to filter (all URLs already tracked)');
+      logger.info('phrase_matching', 'No new URLs to filter (all URLs already tracked)');
     } else {
-      console.log('[Scan Engine] AI filtering disabled, using all new results');
+      logger.warn('phrase_matching', 'AI filtering disabled, using all new results');
     }
 
     // Progress: AI filtering complete
@@ -231,9 +252,9 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     });
 
     if (deduplicatedResults.length < filteredResults.length) {
-      console.log(
-        `[Scan Engine] Deduplication: Removed ${filteredResults.length - deduplicatedResults.length} duplicate URLs within scan batch`
-      );
+      logger.info('finalization', `Deduplication: Removed ${filteredResults.length - deduplicatedResults.length} duplicate URLs within scan batch`, {
+        duplicates_removed: filteredResults.length - deduplicatedResults.length,
+      });
     }
 
     // Progress: Deduplication complete, evidence collection happening during insert
@@ -363,9 +384,12 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         .select('id');
 
       if (insertError) {
-        console.error('[Scan Engine] Batch insert failed:', insertError);
+        logger.error('finalization', `Batch insert failed: ${insertError.message}`, 'DB_BATCH_FAIL', {
+          error_message: insertError.message,
+          error_code: insertError.code,
+          batch_size: infringementsWithScoring.length,
+        });
         // Attempt individual inserts as fallback so partial results aren't lost
-        console.log('[Scan Engine] Attempting individual inserts as fallback...');
         for (const infringement of infringementsWithScoring) {
           const { error: singleError } = await supabase
             .from('infringements')
@@ -373,13 +397,18 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
           if (!singleError) {
             actualInsertedCount++;
           } else {
-            console.error(`[Scan Engine] Failed to insert ${infringement.source_url}:`, singleError.message);
+            logger.warn('finalization', `Failed to insert ${infringement.source_url}: ${singleError.message}`, 'DB_INSERT_FAIL');
           }
         }
-        console.log(`[Scan Engine] Fallback: Inserted ${actualInsertedCount}/${infringementsWithScoring.length} infringements individually`);
+        logger.selfHeal('finalization', 'DB_BATCH_FAIL', `Switched to individual inserts: ${actualInsertedCount}/${infringementsWithScoring.length} succeeded`, {
+          inserted: actualInsertedCount,
+          total: infringementsWithScoring.length,
+        });
       } else {
         actualInsertedCount = insertedData?.length ?? infringementsWithScoring.length;
-        console.log(`[Scan Engine] Inserted ${actualInsertedCount} new unique infringements`);
+        logger.info('finalization', `Inserted ${actualInsertedCount} new unique infringements`, {
+          inserted_count: actualInsertedCount,
+        });
       }
     }
 
@@ -422,9 +451,11 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       const errors = results.filter((r) => r && 'error' in r && r.error);
 
       if (errors.length > 0) {
-        console.error(`Error updating ${errors.length} existing infringements`);
+        logger.warn('finalization', `Failed to update ${errors.length} existing infringements`, 'DB_INSERT_FAIL');
       } else {
-        console.log(`Updated ${knownUrls} existing infringements with new last_seen_at timestamp`);
+        logger.info('finalization', `Updated ${knownUrls} existing infringements with new last_seen_at timestamp`, {
+          updated_count: knownUrls,
+        });
       }
     }
 
@@ -458,18 +489,22 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     });
 
     if (historyError) {
-      console.error('[Scan Engine] Error creating scan history:', historyError);
+      logger.error('finalization', `Error creating scan history: ${historyError.message}`, 'DB_INSERT_FAIL', {
+        error_message: historyError.message,
+      });
     }
 
-    console.log(
-      `[Scan Engine] Scan ${scanId} completed (Run #${runNumber}): ${actualInsertedCount} new infringements inserted (${deduplicatedResults.length} processed)`
-    );
-    console.log(
-      `[Scan Engine] Delta Detection Savings: ${apiCallsSaved} API calls, ${aiFilteringSaved} AI filtering calls`
-    );
-    console.log(
-      `[Scan Engine] Total scanned: ${scanResults.length} URLs (${knownUrls} known, ${newResults.length} new)`
-    );
+    logger.info('finalization', `Scan completed (Run #${runNumber}): ${actualInsertedCount} new infringements`, {
+      run_number: runNumber,
+      inserted_count: actualInsertedCount,
+      processed_count: deduplicatedResults.length,
+      total_scanned: scanResults.length,
+      known_urls: knownUrls,
+      new_urls: newResults.length,
+      api_calls_saved: apiCallsSaved,
+      ai_filtering_saved: aiFilteringSaved,
+      duration_seconds: durationSeconds,
+    });
 
     // ── Early Evidence Capture for P0 Results ────────────────────────
     // Trigger lightweight evidence capture for P0 infringements at scan time
@@ -477,7 +512,9 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     if (filteredResults.length > 0) {
       const p0Results = filteredResults.filter((r: any) => r.priority === 'P0' || r.severity_score >= 80);
       if (p0Results.length > 0) {
-        console.log(`[Scan Engine] Triggering early evidence capture for ${p0Results.length} P0 results`);
+        logger.info('finalization', `Triggering early evidence capture for ${p0Results.length} P0 results`, {
+          p0_count: p0Results.length,
+        });
 
         // Capture page content for P0 results (non-blocking, best-effort)
         for (const result of p0Results.slice(0, 5)) { // Cap at 5 to avoid overloading
@@ -504,7 +541,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
                   early_capture: true,
                 },
               });
-              console.log(`[Scan Engine] Early evidence captured for: ${result.source_url}`);
+              logger.info('finalization', `Early evidence captured for: ${result.source_url}`);
             }
           } catch {
             // Non-blocking — evidence capture failures don't affect scan
@@ -564,7 +601,9 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         }
       }
     } catch (error) {
-      console.error('[Scan Engine] Error tracking events in GHL:', error);
+      logger.error('notification', `Error tracking events in GHL: ${error instanceof Error ? error.message : String(error)}`, 'GHL_FAIL', {
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       // Don't fail the scan if GHL tracking fails
     }
 
@@ -608,10 +647,42 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         }
       }
     } catch (error) {
-      console.error('[Scan Engine] Error sending email notifications:', error);
+      logger.error('notification', `Error sending email notifications: ${error instanceof Error ? error.message : String(error)}`, 'EMAIL_FAIL', {
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
+
+    // Final flush — persist all buffered logs
+    await logger.flush();
   } catch (error) {
-    console.error(`Scan ${scanId} failed:`, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    // Logger may not exist if error happened before initialization
+    if (logger) {
+      logger.fatal('initialization', `Scan failed: ${errorMessage}`, 'UNKNOWN', {
+        stack: errorStack,
+      });
+      await logger.flush();
+
+      // Send admin alert for fatal scan failure
+      try {
+        await notifyScanError({
+          scanId,
+          productName: product.name,
+          productId: product.id,
+          errorCode: 'UNKNOWN',
+          errorMessage,
+          stage: 'initialization',
+          scanParams: logger.getScanParams(),
+          recentLogs: logger.getRecentLogs(10),
+        });
+      } catch {
+        // Don't let alert failure mask the original error
+      }
+    } else {
+      console.error(`Scan ${scanId} failed (pre-logger):`, error);
+    }
 
     // Update scan status to failed
     await supabase
@@ -643,10 +714,11 @@ async function runTieredSearch(
   stages: ScanStage[],
   scanStartTime: number = Date.now(),
   maxDurationMs: number = 240_000,
+  logger?: ScanLogger,
 ): Promise<InfringementResult[]> {
   const apiKey = process.env.SERPAPI_KEY;
   if (!apiKey || apiKey === 'xxxxx') {
-    console.log('[Scan Engine] No SerpAPI key configured, skipping tiered search');
+    logger?.warn('keyword_search', 'No SerpAPI key configured, skipping tiered search', 'API_LIMIT');
     // Still run Telegram Bot API
     const telegramResults = await scanTelegram(product, intelligence);
     return telegramResults;
@@ -662,7 +734,11 @@ async function runTieredSearch(
   const { tier1, tier2 } = generateQueries(product, intelligence);
 
   // ── TIER 1: Broad Discovery ──────────────────────────────────────
-  console.log(`[Scan Engine] Tier 1: ${tier1.length} broad queries (budget: ${client.remaining})`);
+  logger?.info('keyword_search', `Tier 1: ${tier1.length} broad queries (budget: ${client.remaining})`, {
+    tier: 1,
+    query_count: tier1.length,
+    budget_remaining: client.remaining,
+  });
 
   const tier1Responses = await client.searchBatch(
     tier1.map((q) => ({ query: q.query, num: q.num }))
@@ -701,7 +777,12 @@ async function runTieredSearch(
     }
   }
 
-  console.log(`[Scan Engine] Tier 1 complete: ${allResults.length} results (${client.used} API calls used)`);
+  logger?.info('keyword_search', `Tier 1 complete: ${allResults.length} results (${client.used} API calls used)`, {
+    tier: 1,
+    results_count: allResults.length,
+    api_calls_used: client.used,
+    elapsed_ms: Date.now() - scanStartTime,
+  });
 
   // Progress: Tier 1 (Keyword Discovery) complete
   setStageStatus(stages, 'keyword_search', 'completed', allResults.length);
@@ -709,7 +790,11 @@ async function runTieredSearch(
   await updateScanProgress(supabase, scanId, stages, 'trademark_search');
 
   // ── TIER 2: Targeted Platform ────────────────────────────────────
-  console.log(`[Scan Engine] Tier 2: ${tier2.length} platform queries (budget: ${client.remaining})`);
+  logger?.info('trademark_search', `Tier 2: ${tier2.length} platform queries (budget: ${client.remaining})`, {
+    tier: 2,
+    query_count: tier2.length,
+    budget_remaining: client.remaining,
+  });
 
   const tier2Responses = await client.searchBatch(
     tier2.map((q) => ({ query: q.query, num: q.num }))
@@ -750,9 +835,13 @@ async function runTieredSearch(
     }
   }
 
-  console.log(
-    `[Scan Engine] Tier 2 complete: +${allResults.length - tier2StartCount} results (${client.used} API calls used)`
-  );
+  logger?.info('trademark_search', `Tier 2 complete: +${allResults.length - tier2StartCount} results (${client.used} API calls used)`, {
+    tier: 2,
+    new_results: allResults.length - tier2StartCount,
+    total_results: allResults.length,
+    api_calls_used: client.used,
+    elapsed_ms: Date.now() - scanStartTime,
+  });
 
   // Progress: Tier 2 (Trademark Protection) complete
   setStageStatus(stages, 'trademark_search', 'completed', allResults.length - tier2StartCount);
@@ -761,7 +850,10 @@ async function runTieredSearch(
 
   // ── TIER 3: Signal-Based Deep Dive ───────────────────────────────
   if (isTimedOut()) {
-    console.log(`[Scan Engine] Time limit reached after Tier 2, skipping Tier 3 and Telegram`);
+    logger?.selfHeal('marketplace_scan', 'TIMEOUT', 'Skipped Tier 3 and Telegram due to time limit', {
+      elapsed_ms: Date.now() - scanStartTime,
+      max_duration_ms: maxDurationMs,
+    });
     setStageStatus(stages, 'marketplace_scan', 'completed', 0);
     setStageStatus(stages, 'platform_scan', 'completed', 0);
     return allResults;
@@ -771,7 +863,11 @@ async function runTieredSearch(
     const { tier3 } = generateQueries(product, intelligence, allFoundUrls);
 
     if (tier3.length > 0) {
-      console.log(`[Scan Engine] Tier 3: ${tier3.length} deep-dive queries (budget: ${client.remaining})`);
+      logger?.info('marketplace_scan', `Tier 3: ${tier3.length} deep-dive queries (budget: ${client.remaining})`, {
+        tier: 3,
+        query_count: tier3.length,
+        budget_remaining: client.remaining,
+      });
 
       const tier3Responses = await client.searchBatch(
         tier3.map((q) => ({ query: q.query, num: q.num }))
@@ -811,11 +907,20 @@ async function runTieredSearch(
         }
       }
 
-      console.log(`[Scan Engine] Tier 3 complete: +${allResults.length - tier3StartCount} results`);
+      logger?.info('marketplace_scan', `Tier 3 complete: +${allResults.length - tier3StartCount} results`, {
+        tier: 3,
+        new_results: allResults.length - tier3StartCount,
+        total_results: allResults.length,
+        api_calls_used: client.used,
+        elapsed_ms: Date.now() - scanStartTime,
+      });
     }
   }
 
-  console.log(`[Scan Engine] SerpAPI budget: ${client.used}/50 calls used`);
+  logger?.info('marketplace_scan', `SerpAPI budget: ${client.used}/50 calls used`, {
+    api_calls_used: client.used,
+    api_calls_remaining: client.remaining,
+  });
 
   // Progress: Search tiers complete
   setStageStatus(stages, 'marketplace_scan', 'completed', allResults.length);
@@ -824,7 +929,10 @@ async function runTieredSearch(
 
   // ── TELEGRAM BOT API (supplementary channel search) ──────────────
   if (isTimedOut()) {
-    console.log(`[Scan Engine] Time limit reached, skipping Telegram`);
+    logger?.selfHeal('platform_scan', 'TIMEOUT', 'Skipped Telegram due to time limit', {
+      elapsed_ms: Date.now() - scanStartTime,
+      max_duration_ms: maxDurationMs,
+    });
     setStageStatus(stages, 'platform_scan', 'completed', 0);
     return allResults;
   }
@@ -832,16 +940,24 @@ async function runTieredSearch(
   try {
     const telegramResults = await scanTelegram(product, intelligence);
     if (telegramResults.length > 0) {
-      console.log(`[Scan Engine] Telegram Bot API: +${telegramResults.length} results`);
+      logger?.info('platform_scan', `Telegram Bot API: +${telegramResults.length} results`, {
+        telegram_results: telegramResults.length,
+      });
       allResults.push(...telegramResults);
     }
   } catch (error) {
-    console.error('[Scan Engine] Telegram scanner error (non-blocking):', error);
+    logger?.error('platform_scan', `Telegram scanner error: ${error instanceof Error ? error.message : String(error)}`, 'TELEGRAM_FAIL', {
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    logger?.selfHeal('platform_scan', 'TELEGRAM_FAIL', 'Continued scan without Telegram results');
   }
 
   // Progress: Telegram complete
   setStageStatus(stages, 'platform_scan', 'completed', allResults.length);
 
-  console.log(`[Scan Engine] Total raw results: ${allResults.length}`);
+  logger?.info('platform_scan', `Total raw results: ${allResults.length}`, {
+    total_results: allResults.length,
+    elapsed_ms: Date.now() - scanStartTime,
+  });
   return allResults;
 }
