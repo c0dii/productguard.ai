@@ -26,6 +26,7 @@ export default function DMCAReviewPage() {
   const [sworn, setSworn] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [upsellLoading, setUpsellLoading] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -119,22 +120,58 @@ export default function DMCAReviewPage() {
               Stop playing whack-a-mole. Let ProductGuard monitor and take down piracy 24/7.
             </p>
 
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="bg-[#0B1018] border border-[#172033] rounded-xl p-4 text-center">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={async () => {
+                  setUpsellLoading('starter');
+                  try {
+                    const res = await fetch('/api/subscription/change', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ planTier: 'starter' }),
+                    });
+                    const result = await res.json();
+                    if (result.url) window.location.href = result.url;
+                    else if (result.action === 'updated') window.location.href = '/dashboard/settings?upgrade=success';
+                  } catch { /* ignore */ }
+                  setUpsellLoading(null);
+                }}
+                disabled={upsellLoading !== null}
+                className="bg-[#0B1018] border border-[#172033] rounded-xl p-4 text-center cursor-pointer hover:border-[#00E4B8] transition-all disabled:opacity-50"
+              >
                 <div className="text-xs text-[#8293AA] font-semibold">Starter</div>
                 <div className="text-2xl font-extrabold text-[#00E4B8]">$29<span className="text-xs text-[#8293AA]">/mo</span></div>
-                <div className="text-[10px] text-[#4D5E74]">5 products · Weekly scans</div>
-              </div>
-              <div className="bg-[#0B1018] border border-[#172033] rounded-xl p-4 text-center">
-                <div className="text-xs text-[#8293AA] font-semibold">Pro</div>
+                <div className="text-[10px] text-[#4D5E74] mb-3">5 products · Weekly scans</div>
+                <div className="bg-[#00E4B8] text-[#060A11] font-extrabold text-xs py-2 rounded-lg">
+                  {upsellLoading === 'starter' ? 'Loading...' : 'Get Starter'}
+                </div>
+              </button>
+              <button
+                onClick={async () => {
+                  setUpsellLoading('pro');
+                  try {
+                    const res = await fetch('/api/subscription/change', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ planTier: 'pro' }),
+                    });
+                    const result = await res.json();
+                    if (result.url) window.location.href = result.url;
+                    else if (result.action === 'updated') window.location.href = '/dashboard/settings?upgrade=success';
+                  } catch { /* ignore */ }
+                  setUpsellLoading(null);
+                }}
+                disabled={upsellLoading !== null}
+                className="bg-[#0B1018] border-2 border-[#00E4B8] rounded-xl p-4 text-center cursor-pointer hover:shadow-[0_0_20px_rgba(0,228,184,0.15)] transition-all disabled:opacity-50"
+              >
+                <div className="text-xs text-[#00E4B8] font-semibold">Pro · Best Value</div>
                 <div className="text-2xl font-extrabold text-[#00E4B8]">$99<span className="text-xs text-[#8293AA]">/mo</span></div>
-                <div className="text-[10px] text-[#4D5E74]">25 products · Daily scans</div>
-              </div>
+                <div className="text-[10px] text-[#4D5E74] mb-3">25 products · Daily scans</div>
+                <div className="bg-[#00E4B8] text-[#060A11] font-extrabold text-xs py-2 rounded-lg">
+                  {upsellLoading === 'pro' ? 'Loading...' : 'Get Pro'}
+                </div>
+              </button>
             </div>
-
-            <button className="w-full bg-[#00E4B8] text-[#060A11] font-extrabold text-sm py-3.5 rounded-xl shadow-[0_0_20px_rgba(0,228,184,0.22)] cursor-pointer border-none">
-              🛡️ Start Protecting Now
-            </button>
           </div>
 
           <p className="text-center text-[10px] text-[#4D5E74] mt-6">

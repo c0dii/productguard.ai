@@ -2,6 +2,26 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  // ── Alerts subdomain handling ──────────────────────────────
+  // alerts.productguard.com serves the (alerts) route group publicly
+  const host = request.headers.get('host') || '';
+  const isAlertsSubdomain = host.startsWith('alerts.');
+
+  if (isAlertsSubdomain) {
+    const { pathname } = request.nextUrl;
+    const allowedPaths = ['/r/', '/signup', '/dmca/', '/api/marketing/'];
+    const isAllowed = allowedPaths.some(p => pathname.startsWith(p)) || pathname === '/';
+
+    if (!isAllowed) {
+      // Redirect disallowed paths to main domain
+      const mainDomain = host.replace('alerts.', '');
+      return NextResponse.redirect(new URL(pathname, `https://${mainDomain}`));
+    }
+
+    // Alerts pages are public — no auth needed
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -96,10 +116,14 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Protected routes only - exclude static assets and API routes
+    // Protected routes
     '/dashboard/:path*',
     '/auth/login',
     '/auth/signup',
     '/admin/:path*',
+    // Alerts subdomain routes (middleware handles subdomain gating)
+    '/r/:path*',
+    '/signup',
+    '/dmca/:path*',
   ],
 };
