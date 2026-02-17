@@ -23,6 +23,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     { href: '/admin/infringements', label: '⚠️ Infringements' },
     { href: '/admin/takedowns', label: '📧 Takedowns' },
     { href: '/admin/dmca-logs', label: '📋 DMCA Logs' },
+    { href: '/admin/marketing', label: '📣 Marketing' },
     { href: '/admin/system', label: '⚙️ System' },
   ];
 
