@@ -184,12 +184,13 @@ export default async function AdminOverviewPage() {
                 {infringementStats?.removed_infringements || 0}
               </p>
             </div>
-            <div>
+            {/* Temporarily disabled - revenue loss calculations need refinement */}
+            {/* <div>
               <p className="text-sm text-pg-text-muted">Estimated Revenue Loss</p>
               <p className="text-xl font-semibold text-pg-danger">
                 {formatCurrency(infringementStats?.total_estimated_loss || 0)}
               </p>
-            </div>
+            </div> */}
           </div>
         </Card>
 

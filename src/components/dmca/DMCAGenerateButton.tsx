@@ -19,10 +19,11 @@ export function DMCAGenerateButton({
 }: DMCAGenerateButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [notice, setNotice] = useState<any>(null);
+  const [quality, setQuality] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (status !== 'active') {
+    if (status !== 'active' && status !== 'takedown_sent') {
       alert('Please confirm this infringement before generating a DMCA notice');
       return;
     }
@@ -44,6 +45,7 @@ export function DMCAGenerateButton({
       }
 
       setNotice(data.notice);
+      setQuality(data.quality || null);
     } catch (err: any) {
       console.error('Error generating DMCA notice:', err);
       setError(err.message || 'Failed to generate DMCA notice. Please try again.');
@@ -54,33 +56,33 @@ export function DMCAGenerateButton({
 
   const handleClose = () => {
     setNotice(null);
+    setQuality(null);
   };
 
   const handleCopy = () => {
-    // Could trigger analytics or other side effects here
     console.log('DMCA notice copied to clipboard');
   };
+
+  const canGenerate = status === 'active' || status === 'takedown_sent';
 
   return (
     <>
       <Button
         onClick={handleGenerate}
-        disabled={isGenerating || status !== 'active'}
+        disabled={isGenerating || !canGenerate}
         className="w-full"
       >
         {isGenerating ? (
           <>
-            <span className="animate-spin mr-2">⏳</span>
+            <span className="animate-spin mr-2">&#9203;</span>
             Generating DMCA Notice...
           </>
         ) : (
-          <>
-            🤖 Generate DMCA Notice
-          </>
+          'Generate DMCA Notice'
         )}
       </Button>
 
-      {status !== 'active' && (
+      {!canGenerate && (
         <p className="text-xs text-pg-text-muted mt-2 text-center">
           Confirm this infringement first to generate a DMCA notice
         </p>
@@ -95,6 +97,7 @@ export function DMCAGenerateButton({
       {notice && (
         <DMCALetterReview
           notice={notice}
+          quality={quality}
           productName={productName}
           infringementUrl={infringementUrl}
           onClose={handleClose}

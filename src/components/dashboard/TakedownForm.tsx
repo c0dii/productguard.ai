@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useRouter } from 'next/navigation';
 import { getPlatformContact, getRecommendedRecipient } from '@/lib/utils/platform-abuse-contacts';
+import { INFRINGEMENT_TYPES } from '@/lib/constants/infringement-types';
 
 interface TakedownFormProps {
   prefilledInfringement: any;
@@ -13,51 +14,6 @@ interface TakedownFormProps {
   availableProducts: any[];
   userId: string;
 }
-
-const INFRINGEMENT_TYPES = [
-  {
-    value: 'exact_recreation',
-    label: 'Exact Recreation/Clone',
-    description: 'Someone has recreated your product with identical or nearly identical functionality',
-    severity: 'high',
-  },
-  {
-    value: 'name_trademark',
-    label: 'Name/Trademark Infringement',
-    description: 'Using your product name, brand, or trademark without authorization',
-    severity: 'high',
-  },
-  {
-    value: 'unauthorized_distribution',
-    label: 'Unauthorized Distribution',
-    description: 'Distributing your product (free or paid) without permission',
-    severity: 'high',
-  },
-  {
-    value: 'piracy_sale',
-    label: 'Piracy/Unauthorized Sale',
-    description: 'Selling unauthorized copies of your product',
-    severity: 'critical',
-  },
-  {
-    value: 'copyright_infringement',
-    label: 'Copyright Infringement',
-    description: 'Using your copyrighted code, documentation, or materials',
-    severity: 'high',
-  },
-  {
-    value: 'trade_dress',
-    label: 'Trade Dress Infringement',
-    description: 'Copying the look, feel, or presentation of your product',
-    severity: 'medium',
-  },
-  {
-    value: 'derivative_work',
-    label: 'Unauthorized Derivative Work',
-    description: 'Creating modifications or extensions without permission',
-    severity: 'medium',
-  },
-];
 
 const TONE_OPTIONS = [
   {
@@ -94,6 +50,7 @@ export function TakedownForm({
 
   // Form state
   const [selectedProduct, setSelectedProduct] = useState(prefilledProduct?.id || '');
+  const [manualUrl, setManualUrl] = useState('');
   const [infringementTypes, setInfringementTypes] = useState<string[]>([]);
   const [tone, setTone] = useState('professional');
   const [additionalEvidence, setAdditionalEvidence] = useState('');
@@ -111,6 +68,8 @@ export function TakedownForm({
   const [signatureConsent, setSignatureConsent] = useState(false);
 
   const selectedProductData = availableProducts.find((p) => p.id === selectedProduct);
+  const isManualEntry = !prefilledInfringement;
+  const effectiveUrl = prefilledInfringement?.source_url || manualUrl;
 
   // Auto-populate evidence from infringement data
   useEffect(() => {
@@ -191,9 +150,10 @@ export function TakedownForm({
         if (prefilledInfringement.estimated_audience) {
           riskInfo.push(`Estimated Audience Reach: ${prefilledInfringement.estimated_audience.toLocaleString()}`);
         }
-        if (prefilledInfringement.est_revenue_loss) {
-          riskInfo.push(`Estimated Revenue Impact: $${prefilledInfringement.est_revenue_loss.toLocaleString()}`);
-        }
+        // Temporarily disabled - revenue loss calculations need refinement
+        // if (prefilledInfringement.est_revenue_loss) {
+        //   riskInfo.push(`Estimated Revenue Impact: $${prefilledInfringement.est_revenue_loss.toLocaleString()}`);
+        // }
         sections.push(`\nRISK ASSESSMENT:\n${riskInfo.join('\n')}`);
       }
 
@@ -205,12 +165,12 @@ export function TakedownForm({
     }
   }, [prefilledInfringement]); // Only run when prefilledInfringement changes
 
-  // Auto-detect platform from infringement URL
-  const platformInfo = prefilledInfringement?.source_url
-    ? getPlatformContact(prefilledInfringement.source_url)
+  // Auto-detect platform from infringement URL (works for both prefilled and manual)
+  const platformInfo = effectiveUrl
+    ? getPlatformContact(effectiveUrl)
     : null;
-  const recommendedRecipient = prefilledInfringement?.source_url
-    ? getRecommendedRecipient(prefilledInfringement.source_url)
+  const recommendedRecipient = effectiveUrl
+    ? getRecommendedRecipient(effectiveUrl)
     : null;
 
   // Auto-populate recipient email from platform detection
@@ -218,7 +178,7 @@ export function TakedownForm({
     if (recommendedRecipient?.email && !recipientEmail) {
       setRecipientEmail(recommendedRecipient.email);
     }
-  }, [recommendedRecipient]);
+  }, [recommendedRecipient?.email]);
 
   const handleInfringementTypeToggle = (type: string) => {
     if (infringementTypes.includes(type)) {
@@ -303,7 +263,7 @@ export function TakedownForm({
             consent_given: signatureConsent,
           },
           infrastructure: prefilledInfringement?.infrastructure || null,
-          infringing_url: prefilledInfringement?.source_url,
+          infringing_url: effectiveUrl,
           recipient_email: recipientEmail,
           cc_emails: ccEmailList,
           // Timeline data
@@ -330,11 +290,11 @@ export function TakedownForm({
   };
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center gap-4 mb-8">
+    <div className="flex items-center justify-center gap-2 sm:gap-4 mb-6 sm:mb-8">
       {[1, 2, 3, 4].map((s) => (
-        <div key={s} className="flex items-center gap-2">
+        <div key={s} className="flex items-center gap-1.5 sm:gap-2">
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base ${
               s === step
                 ? 'bg-pg-accent text-white'
                 : s < step
@@ -344,7 +304,7 @@ export function TakedownForm({
           >
             {s < step ? '✓' : s}
           </div>
-          {s < 4 && <div className={`w-12 h-1 ${s < step ? 'bg-green-500' : 'bg-pg-border'}`} />}
+          {s < 4 && <div className={`w-6 sm:w-12 h-1 ${s < step ? 'bg-green-500' : 'bg-pg-border'}`} />}
         </div>
       ))}
     </div>
@@ -357,7 +317,7 @@ export function TakedownForm({
       {/* Step 1: Product Selection & IP Ownership */}
       {step === 1 && (
         <Card>
-          <h2 className="text-2xl font-bold mb-6 text-pg-text">Step 1: Product & IP Ownership</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 1: Product & IP Ownership</h2>
 
           {/* Product Selection */}
           <div className="mb-6">
@@ -390,6 +350,37 @@ export function TakedownForm({
               </div>
             )}
           </div>
+
+          {/* Manual URL Input (when not coming from an infringement) */}
+          {isManualEntry && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-pg-text mb-2">
+                Infringing URL <span className="text-pg-danger">*</span>
+              </label>
+              <input
+                type="url"
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                className="input-field w-full"
+                placeholder="https://example.com/infringing-page"
+              />
+              <p className="text-xs text-pg-text-muted mt-1">
+                Enter the URL where you found the unauthorized copy of your product
+              </p>
+              {manualUrl && platformInfo && (
+                <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                  <p className="text-sm text-pg-text">
+                    Platform detected: <strong>{platformInfo.name}</strong>
+                  </p>
+                  {recommendedRecipient?.email && (
+                    <p className="text-xs text-pg-text-muted mt-1">
+                      Recommended recipient: {recommendedRecipient.email}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* IP Ownership Information */}
           <div className="space-y-4 mb-6">
@@ -512,7 +503,7 @@ export function TakedownForm({
           <div className="flex justify-end">
             <Button
               onClick={() => setStep(2)}
-              disabled={!selectedProduct || !contactName || !contactEmail}
+              disabled={!selectedProduct || !contactName || !contactEmail || (isManualEntry && !manualUrl)}
             >
               Next: Infringement Type →
             </Button>
@@ -523,7 +514,7 @@ export function TakedownForm({
       {/* Step 2: Infringement Type Selection */}
       {step === 2 && (
         <Card>
-          <h2 className="text-2xl font-bold mb-6 text-pg-text">Step 2: Infringement Type</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 2: Infringement Type</h2>
           <p className="text-sm text-pg-text-muted mb-6">
             Select all types of infringement that apply. Multiple selections create a stronger case.
           </p>
@@ -580,23 +571,26 @@ export function TakedownForm({
       {/* Step 3: Additional Evidence */}
       {step === 3 && (
         <Card>
-          <h2 className="text-2xl font-bold mb-6 text-pg-text">Step 3: Additional Evidence</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 3: Additional Evidence</h2>
           <p className="text-sm text-pg-text-muted mb-6">
             Provide any additional proof or context to strengthen your claim
           </p>
 
-          {prefilledInfringement && (
+          {effectiveUrl && (
             <div className="mb-6 space-y-4">
               <div className="p-4 rounded-lg bg-pg-bg border border-pg-border">
                 <h3 className="text-sm font-semibold text-pg-text mb-2">Infringing URL</h3>
                 <a
-                  href={prefilledInfringement.source_url}
+                  href={effectiveUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-pg-accent hover:underline break-all text-sm"
                 >
-                  {prefilledInfringement.source_url}
+                  {effectiveUrl}
                 </a>
+                {isManualEntry && (
+                  <p className="text-xs text-pg-text-muted mt-1">Manually reported URL</p>
+                )}
               </div>
 
               {/* Platform Detection */}
@@ -628,12 +622,12 @@ export function TakedownForm({
                       )}
                       {platformInfo.instructions && (
                         <p className="text-sm text-pg-text-muted mt-2">
-                          💡 {platformInfo.instructions}
+                          {platformInfo.instructions}
                         </p>
                       )}
                       {platformInfo.responseTime && (
                         <p className="text-xs text-pg-text-muted mt-1">
-                          ⏱️ Typical response: {platformInfo.responseTime}
+                          Typical response: {platformInfo.responseTime}
                         </p>
                       )}
                     </div>
@@ -677,11 +671,11 @@ export function TakedownForm({
       {/* Step 4: Tone Selection & Review */}
       {step === 4 && (
         <Card>
-          <h2 className="text-2xl font-bold mb-6 text-pg-text">Step 4: Tone & Review</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 4: Tone & Review</h2>
 
           {/* Email Configuration */}
-          <div className="mb-8 p-6 rounded-lg bg-pg-bg border border-pg-border">
-            <h3 className="text-lg font-semibold text-pg-text mb-4">📧 Email Configuration</h3>
+          <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-lg bg-pg-bg border border-pg-border">
+            <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-3 sm:mb-4">📧 Email Configuration</h3>
 
             <div className="space-y-4">
               {/* Recipient Email */}
@@ -786,8 +780,8 @@ export function TakedownForm({
           </div>
 
           {/* Signature Section */}
-          <div className="mb-8 p-6 rounded-lg bg-gradient-to-br from-pg-accent/5 to-blue-500/5 border-2 border-pg-accent/30">
-            <h3 className="text-lg font-semibold text-pg-text mb-2">✍️ Electronic Signature (Required)</h3>
+          <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-lg bg-gradient-to-br from-pg-accent/5 to-blue-500/5 border-2 border-pg-accent/30">
+            <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-2">✍️ Electronic Signature (Required)</h3>
             <p className="text-sm text-pg-text-muted mb-4">
               Your electronic signature legally certifies this notice under the DMCA and ESIGN Act.
             </p>
@@ -850,8 +844,8 @@ export function TakedownForm({
           </div>
 
           {/* Review Summary */}
-          <div className="mb-6 p-6 rounded-lg bg-pg-bg border border-pg-border space-y-4">
-            <h3 className="text-lg font-semibold text-pg-text">Review Your Submission</h3>
+          <div className="mb-6 p-4 sm:p-6 rounded-lg bg-pg-bg border border-pg-border space-y-4">
+            <h3 className="text-base sm:text-lg font-semibold text-pg-text">Review Your Submission</h3>
 
             <div>
               <p className="text-sm text-pg-text-muted">Product</p>

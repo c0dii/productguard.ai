@@ -3,7 +3,60 @@
  *
  * Fetches domain registration and hosting provider information
  * using the WhoisXML API service.
+ *
+ * Includes in-memory cache with 30-day TTL to avoid redundant API calls
+ * on rescans. Cache is keyed by normalized domain name.
  */
+
+// ── In-Memory Cache (30-day TTL) ─────────────────────────────────────
+const WHOIS_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+interface CacheEntry {
+  record: WhoisRecord;
+  fetchedAt: number; // Date.now() timestamp
+}
+
+const whoisCache = new Map<string, CacheEntry>();
+
+function getCachedWhois(domain: string): WhoisRecord | null {
+  const entry = whoisCache.get(domain);
+  if (!entry) return null;
+
+  const age = Date.now() - entry.fetchedAt;
+  if (age > WHOIS_CACHE_TTL_MS) {
+    whoisCache.delete(domain);
+    return null;
+  }
+
+  return entry.record;
+}
+
+function setCachedWhois(domain: string, record: WhoisRecord): void {
+  whoisCache.set(domain, { record, fetchedAt: Date.now() });
+
+  // Evict oldest entries if cache grows too large (>500 domains)
+  if (whoisCache.size > 500) {
+    const oldest = [...whoisCache.entries()]
+      .sort((a, b) => a[1].fetchedAt - b[1].fetchedAt)
+      .slice(0, 100);
+    for (const [key] of oldest) {
+      whoisCache.delete(key);
+    }
+  }
+}
+
+/** Get cache stats for monitoring */
+export function getWhoisCacheStats(): { size: number; hitRate: string } {
+  return {
+    size: whoisCache.size,
+    hitRate: _cacheHits + _cacheMisses > 0
+      ? `${((_cacheHits / (_cacheHits + _cacheMisses)) * 100).toFixed(1)}%`
+      : 'N/A',
+  };
+}
+
+let _cacheHits = 0;
+let _cacheMisses = 0;
 
 export interface WhoisRecord {
   domain: string;
@@ -55,12 +108,12 @@ function extractDomain(url: string): string | null {
     domain = domain.replace(/^www\./, '');
 
     // Remove path, query, hash
-    domain = domain.split('/')[0];
-    domain = domain.split('?')[0];
-    domain = domain.split('#')[0];
+    domain = domain.split('/')[0]!;
+    domain = domain.split('?')[0]!;
+    domain = domain.split('#')[0]!;
 
     // Remove port if present
-    domain = domain.split(':')[0];
+    domain = domain.split(':')[0]!;
 
     // Validate domain format (basic check)
     if (!domain || !domain.includes('.')) {
@@ -91,6 +144,15 @@ export async function lookupWhois(url: string): Promise<WhoisRecord | null> {
     console.warn('[WHOIS] Could not extract domain from URL:', url);
     return null;
   }
+
+  // Check cache first
+  const cached = getCachedWhois(domain);
+  if (cached) {
+    _cacheHits++;
+    console.log(`[WHOIS] Cache HIT for ${domain} (${whoisCache.size} cached, ${getWhoisCacheStats().hitRate} hit rate)`);
+    return cached;
+  }
+  _cacheMisses++;
 
   try {
     const apiUrl = new URL('https://www.whoisxmlapi.com/whoisserver/WhoisService');
@@ -139,6 +201,9 @@ export async function lookupWhois(url: string): Promise<WhoisRecord | null> {
     };
 
     console.log('[WHOIS] Successfully fetched WHOIS data for:', domain);
+
+    // Cache the result
+    setCachedWhois(domain, whoisRecord);
 
     return whoisRecord;
   } catch (error: any) {
@@ -295,7 +360,7 @@ export function parseBulkWhoisCSV(csvData: string): Map<string, WhoisRecord> {
 
     // Parse each data row
     for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
+      const line = lines[i]?.trim();
       if (!line) continue;
 
       // Split CSV (handling quoted values)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runDailyWorkflowChecks } from '@/lib/ghl/workflow-automation';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * Daily Workflow Automation Cron Job
@@ -15,11 +16,21 @@ import { runDailyWorkflowChecks } from '@/lib/ghl/workflow-automation';
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret to prevent unauthorized access
+    // Verify cron secret — mandatory, timing-safe comparison
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      console.error('[Cron] CRON_SECRET environment variable is not configured');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const expected = `Bearer ${cronSecret}`;
+    if (
+      !authHeader ||
+      authHeader.length !== expected.length ||
+      !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -39,7 +50,6 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: 'Daily workflow checks failed',
-        details: error.message,
       },
       { status: 500 }
     );

@@ -118,7 +118,7 @@ async function handleTrialStarted(
 
   await client.updateContact(contactId, {
     customFields: {
-      [GHL_CUSTOM_FIELDS.TRIAL_END_DATE]: trialEndDate.toISOString().split('T')[0],
+      [GHL_CUSTOM_FIELDS.TRIAL_END_DATE]: trialEndDate.toISOString().split('T')[0]!,
       [GHL_CUSTOM_FIELDS.SUBSCRIPTION_STATUS]: 'trial',
     },
   });
@@ -232,7 +232,7 @@ export async function trackUserSignup(userId: string, email: string, name?: stri
     data: { name },
     tags: [GHL_TAGS.TRIAL_USER, GHL_TAGS.NEEDS_ONBOARDING],
     customFields: {
-      [GHL_CUSTOM_FIELDS.ACCOUNT_CREATED]: new Date().toISOString().split('T')[0],
+      [GHL_CUSTOM_FIELDS.ACCOUNT_CREATED]: new Date().toISOString().split('T')[0]!,
     },
   });
 }
@@ -260,7 +260,7 @@ export async function trackFirstScan(
     email,
     data: { scanId, productName, resultsFound },
     customFields: {
-      [GHL_CUSTOM_FIELDS.LAST_SCAN]: new Date().toISOString().split('T')[0],
+      [GHL_CUSTOM_FIELDS.LAST_SCAN]: new Date().toISOString().split('T')[0]!,
     },
   });
 }
@@ -279,7 +279,7 @@ export async function trackScanCompleted(
     tags: [GHL_TAGS.ACTIVE_SCANNER],
     customFields: {
       [GHL_CUSTOM_FIELDS.TOTAL_SCANS]: totalScans,
-      [GHL_CUSTOM_FIELDS.LAST_SCAN]: new Date().toISOString().split('T')[0],
+      [GHL_CUSTOM_FIELDS.LAST_SCAN]: new Date().toISOString().split('T')[0]!,
     },
   });
 }

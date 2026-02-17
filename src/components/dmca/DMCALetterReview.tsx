@@ -10,13 +10,24 @@ interface GeneratedDMCANotice {
   body: string;
   recipient_email: string;
   recipient_name: string;
+  recipient_form_url?: string | null;
   legal_references: string[];
   evidence_links: string[];
   sworn_statement: string;
+  profile?: string;
+}
+
+interface QualityResult {
+  passed: boolean;
+  score: number;
+  strength: 'strong' | 'standard' | 'weak';
+  errors: Array<{ code: string; message: string; fix: string }>;
+  warnings: Array<{ code: string; message: string; fix: string }>;
 }
 
 interface DMCALetterReviewProps {
   notice: GeneratedDMCANotice;
+  quality?: QualityResult;
   productName: string;
   infringementUrl: string;
   onClose: () => void;
@@ -25,6 +36,7 @@ interface DMCALetterReviewProps {
 
 export function DMCALetterReview({
   notice,
+  quality,
   productName,
   infringementUrl,
   onClose,
@@ -58,14 +70,30 @@ export function DMCALetterReview({
     URL.revokeObjectURL(url);
   };
 
+  // Determine strength based on score thresholds: <75 red, 75-84 yellow, 85+ green
+  const getStrengthFromScore = (score: number) => {
+    if (score >= 85) return 'strong';
+    if (score >= 75) return 'standard';
+    return 'weak';
+  };
+
+  const strengthConfig = {
+    strong: { bg: 'bg-green-100 dark:bg-green-500/20', border: 'border-green-400 dark:border-green-500/50', barColor: 'bg-green-500', label: 'Strong' },
+    standard: { bg: 'bg-yellow-100 dark:bg-yellow-500/20', border: 'border-yellow-400 dark:border-yellow-500/50', barColor: 'bg-yellow-500', label: 'Standard' },
+    weak: { bg: 'bg-red-100 dark:bg-red-500/20', border: 'border-red-400 dark:border-red-500/50', barColor: 'bg-red-500', label: 'Weak' },
+  };
+
+  const effectiveStrength = quality ? getStrengthFromScore(quality.score) : null;
+  const strengthStyle = effectiveStrength ? strengthConfig[effectiveStrength] : null;
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <Card className="max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-2xl">
         {/* Header */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b border-pg-border">
+        <div className="flex items-start justify-between mb-3 sm:mb-4 pb-3 sm:pb-4 border-b border-pg-border">
           <div>
-            <h2 className="text-2xl font-bold text-pg-text mb-1">DMCA Takedown Notice</h2>
-            <p className="text-sm text-pg-text-muted">Review and edit before sending</p>
+            <h2 className="text-lg sm:text-2xl font-bold text-pg-text mb-1">DMCA Takedown Notice</h2>
+            <p className="text-xs sm:text-sm text-pg-text-muted">Review and edit before sending</p>
           </div>
           <button
             onClick={onClose}
@@ -77,15 +105,62 @@ export function DMCALetterReview({
           </button>
         </div>
 
-        {/* AI Badge */}
-        <div className="mb-4 flex items-center gap-2">
-          <Badge variant="default" className="bg-blue-600">
-            🤖 AI-Generated
-          </Badge>
-          <span className="text-xs text-pg-text-muted">
-            Review for accuracy. You are legally responsible for the contents.
-          </span>
-        </div>
+        {/* Quality Score Bar */}
+        {quality && strengthStyle && (
+          <div className={`mb-4 p-4 rounded-lg ${strengthStyle.bg} border ${strengthStyle.border}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-gray-900">
+                  Notice Strength: {strengthStyle.label}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold text-gray-900 ${strengthStyle.barColor}/30`}>
+                  {quality.score}/100
+                </span>
+              </div>
+              {!quality.passed && (
+                <span className="text-xs text-gray-900 dark:text-gray-900 font-semibold">
+                  Missing required elements
+                </span>
+              )}
+            </div>
+
+            {/* Score Bar */}
+            <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden mb-3">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${strengthStyle.barColor}`}
+                style={{ width: `${quality.score}%` }}
+              />
+            </div>
+
+            {/* Errors */}
+            {quality.errors.length > 0 && (
+              <div className="mb-2">
+                {quality.errors.map((err, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs mb-1">
+                    <span className="text-gray-900 dark:text-gray-900 mt-0.5 shrink-0 font-bold">✕</span>
+                    <span className="text-gray-900 dark:text-gray-900">
+                      <strong>{err.message}</strong> — {err.fix}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Warnings */}
+            {quality.warnings.length > 0 && (
+              <div>
+                {quality.warnings.map((warn, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs mb-1">
+                    <span className="text-gray-900 dark:text-gray-900 mt-0.5 shrink-0 font-bold">!</span>
+                    <span className="text-gray-800 dark:text-gray-900">
+                      {warn.message} — <span className="italic">{warn.fix}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Product & Infringement Info */}
         <div className="mb-6 p-4 bg-pg-surface rounded-lg">
@@ -103,10 +178,25 @@ export function DMCALetterReview({
 
         {/* Recipient Info */}
         <div className="mb-6">
-          <h3 className="text-sm font-bold text-pg-text mb-2">Recipient</h3>
-          <div className="p-3 bg-pg-bg rounded-lg text-sm">
+          <h3 className="text-sm font-bold text-pg-text mb-2">Send To</h3>
+          <div className="p-3 bg-pg-bg rounded-lg text-sm space-y-1">
             <p className="font-semibold text-pg-text">{notice.recipient_name}</p>
-            <p className="text-pg-accent">{notice.recipient_email}</p>
+            {notice.recipient_email && (
+              <p className="text-pg-accent">{notice.recipient_email}</p>
+            )}
+            {notice.recipient_form_url && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-pg-border">
+                <span className="text-xs text-pg-text-muted">This provider prefers web form submissions:</span>
+                <a
+                  href={notice.recipient_form_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-pg-accent hover:underline font-medium"
+                >
+                  Open DMCA Form →
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
@@ -163,22 +253,42 @@ export function DMCALetterReview({
         {/* Legal References */}
         <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <h3 className="text-sm font-bold text-yellow-900 dark:text-yellow-400 mb-2">
-            ⚖️ Legal Requirements Met
+            Legal References
           </h3>
           <ul className="text-xs text-yellow-800 dark:text-yellow-500 space-y-1">
             {notice.legal_references.map((ref, i) => (
-              <li key={i}>• {ref}</li>
+              <li key={i} className="flex items-center gap-2">
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {ref}
+              </li>
             ))}
-            <li>• Good faith belief statement</li>
-            <li>• Accuracy statement under penalty of perjury</li>
-            <li>• Contact information provided</li>
+            <li className="flex items-center gap-2">
+              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Good faith belief statement included
+            </li>
+            <li className="flex items-center gap-2">
+              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Accuracy statement under penalty of perjury included
+            </li>
+            <li className="flex items-center gap-2">
+              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Electronic signature included
+            </li>
           </ul>
         </div>
 
         {/* Warning */}
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <h3 className="text-sm font-bold text-red-900 dark:text-red-400 mb-2">
-            ⚠️ Important Legal Notice
+            Important Legal Notice
           </h3>
           <p className="text-xs text-red-800 dark:text-red-500">
             By submitting this DMCA notice, you are making statements under penalty of perjury. False or misleading
@@ -198,22 +308,31 @@ export function DMCALetterReview({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={handleDownload}>
-              📥 Download
+              Download .txt
             </Button>
             <Button onClick={handleCopy}>
-              {copied ? '✓ Copied!' : '📋 Copy to Clipboard'}
+              {copied ? 'Copied!' : 'Copy to Clipboard'}
             </Button>
           </div>
         </div>
 
         {/* Next Steps */}
         <div className="mt-4 pt-4 border-t border-pg-border">
-          <h3 className="text-sm font-bold text-pg-text mb-2">Next Steps:</h3>
+          <h3 className="text-sm font-bold text-pg-text mb-2">Next Steps</h3>
           <ol className="text-xs text-pg-text-muted space-y-1 list-decimal list-inside">
-            <li>Copy the notice to your clipboard or download it</li>
-            <li>Send via email to: <span className="text-pg-accent font-mono">{notice.recipient_email}</span></li>
+            {notice.recipient_form_url ? (
+              <>
+                <li>Open the provider&apos;s DMCA form (link above) and paste the notice</li>
+                <li>Or copy to clipboard and send via email to: <span className="text-pg-accent font-mono">{notice.recipient_email || 'see form'}</span></li>
+              </>
+            ) : (
+              <>
+                <li>Copy the notice to your clipboard or download it</li>
+                <li>Send via email to: <span className="text-pg-accent font-mono">{notice.recipient_email || 'provider contact'}</span></li>
+              </>
+            )}
             <li>Keep a copy for your records</li>
-            <li>Update infringement status to "Takedown Sent" after sending</li>
+            <li>Mark infringement as &quot;Takedown Sent&quot; after sending</li>
           </ol>
         </div>
       </Card>

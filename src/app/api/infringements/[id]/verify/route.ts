@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { learnFromFeedback, recordDailyMetrics, calculatePerformanceMetrics } from '@/lib/intelligence/intelligence-engine';
 import { createBlockchainTimestamp, formatTimestampProof } from '@/lib/evidence/blockchain-timestamp';
+import { capturePageEvidence } from '@/lib/evidence/capture-page';
 import { trackInfringementVerified } from '@/lib/ghl/events';
+import { analyzeEvidence } from '@/lib/evidence/analyze-evidence';
 
 /**
  * POST /api/infringements/[id]/verify
@@ -33,17 +35,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const body = await request.json();
     const { action } = body;
 
-    if (!action || !['verify', 'reject'].includes(action)) {
+    if (!action || !['verify', 'reject', 'whitelist'].includes(action)) {
       return NextResponse.json(
-        { error: 'Invalid action. Must be "verify" or "reject"' },
+        { error: 'Invalid action. Must be "verify", "reject", or "whitelist"' },
         { status: 400 }
       );
     }
 
-    // Fetch infringement and verify ownership
+    // Fetch infringement with product data (including AI data for evidence snapshot)
     const { data: infringement, error: fetchError } = await supabase
       .from('infringements')
-      .select('*, products!inner(user_id)')
+      .select('*, products!inner(user_id, ai_extracted_data, keywords, name, description)')
       .eq('id', id)
       .single();
 
@@ -57,8 +59,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Update status based on action
-    const newStatus = action === 'verify' ? 'active' : 'false_positive';
+    const newStatus = action === 'verify' ? 'active' : action === 'whitelist' ? 'archived' : 'false_positive';
     const now = new Date().toISOString();
+
+    // If whitelisting, add the source URL to the product's whitelist_urls
+    if (action === 'whitelist') {
+      const { data: currentProduct } = await supabase
+        .from('products')
+        .select('whitelist_urls')
+        .eq('id', infringement.product_id)
+        .single();
+
+      const existingUrls: string[] = currentProduct?.whitelist_urls || [];
+      if (!existingUrls.includes(infringement.source_url)) {
+        const { error: whitelistError } = await supabase
+          .from('products')
+          .update({ whitelist_urls: [...existingUrls, infringement.source_url] })
+          .eq('id', infringement.product_id);
+
+        if (whitelistError) {
+          console.error('Error adding URL to whitelist:', whitelistError);
+          return NextResponse.json({ error: 'Failed to whitelist URL' }, { status: 500 });
+        }
+      }
+    }
 
     const { error: updateError } = await supabase
       .from('infringements')
@@ -78,14 +102,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Log status transition in audit table
+    const transitionReason = action === 'verify'
+      ? 'User verified as real infringement'
+      : action === 'whitelist'
+      ? `User whitelisted URL: ${infringement.source_url}`
+      : 'User marked as false positive';
+
     await supabase.from('status_transitions').insert({
       infringement_id: id,
       from_status: infringement.status,
       to_status: newStatus,
-      reason:
-        action === 'verify' ? 'User verified as real infringement' : 'User marked as false positive',
+      reason: transitionReason,
       triggered_by: 'user',
-      metadata: { user_id: user.id, action },
+      metadata: { user_id: user.id, action, ...(action === 'whitelist' ? { whitelisted_url: infringement.source_url } : {}) },
     });
 
     // INTELLIGENCE ENGINE: Learn from user feedback
@@ -112,11 +141,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const userIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
         const userAgent = request.headers.get('user-agent') || 'unknown';
 
-        // Create cryptographic hash of evidence for integrity verification
+        // Capture live page evidence: HTML, text, links, Wayback Machine archive
+        console.log('[Evidence Capture] Starting page capture for', infringement.source_url);
+        const pageCapture = await capturePageEvidence(
+          infringement.source_url,
+          user.id,
+          id
+        );
+
+        // Create cryptographic hash of ALL evidence (including captured page)
         const evidenceData = JSON.stringify({
           url: infringement.source_url,
           infrastructure: infringement.infrastructure,
           evidence: infringement.evidence,
+          page_html_hash: pageCapture.page_html_hash,
+          page_text_length: pageCapture.page_text.length,
+          page_links_count: pageCapture.page_links.length,
+          wayback_url: pageCapture.wayback_url,
           timestamp: now,
         });
         const contentHash = crypto.createHash('sha256').update(evidenceData).digest('hex');
@@ -127,7 +168,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         if (timestampProof.status !== 'failed') {
           console.log('[Blockchain Timestamp] Successfully created. Status:', timestampProof.status);
-          console.log('[Blockchain Timestamp] Verification URL:', timestampProof.verification_url);
         } else {
           console.warn('[Blockchain Timestamp] Failed to create timestamp, continuing without it');
         }
@@ -153,6 +193,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             user_agent: 'ProductGuard Scanner',
           },
           {
+            action: 'page_evidence_captured',
+            performed_by: 'system',
+            performed_at: pageCapture.captured_at,
+            ip_address: 'system',
+            user_agent: 'ProductGuard Evidence Capture',
+          },
+          {
             action: 'user_verified',
             performed_by: user.id,
             performed_at: now,
@@ -161,17 +208,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           },
         ];
 
-        // Create evidence snapshot record
+        // Freeze product AI data at time of verification for content comparisons
+        const productAiData = infringement.products?.ai_extracted_data || null;
+
+        // Create evidence snapshot record with captured page data
         const { data: snapshot, error: snapshotError } = await supabase
           .from('evidence_snapshots')
           .insert({
             infringement_id: id,
             user_id: user.id,
-            page_title: infringement.evidence?.page_title || '',
+            page_title: pageCapture.page_title || (infringement.evidence as any)?.page_title || '',
             page_url: infringement.source_url,
-            page_hash: infringement.evidence?.page_hash || contentHash,
+            page_hash: pageCapture.page_html_hash || contentHash,
             content_hash: contentHash,
             timestamp_proof: timestampProof.status !== 'failed' ? JSON.stringify(timestampProof) : null,
+            html_archive_url: pageCapture.html_storage_path,
             infrastructure_snapshot: infringement.infrastructure || {},
             evidence_matches: infringement.evidence?.matches || infringement.evidence?.matched_excerpts?.map((text: string) => ({
               type: 'text_match',
@@ -181,12 +232,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             })) || [],
             chain_of_custody: chainOfCustody,
             attestation,
+            // Store captured page data
+            page_capture: {
+              page_text: pageCapture.page_text.slice(0, 100000), // Cap at 100KB
+              page_links: pageCapture.page_links,
+              wayback_url: pageCapture.wayback_url,
+              html_storage_path: pageCapture.html_storage_path,
+              page_html_hash: pageCapture.page_html_hash,
+            },
+            // Freeze product AI data for "Original vs Infringing" content comparisons
+            product_ai_data: productAiData,
             captured_at: now,
             verified: true,
             verification_status: 'valid',
-            // Screenshot and HTML archive would be added here via separate API calls
-            // screenshot_url: null,  // Will be populated by screenshot service
-            // html_archive_url: null, // Will be populated by archive service
           })
           .select()
           .single();
@@ -199,15 +257,55 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             .eq('id', id);
 
           console.log(`[Evidence Snapshot] Created snapshot ${snapshot.id} for infringement ${id}`);
+          console.log(`[Evidence Snapshot] Page: "${pageCapture.page_title}" | ${pageCapture.page_links.length} links | HTML hash: ${pageCapture.page_html_hash.slice(0, 12)}...`);
 
+          if (pageCapture.wayback_url) {
+            console.log(`[Evidence Snapshot] Wayback Machine archive: ${pageCapture.wayback_url}`);
+          }
           if (timestampProof.status !== 'failed') {
             console.log(`[Evidence Snapshot] Blockchain timestamp anchored. Proof:`, formatTimestampProof(timestampProof));
           }
 
-          // TODO: Trigger background jobs for:
-          // 1. Screenshot capture (Puppeteer/Playwright)
-          // 2. HTML archival
-          // 3. Blockchain timestamp upgrade (check confirmation after ~1 hour)
+          // Run AI evidence analysis (non-blocking — don't fail verification if this fails)
+          try {
+            const product = infringement.products;
+            const analysisResult = await analyzeEvidence({
+              productName: product.name || '',
+              productDescription: product.description || null,
+              productUrl: (infringement as any).products?.url || null,
+              productType: (infringement as any).products?.type || 'other',
+              productKeywords: product.keywords || null,
+              aiExtractedData: product.ai_extracted_data || null,
+              capturedPageText: pageCapture.page_text || '',
+              capturedPageTitle: pageCapture.page_title || null,
+              infringementUrl: infringement.source_url,
+              platform: infringement.platform,
+            });
+
+            if (analysisResult && analysisResult.matches.length > 0) {
+              // Update the evidence snapshot with AI analysis
+              await supabase
+                .from('evidence_snapshots')
+                .update({
+                  ai_evidence_analysis: analysisResult,
+                  evidence_matches: analysisResult.matches.map((m) => ({
+                    type: m.type,
+                    matched_text: m.infringing_text,
+                    original_text: m.original_text,
+                    context: m.context,
+                    severity: m.legal_significance,
+                    confidence: m.confidence,
+                    explanation: m.explanation,
+                    dmca_language: m.dmca_language,
+                  })),
+                })
+                .eq('id', snapshot.id);
+
+              console.log(`[Evidence Analyzer] AI analysis complete: ${analysisResult.matches.length} matches, strength: ${analysisResult.strength_score}/100`);
+            }
+          } catch (analysisError) {
+            console.error('[Evidence Analyzer] AI analysis failed (non-blocking):', analysisError);
+          }
         } else {
           console.error('[Evidence Snapshot] Failed to create snapshot:', snapshotError);
         }
@@ -248,6 +346,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       message:
         action === 'verify'
           ? 'Infringement verified and marked as active. Evidence snapshot created for legal defense.'
+          : action === 'whitelist'
+          ? 'URL whitelisted and infringement dismissed. Future scans will skip this URL.'
           : 'Infringement marked as false positive',
     });
   } catch (error) {

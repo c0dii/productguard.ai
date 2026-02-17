@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createCheckoutSession } from '@/lib/stripe';
 import type { PlanTier } from '@/types';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 5 checkout attempts per minute per IP
+    const ip = getClientIp(req);
+    const limiter = rateLimit(`checkout:${ip}`, { limit: 5, windowSeconds: 60 });
+    if (!limiter.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(limiter.resetIn) } }
+      );
+    }
+
     const supabase = await createClient();
 
     // Get authenticated user
@@ -36,7 +47,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error creating checkout session:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create checkout session' },
+      { error: 'Failed to create checkout session' },
       { status: 500 }
     );
   }

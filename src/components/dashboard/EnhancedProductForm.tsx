@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { TagInput } from '@/components/ui/TagInput';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { ProductImageUpload } from './ProductImageUpload';
+import { filterGenericKeywords } from '@/lib/utils/keyword-quality';
 import type { Product, ProductType, AIExtractedData, ProductImage } from '@/types';
 
 interface EnhancedProductFormProps {
@@ -67,6 +68,7 @@ export function EnhancedProductForm({
 
     // Authorized Sales
     whitelist_domains: product?.whitelist_domains || [],
+    whitelist_urls: product?.whitelist_urls || [],
     authorized_sellers: product?.authorized_sellers || [],
 
     // Advanced
@@ -87,6 +89,7 @@ export function EnhancedProductForm({
 
     onSave({
       ...formData,
+      keywords: filterGenericKeywords(formData.keywords),
       ai_extracted_data: aiExtractedData,
       product_images: productImages,
       full_text_content: fullTextContent,
@@ -193,10 +196,11 @@ export function EnhancedProductForm({
         setFullTextContent(data.full_text_content);
       }
 
-      // Optionally update other fields if they've changed
+      // Update fields with refreshed data
       setFormData((prev) => ({
         ...prev,
         keywords: data.keywords && data.keywords.length > 0 ? data.keywords : prev.keywords,
+        description: data.ai_extracted_data?.product_description || prev.description,
       }));
 
     } catch (error: any) {
@@ -583,9 +587,16 @@ export function EnhancedProductForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-pg-text mb-2">
-            Description
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-pg-text">
+              Description
+            </label>
+            {aiExtractedData?.product_description && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">
+                AI Generated
+              </span>
+            )}
+          </div>
           <textarea
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -593,6 +604,9 @@ export function EnhancedProductForm({
             className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
             placeholder="Describe your product..."
           />
+          <p className="text-xs text-pg-text-muted mt-1">
+            This description is used in DMCA takedown notices. Keep it concise and factual.
+          </p>
         </div>
 
         <TagInput
@@ -670,6 +684,14 @@ export function EnhancedProductForm({
           label="Whitelist Domains"
           placeholder="e.g., gumroad.com, udemy.com"
           helpText="Authorized domains to exclude from infringement detection"
+        />
+
+        <TagInput
+          value={formData.whitelist_urls}
+          onChange={(urls) => setFormData({ ...formData, whitelist_urls: urls })}
+          label="Approved URLs"
+          placeholder="e.g., https://gumroad.com/l/my-product"
+          helpText="Specific URLs you own that should never trigger infringement alerts. URLs are auto-added when you use 'This Is My Approved URL' during review."
         />
 
         <TagInput

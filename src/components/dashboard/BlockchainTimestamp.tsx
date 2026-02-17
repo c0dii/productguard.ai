@@ -60,11 +60,11 @@ export function BlockchainTimestamp({ timestampProof }: BlockchainTimestampProps
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">₿</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-xl sm:text-2xl">₿</span>
           <div>
-            <h3 className="text-lg font-bold text-pg-text">Blockchain Timestamp</h3>
+            <h3 className="text-base sm:text-lg font-bold text-pg-text">Blockchain Timestamp</h3>
             <p className="text-xs text-pg-text-muted">Bitcoin Notary via OpenTimestamps</p>
           </div>
         </div>

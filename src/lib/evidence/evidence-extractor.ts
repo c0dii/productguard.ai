@@ -11,6 +11,7 @@
 import { generateCompletion, AI_MODELS } from '@/lib/ai/client';
 import type { Product } from '@/types';
 import crypto from 'crypto';
+import { isGenericKeyword } from '@/lib/utils/keyword-quality';
 
 export interface EvidenceMatch {
   type: 'brand_mention' | 'keyword_match' | 'copyrighted_content' | 'pricing_info' | 'download_link';
@@ -74,6 +75,8 @@ CRITICAL RULES:
 4. Identify matches for: brand names, product names, copyrighted phrases, pricing, download links
 5. Rate confidence based on exactness of match
 6. Flag critical evidence (direct copies, download links, pricing that undercuts legitimate product)
+7. NEVER match generic industry terms as evidence. Words like "trading", "indicator", "course", "review", "chart", "strategy", "download", "premium" etc. are NOT evidence of infringement. Only match content that is SPECIFIC to this product — brand names, product names, unique phrases, proprietary terminology.
+8. A keyword match is only valid if it includes the product name, brand name, or a distinctive multi-word phrase unique to this product.
 
 NEVER make up quotes. ONLY extract what's actually there.
 
@@ -149,8 +152,8 @@ Extract evidence that proves IP infringement. Remember: ONLY extract text that a
       matches: validatedMatches,
       page_hash: pageHash,
       extracted_at: new Date().toISOString(),
-      page_title: pageTitle,
-      page_description: pageDescription,
+      page_title: pageTitle ?? '',
+      page_description: pageDescription ?? '',
       total_matches: validatedMatches.length,
       critical_findings: response.data.critical_findings,
     };
@@ -158,7 +161,7 @@ Extract evidence that proves IP infringement. Remember: ONLY extract text that a
     console.error('[Evidence Extraction] AI analysis failed:', error);
 
     // Fallback: Basic keyword matching without AI
-    return extractEvidenceFallback(pageText, pageHash, product, pageTitle, pageDescription);
+    return extractEvidenceFallback(pageText, pageHash, product, pageTitle ?? '', pageDescription ?? '');
   }
 }
 
@@ -194,9 +197,12 @@ function extractEvidenceFallback(
     }
   }
 
-  // Search for keywords
+  // Search for keywords — only product-specific ones
   if (product.keywords) {
     for (const keyword of product.keywords) {
+      // Skip generic keywords to prevent false positive evidence
+      if (isGenericKeyword(keyword)) continue;
+
       const position = lowerText.indexOf(keyword.toLowerCase());
       if (position !== -1) {
         const contextStart = Math.max(0, position - 50);

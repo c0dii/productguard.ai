@@ -170,12 +170,13 @@ export function InfringementCard({ infringement, productPrice, isResolved = fals
                   : infringement.audience_size || 'Unknown'}
               </p>
             </div>
-            <div>
+            {/* Temporarily disabled - revenue loss calculations need refinement */}
+            {/* <div>
               <p className="text-pg-text-muted">Est. Loss</p>
               <p className="font-semibold text-pg-danger">
                 ${(infringement.est_revenue_loss || 0).toLocaleString()}
               </p>
-            </div>
+            </div> */}
             {infringement.severity_score !== undefined && (
               <div>
                 <p className="text-pg-text-muted">Severity</p>

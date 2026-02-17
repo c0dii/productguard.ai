@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -10,7 +9,7 @@ interface InfringementActionsProps {
   sourceUrl: string;
   isResolved: boolean;
   isPending?: boolean;
-  hasInfrastructureData?: boolean;
+  productId?: string;
 }
 
 export function InfringementActions({
@@ -18,49 +17,25 @@ export function InfringementActions({
   sourceUrl,
   isResolved,
   isPending = false,
-  hasInfrastructureData = false,
+  productId,
 }: InfringementActionsProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isProfileLoading, setIsProfileLoading] = useState(false);
-  const [verifyAction, setVerifyAction] = useState<'verify' | 'reject' | null>(null);
-
-  const handleVisitSite = () => {
-    window.open(sourceUrl, '_blank');
-  };
-
-  const handleRefreshInfrastructure = async () => {
-    setIsProfileLoading(true);
-    try {
-      const response = await fetch(`/api/infringements/${infringementId}/profile-infrastructure`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        router.refresh();
-        alert('Infrastructure data refreshed successfully!');
-      } else {
-        alert('Failed to refresh infrastructure data');
-      }
-    } catch (error) {
-      console.error('Error refreshing infrastructure:', error);
-      alert('Error refreshing infrastructure data');
-    } finally {
-      setIsProfileLoading(false);
-    }
-  };
+  const [verifyAction, setVerifyAction] = useState<'verify' | 'reject' | 'whitelist' | null>(null);
 
   const handleMarkNotAThreat = async () => {
-    if (!confirm('Mark this as not a threat? This will remove it from active infringements.')) return;
+    if (!confirm('Mark this as not a threat? This will dismiss it from active infringements.')) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/infringements/${infringementId}/resolve`, {
-        method: 'PUT',
+      const response = await fetch(`/api/infringements/${infringementId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject' }),
       });
 
       if (response.ok) {
-        router.refresh();
+        router.push(productId ? `/dashboard/products/${productId}` : '/dashboard/infringements');
       } else {
         alert('Failed to mark as not a threat');
       }
@@ -92,7 +67,7 @@ export function InfringementActions({
     }
   };
 
-  const handleVerificationAction = async (action: 'verify' | 'reject') => {
+  const handleVerificationAction = async (action: 'verify' | 'reject' | 'whitelist') => {
     setVerifyAction(action);
     setIsLoading(true);
 
@@ -104,8 +79,12 @@ export function InfringementActions({
       });
 
       if (response.ok) {
-        // Redirect back to infringements list after action
-        router.push('/dashboard/infringements');
+        if (action === 'reject' || action === 'whitelist') {
+          // Go back to product page so user can continue reviewing infringements
+          router.push(productId ? `/dashboard/products/${productId}` : '/dashboard/infringements');
+          return;
+        }
+        // 'verify' — Stay on the page so user sees the status change and can take DMCA action
         router.refresh();
       } else {
         const error = await response.json();
@@ -143,9 +122,12 @@ export function InfringementActions({
                 Confirming...
               </span>
             ) : (
-              '⚠️ Confirm Threat'
+              'Confirm Infringement'
             )}
           </Button>
+          <p className="text-xs text-pg-text-muted text-center -mt-1">
+            Yes, this is unauthorized use of my content
+          </p>
 
           <Button
             onClick={() => handleVerificationAction('reject')}
@@ -166,13 +148,43 @@ export function InfringementActions({
                 Dismissing...
               </span>
             ) : (
-              'Dismiss'
+              'Not an Infringement'
             )}
           </Button>
+          <p className="text-xs text-pg-text-muted text-center -mt-1">
+            This is legitimate use or a false positive
+          </p>
 
-          <div className="pt-3 border-t border-pg-border">
-            <p className="text-xs text-pg-text-muted mb-2">
-              💡 Review all details carefully before confirming to ensure this is a genuine threat.
+          <div className="border-t border-pg-border pt-3 mt-1">
+            <Button
+              onClick={() => handleVerificationAction('whitelist')}
+              disabled={isLoading}
+              variant="ghost"
+              className="w-full hover:bg-green-500/10 hover:text-green-400 border-2 border-pg-border hover:border-green-500/50"
+            >
+              {isLoading && verifyAction === 'whitelist' ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Whitelisting...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  This Is My Approved URL
+                </span>
+              )}
+            </Button>
+            <p className="text-xs text-pg-text-muted text-center -mt-1">
+              I own this page — whitelist it to prevent future alerts
             </p>
           </div>
         </>
@@ -180,19 +192,14 @@ export function InfringementActions({
 
       {/* Active Infringement Actions */}
       {!isResolved && !isPending && (
-        <>
-          <Link href={`/dashboard/takedowns/new?infringement_id=${infringementId}`}>
-            <Button className="w-full">⚡ Send DMCA Notice</Button>
-          </Link>
-          <Button
-            variant="secondary"
-            onClick={handleMarkNotAThreat}
-            disabled={isLoading}
-            className="w-full border-2 border-pg-border hover:border-pg-danger"
-          >
-            ✓ Mark as Not a Threat
-          </Button>
-        </>
+        <Button
+          variant="secondary"
+          onClick={handleMarkNotAThreat}
+          disabled={isLoading}
+          className="w-full border-2 border-pg-border hover:border-pg-danger"
+        >
+          ✓ Mark as Not a Threat
+        </Button>
       )}
 
       {/* Resolved Infringement Actions */}

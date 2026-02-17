@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Product } from '@/types';
 
 export interface LearningPattern {
@@ -161,7 +162,7 @@ export async function optimizeSearchQuery(
 
 /**
  * Generate AI prompt examples from verified vs rejected infringements
- * Improves AI filtering accuracy
+ * Includes rich context: platform, severity, infrastructure, match type
  */
 export async function getAIPromptExamples(productId: string): Promise<{
   verified_examples: string[];
@@ -169,32 +170,46 @@ export async function getAIPromptExamples(productId: string): Promise<{
 }> {
   const supabase = await createClient();
 
+  const selectFields = 'source_url, platform, severity_score, match_type, match_confidence, monetization_detected, infrastructure, evidence';
+
   // Get verified infringements (true positives)
   const { data: verified } = await supabase
     .from('infringements')
-    .select('source_url, evidence')
+    .select(selectFields)
     .eq('product_id', productId)
     .eq('status', 'active')
     .not('verified_by_user_at', 'is', null)
+    .order('severity_score', { ascending: false })
     .limit(5);
 
   // Get false positives
   const { data: falsePositives } = await supabase
     .from('infringements')
-    .select('source_url, evidence')
+    .select(selectFields)
     .eq('product_id', productId)
     .eq('status', 'false_positive')
     .limit(5);
 
+  const formatExample = (item: any, isFP: boolean) => {
+    const parts = [`URL: ${item.source_url}`];
+    if (item.platform) parts.push(`Platform: ${item.platform}`);
+    if (item.severity_score) parts.push(`Severity: ${item.severity_score}/100`);
+    if (item.match_type) parts.push(`Match: ${item.match_type}`);
+    if (item.match_confidence) parts.push(`Confidence: ${(item.match_confidence * 100).toFixed(0)}%`);
+    const hosting = item.infrastructure?.hosting_provider;
+    if (hosting) parts.push(`Hosting: ${hosting}`);
+    const country = item.infrastructure?.country;
+    if (country) parts.push(`Country: ${country}`);
+    if (item.monetization_detected) parts.push(`Monetized: yes`);
+    const excerpts = item.evidence?.matched_excerpts;
+    if (excerpts?.length) parts.push(`Contains: ${excerpts.join(', ')}`);
+    if (isFP) parts.push('(NOT an infringement)');
+    return parts.join(' | ');
+  };
+
   return {
-    verified_examples: (verified || []).map(v => {
-      const excerpts = v.evidence?.matched_excerpts || [];
-      return `URL: ${v.source_url} - Contains: ${excerpts.join(', ')}`;
-    }),
-    false_positive_examples: (falsePositives || []).map(fp => {
-      const excerpts = fp.evidence?.matched_excerpts || [];
-      return `URL: ${fp.source_url} - Contains: ${excerpts.join(', ')} (NOT an infringement)`;
-    }),
+    verified_examples: (verified || []).map(v => formatExample(v, false)),
+    false_positive_examples: (falsePositives || []).map(fp => formatExample(fp, true)),
   };
 }
 
@@ -296,4 +311,90 @@ export async function getSuggestedImprovements(productId: string): Promise<strin
   }
 
   return suggestions;
+}
+
+// ── Admin-Client Functions (for background scan context) ──────────────
+
+/**
+ * Intelligence data bundle for scan-time query optimization.
+ * Fetched once and passed to all platform scanners.
+ */
+export interface IntelligenceData {
+  verifiedKeywords: string[];
+  falsePositiveDomains: string[];
+  /** Platforms (e.g. google, telegram) with high verified-infringement rates */
+  verifiedPlatforms: string[];
+  /** Hosting providers frequently associated with real infringements */
+  verifiedHosting: string[];
+  /** Countries frequently associated with real infringements */
+  verifiedCountries: string[];
+  /** Match types (e.g. keyword, exact_hash) that are most reliable */
+  reliableMatchTypes: string[];
+  /** Hosting providers frequently associated with false positives */
+  falsePositiveHosting: string[];
+  hasLearningData: boolean;
+}
+
+/**
+ * Fetch intelligence data for a product using an admin client.
+ * Call this ONCE before scanning, then pass the data to all platform scanners.
+ */
+export async function fetchIntelligenceForScan(
+  supabase: SupabaseClient,
+  productId: string
+): Promise<IntelligenceData> {
+  try {
+    // Fetch all pattern types in parallel
+    const [
+      { data: keywordPatterns },
+      { data: fpDomains },
+      { data: platformPatterns },
+      { data: hostingPatterns },
+      { data: countryPatterns },
+      { data: matchTypePatterns },
+      { data: fpHostingPatterns },
+    ] = await Promise.all([
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'verified_keyword', p_limit: 10 }),
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'false_positive_domain', p_limit: 10 }),
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'verified_platform', p_limit: 10 }),
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'verified_hosting', p_limit: 10 }),
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'verified_country', p_limit: 10 }),
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'verified_match_type', p_limit: 10 }),
+      supabase.rpc('get_top_patterns', { p_product_id: productId, p_pattern_type: 'false_positive_hosting', p_limit: 10 }),
+    ]);
+
+    const extractValues = (data: any[] | null, minConfidence: number) =>
+      (data || []).filter((p: any) => p.confidence_score > minConfidence).map((p: any) => p.pattern_value);
+
+    const verifiedKeywords = extractValues(keywordPatterns, 0.7).slice(0, 5);
+    const falsePositiveDomains = extractValues(fpDomains, 0.6);
+    const verifiedPlatforms = extractValues(platformPatterns, 0.6);
+    const verifiedHosting = extractValues(hostingPatterns, 0.6);
+    const verifiedCountries = extractValues(countryPatterns, 0.6);
+    const reliableMatchTypes = extractValues(matchTypePatterns, 0.7);
+    const falsePositiveHosting = extractValues(fpHostingPatterns, 0.6);
+
+    const hasLearningData = verifiedKeywords.length > 0 || falsePositiveDomains.length > 0
+      || verifiedPlatforms.length > 0 || verifiedHosting.length > 0;
+
+    if (hasLearningData) {
+      console.log(
+        `[Intelligence Engine] Loaded scan intelligence: ${verifiedKeywords.length} keywords, ${falsePositiveDomains.length} FP domains, ${verifiedPlatforms.length} platforms, ${verifiedHosting.length} hosting, ${verifiedCountries.length} countries, ${reliableMatchTypes.length} match types`
+      );
+    }
+
+    return {
+      verifiedKeywords, falsePositiveDomains, verifiedPlatforms,
+      verifiedHosting, verifiedCountries, reliableMatchTypes,
+      falsePositiveHosting, hasLearningData,
+    };
+  } catch (error) {
+    // Intelligence fetch failures should never block scans
+    console.warn('[Intelligence Engine] Failed to fetch intelligence data (non-blocking):', error);
+    return {
+      verifiedKeywords: [], falsePositiveDomains: [], verifiedPlatforms: [],
+      verifiedHosting: [], verifiedCountries: [], reliableMatchTypes: [],
+      falsePositiveHosting: [], hasLearningData: false,
+    };
+  }
 }

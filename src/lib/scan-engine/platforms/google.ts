@@ -1,4 +1,6 @@
 import type { Product, InfringementResult, RiskLevel } from '@/types';
+import type { IntelligenceData } from '@/lib/intelligence/intelligence-engine';
+import { isGenericKeyword, keywordSpecificityScore } from '@/lib/utils/keyword-quality';
 
 interface SerpApiResult {
   organic_results?: Array<{
@@ -13,7 +15,7 @@ interface SerpApiResult {
  * Google Search Scanner using SerpAPI
  * Searches for pirated/leaked/unauthorized copies of digital products
  */
-export async function scanGoogle(product: Product): Promise<InfringementResult[]> {
+export async function scanGoogle(product: Product, intelligence?: IntelligenceData): Promise<InfringementResult[]> {
   console.log(`[Google Scanner] Scanning for: ${product.name}`);
 
   const apiKey = process.env.SERPAPI_KEY;
@@ -29,8 +31,8 @@ export async function scanGoogle(product: Product): Promise<InfringementResult[]
     // Generate keyword variations for better coverage
     const keywordVariations = generateKeywordVariations(product);
 
-    // Build comprehensive search queries
-    const searchQueries = buildSearchQueries(product, keywordVariations);
+    // Build comprehensive search queries (with intelligence optimization)
+    const searchQueries = buildSearchQueries(product, keywordVariations, intelligence);
 
     console.log(`[Google Scanner] Running ${searchQueries.length} search queries`);
 
@@ -109,13 +111,19 @@ function generateKeywordVariations(product: Product): string[] {
     variations.add(`TTM Squeeze Pro`);
   }
 
-  // Add variations from product keywords
+  // Add variations from product keywords — only specific ones, not generic terms
   if (product.keywords && product.keywords.length > 0) {
-    product.keywords.forEach((keyword) => {
-      if (keyword.length > 3) {
+    product.keywords
+      .filter((keyword) => keyword.length > 3 && !isGenericKeyword(keyword))
+      .forEach((keyword) => {
         variations.add(keyword);
-      }
-    });
+      });
+  }
+
+  // Add brand+product combination if brand_name exists
+  if (product.brand_name) {
+    variations.add(`${product.brand_name} ${name}`);
+    variations.add(product.brand_name);
   }
 
   return Array.from(variations);
@@ -124,7 +132,7 @@ function generateKeywordVariations(product: Product): string[] {
 /**
  * Build comprehensive search queries
  */
-function buildSearchQueries(product: Product, keywordVariations: string[]): string[] {
+function buildSearchQueries(product: Product, keywordVariations: string[], intelligence?: IntelligenceData): string[] {
   const queries: string[] = [];
 
   // Use primary keyword (original name or first variation)
@@ -134,6 +142,25 @@ function buildSearchQueries(product: Product, keywordVariations: string[]): stri
   if (!primaryKeyword) {
     return queries;
   }
+
+  // ============================================
+  // -1. INTELLIGENCE ENGINE QUERIES (learned from user feedback)
+  // ============================================
+
+  if (intelligence?.hasLearningData) {
+    console.log(`[Google Scanner] Intelligence engine active: +${intelligence.verifiedKeywords.length} keywords, -${intelligence.falsePositiveDomains.length} FP domains`);
+
+    // Add queries using verified keywords (these led to confirmed infringements before)
+    for (const keyword of intelligence.verifiedKeywords.slice(0, 3)) {
+      queries.push(`"${keyword}" "${primaryKeyword}"`);
+      queries.push(`"${keyword}" free download`);
+    }
+  }
+
+  // Build domain exclusion suffix from false positive domains
+  const fpExclusion = intelligence?.falsePositiveDomains
+    ?.map(d => `-site:${d}`)
+    .join(' ') || '';
 
   // ============================================
   // 0. AI-ENHANCED SEARCHES (if approved AI data exists)
@@ -174,12 +201,14 @@ function buildSearchQueries(product: Product, keywordVariations: string[]): stri
       });
     }
 
-    // AI KEYWORDS - Merge with manual keywords for broader coverage
+    // AI KEYWORDS - Only use product-specific keywords (skip generic terms)
     if (aiData.keywords && aiData.keywords.length > 0) {
-      const aiKeywords = aiData.keywords.slice(0, 5);
-      aiKeywords.forEach((keyword) => {
+      const specificAiKeywords = aiData.keywords
+        .filter((kw) => !isGenericKeyword(kw) && keywordSpecificityScore(kw) >= 0.5)
+        .slice(0, 5);
+      specificAiKeywords.forEach((keyword) => {
         // Only add if not already in manual keywords
-        if (!product.keywords.includes(keyword)) {
+        if (!product.keywords?.includes(keyword)) {
           queries.push(`"${keyword}" free download`);
         }
       });
@@ -220,12 +249,12 @@ function buildSearchQueries(product: Product, keywordVariations: string[]): stri
   // 2. PIRACY-SPECIFIC SEARCHES
   // ============================================
 
-  // Core piracy terms
-  queries.push(`"${primaryKeyword}" free download`);
-  queries.push(`"${primaryKeyword}" torrent`);
-  queries.push(`"${primaryKeyword}" leaked`);
-  queries.push(`"${primaryKeyword}" cracked`);
-  queries.push(`"${primaryKeyword}" nulled`);
+  // Core piracy terms (with FP domain exclusions if intelligence data available)
+  queries.push(`"${primaryKeyword}" free download ${fpExclusion}`.trim());
+  queries.push(`"${primaryKeyword}" torrent ${fpExclusion}`.trim());
+  queries.push(`"${primaryKeyword}" leaked ${fpExclusion}`.trim());
+  queries.push(`"${primaryKeyword}" cracked ${fpExclusion}`.trim());
+  queries.push(`"${primaryKeyword}" nulled ${fpExclusion}`.trim());
 
   // File hosting
   queries.push(`"${primaryKeyword}" mega.nz`);
@@ -393,7 +422,22 @@ function isLegitimateSource(url: string, product: Product): boolean {
   }
 
   // Check if URL matches any legitimate domain
-  return legitimateDomains.some((domain) => urlLower.includes(domain));
+  if (legitimateDomains.some((domain) => urlLower.includes(domain))) {
+    return true;
+  }
+
+  // Check against specifically whitelisted URLs (user-approved pages)
+  if (product.whitelist_urls && product.whitelist_urls.length > 0) {
+    const normalizedUrl = urlLower.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+    for (const whitelistedUrl of product.whitelist_urls) {
+      const normalizedWhitelist = whitelistedUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+      if (normalizedUrl === normalizedWhitelist || normalizedUrl.startsWith(normalizedWhitelist)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**

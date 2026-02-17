@@ -1,9 +1,32 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { analyzeProductPage } from '@/lib/ai/product-analyzer';
+import { createClient } from '@/lib/supabase/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 scrapes per minute per IP
+    const ip = getClientIp(request);
+    const limiter = rateLimit(`scrape:${ip}`, { limit: 10, windowSeconds: 60 });
+    if (!limiter.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(limiter.resetIn) } }
+      );
+    }
+
+    // Authenticate user
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { url, useAI = true } = await request.json();
 
     if (!url) {
@@ -16,6 +39,25 @@ export async function POST(request: Request) {
       productUrl = new URL(url);
     } catch (e) {
       return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    }
+
+    // SSRF protection: only allow http/https and block internal hostnames
+    if (!['http:', 'https:'].includes(productUrl.protocol)) {
+      return NextResponse.json({ error: 'Only HTTP/HTTPS URLs are allowed' }, { status: 400 });
+    }
+
+    const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', 'metadata.google.internal'];
+    const hostname = productUrl.hostname.toLowerCase();
+    if (
+      blockedHostnames.includes(hostname) ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('172.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('169.254.') ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      return NextResponse.json({ error: 'URL not allowed' }, { status: 400 });
     }
 
     // Fetch the page
@@ -53,10 +95,20 @@ export async function POST(request: Request) {
         aiData = analysis.aiExtractedData;
         fullTextContent = analysis.fullTextContent;
 
+        // Prefer AI-extracted clean product name over raw page title
+        if (analysis.productName) {
+          extractedData.name = analysis.productName;
+        }
+
         // Merge AI-extracted keywords with scraped keywords
         if (aiData.keywords && aiData.keywords.length > 0) {
           const allKeywords = [...new Set([...extractedData.keywords, ...aiData.keywords])];
           extractedData.keywords = allKeywords.slice(0, 15); // Limit to 15 total
+        }
+
+        // Prefer AI-generated description (DMCA-ready) over generic meta description
+        if (aiData.product_description) {
+          extractedData.description = aiData.product_description;
         }
       } catch (aiError) {
         console.error('AI analysis failed, continuing with basic scraping:', aiError);
@@ -86,7 +138,7 @@ function extractTitle($: cheerio.CheerioAPI): string {
     () => $('meta[name="twitter:title"]').attr('content'),
     () => $('[itemtype*="schema.org/Product"] [itemprop="name"]').text(),
     () => $('h1').first().text(),
-    () => $('title').text().split('|')[0].split('-')[0].trim(),
+    () => $('title').text().split('|')[0]?.split('-')[0]?.trim(),
   ];
 
   for (const strategy of strategies) {
@@ -123,30 +175,83 @@ function extractDescription($: cheerio.CheerioAPI): string {
 
 // Extract price
 function extractPrice($: cheerio.CheerioAPI): number {
-  const strategies = [
+  // Strategy 1: Structured data (meta tags, schema.org)
+  const metaStrategies = [
     () => $('meta[property="product:price:amount"]').attr('content'),
     () => $('meta[property="og:price:amount"]').attr('content'),
     () => $('[itemtype*="schema.org/Product"] [itemprop="price"]').attr('content'),
     () => $('[itemtype*="schema.org/Product"] [itemprop="price"]').text(),
-    () => $('.price').first().text(),
-    () => $('[class*="price"]').first().text(),
     () => $('[data-price]').first().attr('data-price'),
   ];
 
-  for (const strategy of strategies) {
+  for (const strategy of metaStrategies) {
     const result = strategy();
     if (result) {
-      // Extract numeric value from price string
-      const match = result.toString().match(/[\d,]+\.?\d*/);
-      if (match) {
-        const price = parseFloat(match[0].replace(',', ''));
-        if (price > 0) {
-          return price;
-        }
-      }
+      const price = parsePriceString(result.toString());
+      if (price > 0) return price;
     }
   }
 
+  // Strategy 2: JSON-LD structured data
+  try {
+    let jsonLdPrice = 0;
+    $('script[type="application/ld+json"]').each((_, el) => {
+      if (jsonLdPrice > 0) return;
+      const text = $(el).html();
+      if (!text) return;
+      try {
+        const json = JSON.parse(text);
+        const offers = json.offers || json?.mainEntity?.offers;
+        if (offers) {
+          const p = parseFloat(offers.price || offers.lowPrice || '0');
+          if (p > 0) jsonLdPrice = p;
+        }
+      } catch {
+        // Ignore individual parse errors
+      }
+    });
+    if (jsonLdPrice > 0) return jsonLdPrice;
+  } catch {
+    // Ignore JSON-LD errors
+  }
+
+  // Strategy 3: Common price selectors
+  const selectorStrategies = [
+    () => $('.price').first().text(),
+    () => $('[class*="price"]').first().text(),
+    () => $('[class*="Price"]').first().text(),
+    () => $('[class*="amount"]').first().text(),
+    () => $('[class*="cost"]').first().text(),
+  ];
+
+  for (const strategy of selectorStrategies) {
+    const result = strategy();
+    if (result) {
+      const price = parsePriceString(result.toString());
+      if (price > 0) return price;
+    }
+  }
+
+  // Strategy 4: Scan page text for price patterns like "$597" or "$29.99"
+  const bodyText = $('body').text();
+  const pricePatterns = bodyText.match(/\$[\d,]+(?:\.\d{2})?/g);
+  if (pricePatterns && pricePatterns.length > 0) {
+    // Take the first reasonable price found (skip very small or huge values)
+    for (const p of pricePatterns) {
+      const price = parsePriceString(p);
+      if (price >= 1 && price <= 50000) return price;
+    }
+  }
+
+  return 0;
+}
+
+function parsePriceString(str: string): number {
+  const match = str.replace(/[^\d.,]/g, '').match(/[\d,]+\.?\d*/);
+  if (match) {
+    const price = parseFloat(match[0].replace(',', ''));
+    if (price > 0 && isFinite(price)) return price;
+  }
   return 0;
 }
 
@@ -222,13 +327,10 @@ function inferProductType($: cheerio.CheerioAPI): string {
 
   const typePatterns = [
     { pattern: /(course|training|tutorial|lesson|class)/i, type: 'course' },
-    { pattern: /(software|app|application|program|tool)/i, type: 'software' },
+    { pattern: /(indicator|trading|strategy|signal)/i, type: 'indicator' },
+    { pattern: /(software|app|application|program|tool|plugin|extension|addon)/i, type: 'software' },
     { pattern: /(ebook|book|pdf|guide|manual)/i, type: 'ebook' },
-    { pattern: /(video|movie|film)/i, type: 'video' },
-    { pattern: /(audio|music|podcast|sound)/i, type: 'audio' },
     { pattern: /(template|theme|design)/i, type: 'template' },
-    { pattern: /(plugin|extension|addon)/i, type: 'plugin' },
-    { pattern: /(service|subscription)/i, type: 'service' },
   ];
 
   for (const { pattern, type } of typePatterns) {
@@ -237,5 +339,5 @@ function inferProductType($: cheerio.CheerioAPI): string {
     }
   }
 
-  return 'digital_product';
+  return 'other';
 }

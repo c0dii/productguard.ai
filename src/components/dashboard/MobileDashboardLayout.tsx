@@ -13,9 +13,9 @@ export function MobileDashboardLayout({ profile, children }: MobileDashboardLayo
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-pg-bg relative overflow-hidden">
+    <div className="min-h-screen bg-pg-bg relative">
       {/* Gradient Mesh Background - only visible in dark mode */}
-      <div className="fixed inset-0 -z-10 dark-only">
+      <div className="fixed inset-0 -z-10 dark-only overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-gradient-to-br from-cyan-500/10 via-blue-500/10 to-purple-500/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-tr from-blue-500/10 via-cyan-500/10 to-teal-500/10 rounded-full blur-3xl"></div>
       </div>
@@ -65,19 +65,19 @@ export function MobileDashboardLayout({ profile, children }: MobileDashboardLayo
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - fixed on desktop, slide-in on mobile */}
       <div
         className={`
-          fixed lg:static inset-y-0 left-0 z-40
+          fixed inset-y-0 left-0 z-40 h-screen
           transform transition-transform duration-300 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        <DashboardSidebar profile={profile} />
+        <DashboardSidebar profile={profile} onNavigate={() => setSidebarOpen(false)} />
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto w-full">
+      {/* Main Content - offset by sidebar width on desktop */}
+      <main className="lg:ml-64 px-3 py-3 sm:p-6 lg:p-8 min-w-0 lg:max-w-[calc(100%-16rem)]">
         {/* Add top padding on mobile to account for menu button */}
         <div className="lg:mt-0 mt-12">
           {children}

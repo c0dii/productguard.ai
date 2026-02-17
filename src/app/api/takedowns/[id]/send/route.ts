@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { logCommunication } from '@/lib/communications/log-communication';
 
 export async function POST(
   request: Request,
@@ -18,13 +19,13 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { recipientEmail } = body;
+    const { recipientEmail, providerName } = body;
 
     if (!recipientEmail) {
       return NextResponse.json({ error: 'Recipient email required' }, { status: 400 });
     }
 
-    // Fetch takedown
+    // Fetch takedown with infringement reference
     const { data: takedown } = await supabase
       .from('takedowns')
       .select('*')
@@ -36,12 +37,22 @@ export async function POST(
       return NextResponse.json({ error: 'Takedown not found' }, { status: 404 });
     }
 
+    // Fetch user's DMCA reply email preference
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, email, dmca_reply_email')
+      .eq('id', user.id)
+      .single();
+
+    const replyToEmail = profile?.dmca_reply_email || profile?.email || user.email;
+
     // TODO: Implement email sending via Resend or another service
     // For now, we'll just update the database to mark it as sent
     // In production, you'd use Resend API here:
     // await resend.emails.send({
     //   from: 'takedowns@productguard.ai',
     //   to: recipientEmail,
+    //   replyTo: replyToEmail,
     //   subject: 'DMCA Takedown Notice',
     //   text: takedown.notice_content,
     // });
@@ -60,6 +71,20 @@ export async function POST(
       console.error('Update error:', error);
       return NextResponse.json({ error: 'Failed to update takedown' }, { status: 500 });
     }
+
+    // Log communication
+    await logCommunication(supabase, {
+      user_id: user.id,
+      infringement_id: takedown.infringement_id || undefined,
+      takedown_id: takedown.id,
+      channel: 'email',
+      to_email: recipientEmail,
+      reply_to_email: replyToEmail || undefined,
+      subject: 'DMCA Takedown Notice',
+      body_preview: takedown.notice_content || undefined,
+      status: 'sent',
+      provider_name: providerName || undefined,
+    });
 
     return NextResponse.json({
       success: true,

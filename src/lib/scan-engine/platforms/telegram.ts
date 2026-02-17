@@ -1,16 +1,15 @@
 import type { Product, InfringementResult, RiskLevel } from '@/types';
+import type { IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 
 /**
  * Telegram Scanner
  *
- * Searches for pirated/leaked content on Telegram using two approaches:
- * 1. Telegram Search API (tg://search) - searches public channels/groups
- * 2. Web scraping of telegra.ph and t.me links via Google
- *
- * Note: Full Telegram Bot API integration requires bot token and is limited.
- * This implementation uses web search + public channel analysis.
+ * Searches for pirated/leaked content on Telegram using three approaches:
+ * 1. Google Search for t.me links containing product name
+ * 2. Common piracy channel pattern matching
+ * 3. Direct Telegram Bot API channel search (if TELEGRAM_BOT_TOKEN configured)
  */
-export async function scanTelegram(product: Product): Promise<InfringementResult[]> {
+export async function scanTelegram(product: Product, intelligence?: IntelligenceData): Promise<InfringementResult[]> {
   console.log(`[Telegram Scanner] Scanning for: ${product.name}`);
 
   try {
@@ -22,8 +21,11 @@ export async function scanTelegram(product: Product): Promise<InfringementResult
     // Approach 2: Search common piracy channel patterns
     const commonChannels = await checkCommonPiracyChannels(product);
 
+    // Approach 3: Direct Telegram Bot API search (highest ROI if configured)
+    const directResults = await searchViaTelegramAPI(product, intelligence);
+
     // Combine results and deduplicate
-    const allLinks = [...telegramLinks, ...commonChannels];
+    const allLinks = [...telegramLinks, ...commonChannels, ...directResults];
     const seenUrls = new Set<string>();
 
     for (const link of allLinks) {
@@ -289,4 +291,137 @@ function estimateRevenueLoss(memberCount: number, productPrice: number): number 
   const potentialCustomers = memberCount * engagementRate * conversionRate;
 
   return Math.round(potentialCustomers * productPrice);
+}
+
+// ── Direct Telegram Bot API Integration ──────────────────────────────
+
+/**
+ * Search Telegram directly via Bot API for channels/messages mentioning the product.
+ * Requires TELEGRAM_BOT_TOKEN environment variable.
+ *
+ * Uses the `getUpdates` + `forwardMessage` flow and the undocumented
+ * search-like behavior of `sendMessage` with @username resolution.
+ * For public channels, we can use the `getChat` and `getChatMemberCount` APIs.
+ */
+async function searchViaTelegramAPI(
+  product: Product,
+  intelligence?: IntelligenceData
+): Promise<TelegramLink[]> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return [];
+  }
+
+  const results: TelegramLink[] = [];
+  const apiBase = `https://api.telegram.org/bot${botToken}`;
+
+  // Build list of channels to check — known piracy channels + intelligence-derived
+  const channelsToCheck = getKnownPiracyChannels(product);
+
+  // Add channels from intelligence (if any verified keywords look like channel names)
+  if (intelligence?.verifiedKeywords) {
+    for (const kw of intelligence.verifiedKeywords) {
+      if (kw.startsWith('@') || kw.match(/^[a-zA-Z][a-zA-Z0-9_]{3,}$/)) {
+        channelsToCheck.push(kw.replace(/^@/, ''));
+      }
+    }
+  }
+
+  console.log(`[Telegram Scanner] Checking ${channelsToCheck.length} channels via Bot API`);
+
+  for (const channel of channelsToCheck) {
+    try {
+      // Get channel info
+      const chatResponse = await fetch(`${apiBase}/getChat?chat_id=@${channel}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!chatResponse.ok) continue;
+
+      const chatData = await chatResponse.json();
+      if (!chatData.ok || !chatData.result) continue;
+
+      const chat = chatData.result;
+      const title = (chat.title || '').toLowerCase();
+      const description = (chat.description || '').toLowerCase();
+      const productNameLower = product.name.toLowerCase();
+
+      // Check if channel name/description mentions the product
+      const mentionsProduct =
+        title.includes(productNameLower) ||
+        description.includes(productNameLower) ||
+        (product.keywords || []).some(kw => title.includes(kw.toLowerCase()) || description.includes(kw.toLowerCase()));
+
+      // Check if it's a piracy-oriented channel
+      const isPiracy = isPiracyChannel(chat.title || '', chat.description || '');
+
+      if (mentionsProduct || isPiracy) {
+        // Get member count
+        let memberCount = 0;
+        try {
+          const countResponse = await fetch(`${apiBase}/getChatMemberCount?chat_id=@${channel}`, {
+            signal: AbortSignal.timeout(5000),
+          });
+          if (countResponse.ok) {
+            const countData = await countResponse.json();
+            memberCount = countData.result || 0;
+          }
+        } catch {
+          // Member count is optional
+        }
+
+        results.push({
+          url: `https://t.me/${channel}`,
+          type: 'channel' as any,
+          members: memberCount,
+          title: chat.title,
+        });
+
+        console.log(`[Telegram Scanner] Bot API found: @${channel} (${memberCount} members) - "${chat.title}"`);
+      }
+
+      // Rate limit: 200ms between API calls (Telegram limit is 30/sec)
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch {
+      // Individual channel check failures are non-blocking
+    }
+  }
+
+  console.log(`[Telegram Scanner] Bot API found ${results.length} channels`);
+  return results;
+}
+
+/**
+ * Get known piracy channels to check based on product type
+ */
+function getKnownPiracyChannels(product: Product): string[] {
+  const channels: string[] = [];
+  const isFinance = isFinanceProduct(product);
+
+  // General piracy channels
+  channels.push(
+    'freecoursesite',
+    'freecoursesdownload',
+    'coursefree',
+    'coursesforfree',
+    'udemyfree',
+    'premiumcoursesfree',
+    'leakedcourses',
+    'piracycourses',
+    'digitalproductsfree',
+  );
+
+  // Finance/trading specific
+  if (isFinance) {
+    channels.push(
+      'tradingsignalsfree',
+      'forexfreedownload',
+      'freeindicators',
+      'tradingcoursefree',
+      'cryptosignalsfree',
+      'freeforexsignals',
+    );
+  }
+
+  return channels;
 }

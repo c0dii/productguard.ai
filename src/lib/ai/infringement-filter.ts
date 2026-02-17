@@ -6,7 +6,7 @@
 
 import { generateCompletion, AI_MODELS } from './client';
 import type { Product, InfringementResult } from '@/types';
-import { getAIPromptExamples } from '@/lib/intelligence/intelligence-engine';
+import { getAIPromptExamples, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 
 export interface FilterResult {
   is_infringement: boolean;
@@ -20,7 +20,8 @@ export interface FilterResult {
  */
 export async function filterSearchResult(
   result: InfringementResult,
-  product: Product
+  product: Product,
+  intelligence?: IntelligenceData
 ): Promise<FilterResult> {
   // Get learned examples from intelligence engine
   const examples = await getAIPromptExamples(product.id);
@@ -47,6 +48,29 @@ WHAT IS NOT AN INFRINGEMENT (False Positives):
 - User discussions asking questions about the product
 - Social media posts mentioning the product
 - Videos explaining how to use the product`;
+
+  // Add learned pattern intelligence (from user feedback history)
+  if (intelligence?.hasLearningData) {
+    systemPrompt += `\n\nLEARNED INTELLIGENCE FROM USER FEEDBACK:`;
+    if (intelligence.verifiedPlatforms.length > 0) {
+      systemPrompt += `\n- Platforms with confirmed infringements: ${intelligence.verifiedPlatforms.join(', ')}`;
+    }
+    if (intelligence.verifiedHosting.length > 0) {
+      systemPrompt += `\n- Hosting providers linked to infringements: ${intelligence.verifiedHosting.join(', ')}`;
+    }
+    if (intelligence.verifiedCountries.length > 0) {
+      systemPrompt += `\n- Countries frequently hosting infringements: ${intelligence.verifiedCountries.join(', ')}`;
+    }
+    if (intelligence.reliableMatchTypes.length > 0) {
+      systemPrompt += `\n- Most reliable detection methods: ${intelligence.reliableMatchTypes.join(', ')}`;
+    }
+    if (intelligence.falsePositiveDomains.length > 0) {
+      systemPrompt += `\n- Domains frequently flagged as false positives: ${intelligence.falsePositiveDomains.join(', ')}`;
+    }
+    if (intelligence.falsePositiveHosting.length > 0) {
+      systemPrompt += `\n- Hosting providers frequently associated with false positives: ${intelligence.falsePositiveHosting.join(', ')}`;
+    }
+  }
 
   // Add learned examples if available (Few-Shot Learning)
   if (examples.verified_examples.length > 0) {
@@ -133,7 +157,8 @@ Respond with JSON only.`;
 export async function filterSearchResults(
   results: InfringementResult[],
   product: Product,
-  minConfidence: number = 0.75
+  minConfidence: number = 0.75,
+  intelligence?: IntelligenceData
 ): Promise<InfringementResult[]> {
   console.log(`[AI Filter] Analyzing ${results.length} results for product: ${product.name}`);
 
@@ -147,7 +172,7 @@ export async function filterSearchResults(
     const batch = results.slice(i, i + batchSize);
 
     const analyses = await Promise.all(
-      batch.map((result) => filterSearchResult(result, product))
+      batch.map((result) => filterSearchResult(result, product, intelligence))
     );
 
     // Filter results based on AI analysis

@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
 import { TakedownActions } from '@/components/dashboard/TakedownActions';
+import { DMCANoticeCard } from '@/components/dashboard/DMCANoticeCard';
 
 export default async function TakedownDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -28,6 +29,16 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
   if (error || !takedown) {
     redirect('/dashboard/takedowns');
   }
+
+  // Fetch latest communication status for this takedown
+  const { data: communication } = await supabase
+    .from('communications')
+    .select('status, sent_at')
+    .eq('takedown_id', id)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
   return (
     <div>
@@ -56,6 +67,8 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
               className={
                 takedown.status === 'sent'
                   ? 'bg-blue-500 bg-opacity-10 text-blue-400'
+                  : takedown.status === 'acknowledged'
+                  ? 'bg-purple-500 bg-opacity-10 text-purple-400'
                   : takedown.status === 'removed'
                   ? 'bg-pg-accent bg-opacity-10 text-pg-accent'
                   : takedown.status === 'failed'
@@ -63,7 +76,12 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
                   : 'bg-pg-warning bg-opacity-10 text-pg-warning'
               }
             >
-              {takedown.status}
+              {takedown.status === 'draft' ? 'Draft — Not Sent'
+                : takedown.status === 'sent' ? 'Sent'
+                : takedown.status === 'acknowledged' ? 'Acknowledged'
+                : takedown.status === 'removed' ? 'Removed'
+                : takedown.status === 'failed' ? 'Failed'
+                : takedown.status}
             </Badge>
           </div>
 
@@ -88,10 +106,23 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
             )}
 
             <div className="flex justify-between items-center py-2 border-b border-pg-border">
-              <span className="text-pg-text-muted">DMCA Submitted</span>
-              <span className="text-pg-text font-semibold">
-                {takedown.submitted_at ? new Date(takedown.submitted_at).toLocaleDateString() : 'Draft'}
+              <span className="text-pg-text-muted">Notice Created</span>
+              <span className="text-pg-text">
+                {takedown.created_at ? new Date(takedown.created_at).toLocaleDateString() : '—'}
               </span>
+            </div>
+
+            <div className="flex justify-between items-center py-2 border-b border-pg-border">
+              <span className="text-pg-text-muted">DMCA Sent</span>
+              {takedown.sent_at ? (
+                <span className="text-pg-text font-semibold">
+                  {new Date(takedown.sent_at).toLocaleDateString()}
+                </span>
+              ) : (
+                <Badge variant="default" className="bg-pg-warning bg-opacity-10 text-pg-warning">
+                  Not Sent
+                </Badge>
+              )}
             </div>
 
             {takedown.resolved_at && (
@@ -164,11 +195,11 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
               </div>
             )}
 
-            {takedown.submitted_at && (
+            {takedown.sent_at && (
               <div className="flex justify-between items-center py-2">
-                <span className="text-pg-text-muted">Days Since Submission</span>
+                <span className="text-pg-text-muted">Days Since Sent</span>
                 <span className="text-pg-text font-semibold">
-                  {Math.floor((Date.now() - new Date(takedown.submitted_at).getTime()) / (1000 * 60 * 60 * 24))} days
+                  {Math.floor((Date.now() - new Date(takedown.sent_at).getTime()) / (1000 * 60 * 60 * 24))} days
                 </span>
               </div>
             )}
@@ -176,8 +207,8 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
 
           {/* Effectiveness Note */}
           {takedown.url_status === 'active' &&
-            takedown.submitted_at &&
-            Math.floor((Date.now() - new Date(takedown.submitted_at).getTime()) / (1000 * 60 * 60 * 24)) > 14 && (
+            takedown.sent_at &&
+            Math.floor((Date.now() - new Date(takedown.sent_at).getTime()) / (1000 * 60 * 60 * 24)) > 14 && (
               <div className="mt-4 p-3 rounded-lg bg-pg-warning bg-opacity-10 border border-pg-warning">
                 <p className="text-xs text-pg-warning">
                   💡 This takedown has been pending for over 14 days. Consider following up or escalating.
@@ -186,25 +217,6 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
             )}
         </Card>
       </div>
-
-      {/* Email Recipients Card */}
-      <Card className="mb-6">
-        <h2 className="text-lg font-bold mb-4">Email Recipients</h2>
-        <div className="space-y-3 text-sm">
-          {takedown.recipient_email && (
-            <div>
-              <span className="text-pg-text-muted">To: </span>
-              <span className="text-pg-text font-mono">{takedown.recipient_email}</span>
-            </div>
-          )}
-          {takedown.cc_emails && takedown.cc_emails.length > 0 && (
-            <div>
-              <span className="text-pg-text-muted">CC: </span>
-              <span className="text-pg-text font-mono">{takedown.cc_emails.join(', ')}</span>
-            </div>
-          )}
-        </div>
-      </Card>
 
       {/* Infringing URL */}
       <Card className="mb-6">
@@ -228,15 +240,15 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
         </div>
       </Card>
 
-      {/* DMCA Notice Content */}
-      <Card>
-        <h2 className="text-lg font-bold mb-4">DMCA Notice</h2>
-        <div className="bg-pg-surface-light p-4 rounded-lg border border-pg-border">
-          <pre className="whitespace-pre-wrap text-sm font-mono text-pg-text-muted leading-relaxed">
-            {takedown.notice_content}
-          </pre>
-        </div>
-      </Card>
+      {/* DMCA Notice — collapsible, collapsed by default */}
+      <DMCANoticeCard
+        sentAt={takedown.sent_at}
+        recipientEmail={takedown.recipient_email}
+        ccEmails={takedown.cc_emails}
+        status={takedown.status}
+        noticeContent={takedown.notice_content}
+        communicationStatus={communication?.status || null}
+      />
     </div>
   );
 }

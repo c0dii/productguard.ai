@@ -10,7 +10,17 @@
  * - Uses Bitcoin blockchain as notary
  */
 
-import { DetachedTimestampFile } from 'opentimestamps';
+// Dynamic import to avoid bitcore-lib duplicate instance crash at module load time
+// The opentimestamps package has a known issue with duplicate bitcore-lib instances
+async function getOpenTimestamps() {
+  try {
+    const mod = await import('opentimestamps');
+    return mod;
+  } catch (error) {
+    console.warn('[Blockchain Timestamp] Failed to load opentimestamps:', (error as Error).message);
+    return null;
+  }
+}
 
 export interface TimestampProof {
   hash: string; // SHA-256 hash that was timestamped
@@ -38,7 +48,12 @@ export async function createBlockchainTimestamp(
     const hashBytes = Buffer.from(contentHash, 'hex');
 
     // Create OpenTimestamps file
-    const detached = DetachedTimestampFile.fromHash(hashBytes);
+    const ots = await getOpenTimestamps();
+    if (!ots) {
+      console.warn('[Blockchain Timestamp] OpenTimestamps unavailable, skipping');
+      return { hash: contentHash, ots_file: '', created_at: new Date().toISOString(), status: 'failed' as const };
+    }
+    const detached = ots.DetachedTimestampFile.fromHash(hashBytes);
 
     // Stamp it (submits to calendar servers, returns immediately)
     // Note: This doesn't wait for Bitcoin confirmation (that takes ~10 minutes)
@@ -86,8 +101,12 @@ export async function verifyBlockchainTimestamp(
     console.log(`[Blockchain Timestamp] Verifying timestamp for hash: ${proof.hash}`);
 
     // Decode OTS file from base64
+    const ots = await getOpenTimestamps();
+    if (!ots) {
+      return { ...proof, status: 'failed' as const };
+    }
     const otsBytes = Buffer.from(proof.ots_file, 'base64');
-    const detached = DetachedTimestampFile.deserialize(otsBytes);
+    const detached = ots.DetachedTimestampFile.deserialize(otsBytes);
 
     // Verify (upgrades the timestamp if Bitcoin block available)
     const result = await detached.verify();
@@ -139,8 +158,12 @@ export async function upgradeTimestamp(proof: TimestampProof): Promise<Timestamp
     console.log(`[Blockchain Timestamp] Upgrading timestamp for hash: ${proof.hash}`);
 
     // Decode OTS file
+    const ots = await getOpenTimestamps();
+    if (!ots) {
+      return proof;
+    }
     const otsBytes = Buffer.from(proof.ots_file, 'base64');
-    const detached = DetachedTimestampFile.deserialize(otsBytes);
+    const detached = ots.DetachedTimestampFile.deserialize(otsBytes);
 
     // Upgrade (fetches Bitcoin attestation if available)
     const upgraded = await detached.upgrade();

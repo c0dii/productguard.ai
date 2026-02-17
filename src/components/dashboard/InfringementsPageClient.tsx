@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { InfringementList } from '@/components/dashboard/InfringementList';
 import Link from 'next/link';
+import { getPlatformDisplayName } from '@/lib/utils/platform-display';
 
 interface Infringement {
   id: string;
@@ -30,139 +31,229 @@ interface InfringementsPageClientProps {
   totalRevenueLoss: number;
 }
 
-type FilterOption = 'all' | 'needs_review' | 'action_required' | 'in_progress' | 'resolved' | 'dismissed';
+type FilterOption = 'actionable' | 'in_progress' | 'resolved' | 'all';
+
+const STATUS_FILTERS: { key: FilterOption; label: string; statuses: string[]; activeClass: string }[] = [
+  {
+    key: 'actionable',
+    label: 'Actionable',
+    statuses: ['pending_verification', 'active'],
+    activeClass: 'bg-pg-accent text-white shadow-lg shadow-pg-accent/30',
+  },
+  {
+    key: 'in_progress',
+    label: 'In Progress',
+    statuses: ['takedown_sent', 'disputed'],
+    activeClass: 'bg-blue-600 text-white shadow-lg shadow-blue-600/30',
+  },
+  {
+    key: 'resolved',
+    label: 'Resolved',
+    statuses: ['removed', 'false_positive', 'archived'],
+    activeClass: 'bg-green-600 text-white shadow-lg shadow-green-600/30',
+  },
+  {
+    key: 'all',
+    label: 'All',
+    statuses: [],
+    activeClass: 'bg-gray-600 text-white shadow-lg shadow-gray-600/30',
+  },
+];
 
 export function InfringementsPageClient({ infringements, totalRevenueLoss }: InfringementsPageClientProps) {
-  const [filter, setFilter] = useState<FilterOption>('all');
+  const [filter, setFilter] = useState<FilterOption>('actionable');
+  const [selectedProduct, setSelectedProduct] = useState<string>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
+  const [selectedCountry, setSelectedCountry] = useState<string>('all');
 
-  // Filter infringements based on selected filter
-  const filteredInfringements = useMemo(() => {
-    switch (filter) {
-      case 'needs_review':
-        return infringements.filter((i) => i.status === 'pending_verification');
-      case 'action_required':
-        return infringements.filter((i) => i.status === 'active');
-      case 'in_progress':
-        return infringements.filter((i) => ['takedown_sent', 'disputed'].includes(i.status));
-      case 'resolved':
-        return infringements.filter((i) => i.status === 'removed');
-      case 'dismissed':
-        return infringements.filter((i) => i.status === 'false_positive');
-      case 'all':
-      default:
-        return infringements;
+  // Extract unique products from infringements
+  const availableProducts = useMemo(() => {
+    const products = new Map<string, string>();
+    infringements.forEach((inf) => {
+      if (inf.product_id && inf.products?.name) {
+        products.set(inf.product_id, inf.products.name);
+      }
+    });
+    return Array.from(products.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]));
+  }, [infringements]);
+
+  // Extract unique platforms from infringement URLs, sorted by count (top 20 + Other)
+  const availablePlatforms = useMemo(() => {
+    const platformCounts = new Map<string, number>();
+    infringements.forEach((inf) => {
+      const name = getPlatformDisplayName(inf.source_url);
+      platformCounts.set(name, (platformCounts.get(name) || 0) + 1);
+    });
+    const sorted = Array.from(platformCounts.entries())
+      .sort((a, b) => b[1] - a[1]);
+    const top20 = sorted.slice(0, 20);
+    const otherCount = sorted.slice(20).reduce((sum, [, count]) => sum + count, 0);
+    return { top20, otherCount, otherNames: new Set(sorted.slice(20).map(([name]) => name)) };
+  }, [infringements]);
+
+  // Extract unique countries from infringements
+  const availableCountries = useMemo(() => {
+    const countryCounts = new Map<string, number>();
+    infringements.forEach((inf) => {
+      const country = inf.infrastructure?.country;
+      if (country) {
+        countryCounts.set(country, (countryCounts.get(country) || 0) + 1);
+      }
+    });
+    return Array.from(countryCounts.entries())
+      .sort((a, b) => b[1] - a[1]);
+  }, [infringements]);
+
+  // Apply product, platform, and country filters first
+  const baseFiltered = useMemo(() => {
+    let result = infringements;
+
+    if (selectedProduct !== 'all') {
+      result = result.filter((i) => i.product_id === selectedProduct);
     }
-  }, [infringements, filter]);
+    if (selectedPlatform !== 'all') {
+      if (selectedPlatform === '__other__') {
+        result = result.filter((i) => availablePlatforms.otherNames.has(getPlatformDisplayName(i.source_url)));
+      } else {
+        result = result.filter((i) => getPlatformDisplayName(i.source_url) === selectedPlatform);
+      }
+    }
+    if (selectedCountry !== 'all') {
+      result = result.filter((i) => i.infrastructure?.country === selectedCountry);
+    }
+
+    return result;
+  }, [infringements, selectedProduct, selectedPlatform, selectedCountry, availablePlatforms]);
+
+  // Then apply status filter
+  const filteredInfringements = useMemo(() => {
+    const activeFilter = STATUS_FILTERS.find((f) => f.key === filter);
+    if (!activeFilter || activeFilter.key === 'all') return baseFiltered;
+    return baseFiltered.filter((i) => activeFilter.statuses.includes(i.status));
+  }, [baseFiltered, filter]);
 
   const getTitle = () => {
     switch (filter) {
-      case 'needs_review':
-        return 'Needs Review';
-      case 'action_required':
-        return 'Action Required';
-      case 'in_progress':
-        return 'In Progress';
-      case 'resolved':
-        return 'Resolved';
-      case 'dismissed':
-        return 'Dismissed';
-      default:
-        return 'All Infringements';
+      case 'actionable': return 'Needs Your Attention';
+      case 'in_progress': return 'In Progress';
+      case 'resolved': return 'Resolved';
+      default: return 'All Infringements';
     }
   };
 
   const getEmptyMessage = () => {
     switch (filter) {
-      case 'needs_review':
-        return 'No items to review. All detected infringements have been reviewed.';
-      case 'action_required':
-        return 'No action required. All confirmed threats have been addressed.';
-      case 'in_progress':
-        return 'No infringements in progress.';
-      case 'resolved':
-        return 'No resolved infringements yet.';
-      case 'dismissed':
-        return 'No dismissed items.';
-      default:
-        return 'No infringements found.';
+      case 'actionable': return 'Nothing needs your attention right now. All detected threats have been addressed.';
+      case 'in_progress': return 'No takedowns in progress.';
+      case 'resolved': return 'No resolved infringements yet.';
+      default: return 'No infringements found. Run a scan to start detecting threats.';
     }
   };
 
   return (
     <div>
-      {/* Filter Tabs */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              filter === 'all'
-                ? 'bg-pg-accent text-white shadow-lg shadow-pg-accent/30'
-                : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
-            }`}
-          >
-            All ({infringements.length})
-          </button>
-          <button
-            onClick={() => setFilter('needs_review')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              filter === 'needs_review'
-                ? 'bg-pg-warning text-white shadow-lg shadow-pg-warning/30'
-                : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
-            }`}
-          >
-            ⚠️ Needs Review ({infringements.filter((i) => i.status === 'pending_verification').length})
-          </button>
-          <button
-            onClick={() => setFilter('action_required')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              filter === 'action_required'
-                ? 'bg-pg-danger text-white shadow-lg shadow-pg-danger/30'
-                : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
-            }`}
-          >
-            🔴 Action Required ({infringements.filter((i) => i.status === 'active').length})
-          </button>
-          <button
-            onClick={() => setFilter('in_progress')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              filter === 'in_progress'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
-            }`}
-          >
-            📧 In Progress ({infringements.filter((i) => ['takedown_sent', 'disputed'].includes(i.status)).length})
-          </button>
-          <button
-            onClick={() => setFilter('resolved')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              filter === 'resolved'
-                ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
-                : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
-            }`}
-          >
-            ✅ Resolved ({infringements.filter((i) => i.status === 'removed').length})
-          </button>
-          <button
-            onClick={() => setFilter('dismissed')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-              filter === 'dismissed'
-                ? 'bg-gray-600 text-white shadow-lg shadow-gray-600/30'
-                : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
-            }`}
-          >
-            Dismissed ({infringements.filter((i) => i.status === 'false_positive').length})
-          </button>
-        </div>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        {/* Product Filter */}
+        {availableProducts.length > 1 && (
+          <div>
+            <label htmlFor="product-filter" className="block text-sm font-medium text-pg-text-muted mb-2">
+              Filter by Product
+            </label>
+            <select
+              id="product-filter"
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              className="input-field w-full sm:w-72"
+            >
+              <option value="all">All Products ({availableProducts.length})</option>
+              {availableProducts.map(([productId, productName]) => {
+                const count = infringements.filter((i) => i.product_id === productId).length;
+                return (
+                  <option key={productId} value={productId}>
+                    {productName} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
 
-        {(filter === 'action_required' || filter === 'in_progress') && totalRevenueLoss > 0 && (
-          <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30">
-            <p className="text-sm text-pg-text">
-              <span className="font-semibold">Est. Revenue Loss:</span>{' '}
-              <span className="text-pg-danger font-bold text-lg">${totalRevenueLoss.toLocaleString()}</span>
+        {/* Platform Filter */}
+        {availablePlatforms.top20.length > 1 && (
+          <div>
+            <label htmlFor="platform-filter" className="block text-sm font-medium text-pg-text-muted mb-2">
+              Filter by Platform
+            </label>
+            <select
+              id="platform-filter"
+              value={selectedPlatform}
+              onChange={(e) => setSelectedPlatform(e.target.value)}
+              className="input-field w-full sm:w-72"
+            >
+              <option value="all">All Platforms</option>
+              {availablePlatforms.top20.map(([name, count]) => (
+                <option key={name} value={name}>
+                  {name} ({count})
+                </option>
+              ))}
+              {availablePlatforms.otherCount > 0 && (
+                <option value="__other__">Other ({availablePlatforms.otherCount})</option>
+              )}
+            </select>
+          </div>
+        )}
+
+        {/* Country Filter */}
+        {availableCountries.length > 0 && (
+          <div>
+            <label htmlFor="country-filter" className="block text-sm font-medium text-pg-text-muted mb-2">
+              Filter by Country
+            </label>
+            <select
+              id="country-filter"
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="input-field w-full sm:w-64"
+            >
+              <option value="all">All Countries ({infringements.length})</option>
+              {availableCountries.map(([country, count]) => (
+                <option key={country} value={country}>
+                  {country} ({count})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-pg-text-muted mt-1">
+              US-based sites are typically easier to take down (DMCA laws)
             </p>
           </div>
         )}
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          {STATUS_FILTERS.map((tab) => {
+            const count = tab.key === 'all'
+              ? baseFiltered.length
+              : baseFiltered.filter((i) => tab.statuses.includes(i.status)).length;
+
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-all ${
+                  filter === tab.key
+                    ? tab.activeClass
+                    : 'bg-pg-surface text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text border border-pg-border'
+                }`}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Infringements List */}
@@ -173,12 +264,13 @@ export function InfringementsPageClient({ infringements, totalRevenueLoss }: Inf
           title={getTitle()}
           emptyMessage={getEmptyMessage()}
           showProductName={true}
+          hideCountryFilter={true}
         />
       ) : (
-        <div className="p-12 rounded-2xl bg-pg-surface backdrop-blur-sm border border-pg-border">
+        <div className="p-6 sm:p-12 rounded-xl sm:rounded-2xl bg-pg-surface backdrop-blur-sm border border-pg-border">
           <div className="text-center">
-            <p className="text-xl font-semibold mb-2 text-pg-text">{getTitle()}</p>
-            <p className="text-pg-text-muted mb-4">{getEmptyMessage()}</p>
+            <p className="text-lg sm:text-xl font-semibold mb-2 text-pg-text">{getTitle()}</p>
+            <p className="text-sm sm:text-base text-pg-text-muted mb-4">{getEmptyMessage()}</p>
             <Link
               href="/dashboard/scans"
               className="inline-block px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all"

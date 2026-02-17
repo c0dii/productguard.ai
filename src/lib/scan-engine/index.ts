@@ -11,6 +11,8 @@ import { priorityScorer } from '@/lib/enforcement/priority-scorer';
 import { infrastructureProfiler } from '@/lib/enforcement/infrastructure-profiler';
 import { filterSearchResults, estimateFilteringCost } from '@/lib/ai/infringement-filter';
 import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } from '@/lib/ghl/events';
+import { fetchIntelligenceForScan, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
+import { notifyHighSeverityInfringement, notifyScanComplete } from '@/lib/notifications/email';
 import crypto from 'crypto';
 
 /**
@@ -40,49 +42,142 @@ function generateUrlHash(url: string): string {
  */
 export async function scanProduct(scanId: string, product: Product): Promise<void> {
   const supabase = createAdminClient();
+  const scanStartTime = Date.now();
 
   try {
+    // Get current scan info to determine if this is a re-run
+    const { data: currentScan } = await supabase
+      .from('scans')
+      .select('run_count, initial_run_at')
+      .eq('id', scanId)
+      .single();
+
+    const isFirstRun = !currentScan?.run_count || currentScan.run_count === 1;
+    const runNumber = (currentScan?.run_count || 0) + 1;
+
     // Update scan status to running
     await supabase
       .from('scans')
       .update({
         status: 'running',
         started_at: new Date().toISOString(),
+        last_run_at: new Date().toISOString(),
+        run_count: runNumber,
       })
       .eq('id', scanId);
 
-    // Run all platform scanners in parallel
-    const scanResults = await runPlatformScanners(product);
+    // Fetch intelligence data for query optimization (non-blocking)
+    const intelligence = await fetchIntelligenceForScan(supabase, product.id);
+
+    // Run all platform scanners in parallel (with intelligence data)
+    const scanResults = await runPlatformScanners(product, intelligence);
 
     console.log(`[Scan Engine] Found ${scanResults.length} raw results from platforms`);
 
+    // DELTA DETECTION: Fetch existing URL hashes for this product
+    const { data: existingInfringements } = await supabase
+      .from('infringements')
+      .select('id, url_hash, source_url, status, seen_count')
+      .eq('product_id', product.id);
+
+    const existingUrlHashes = new Set(
+      (existingInfringements || []).map((inf) => inf.url_hash).filter((hash): hash is string => hash !== null)
+    );
+
+    console.log(`[Scan Engine] Delta Detection: Found ${existingUrlHashes.size} existing URLs in database`);
+
+    // Filter out known URLs BEFORE expensive processing
+    const newResults = scanResults.filter((result) => {
+      const urlHash = generateUrlHash(result.source_url);
+      return !existingUrlHashes.has(urlHash);
+    });
+
+    const knownUrls = scanResults.length - newResults.length;
+
+    console.log(
+      `[Scan Engine] Delta Detection: ${newResults.length} new URLs, ${knownUrls} already tracked`
+    );
+
+    // WHITELIST URL FILTERING: Remove user-approved URLs before expensive processing
+    const whitelistUrls = product.whitelist_urls || [];
+    let whitelistFiltered = newResults;
+    if (whitelistUrls.length > 0) {
+      const normalizedWhitelist = whitelistUrls.map(u =>
+        u.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '')
+      );
+      whitelistFiltered = newResults.filter((result) => {
+        const normalizedResultUrl = result.source_url.toLowerCase()
+          .replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
+        return !normalizedWhitelist.some(wUrl =>
+          normalizedResultUrl === wUrl || normalizedResultUrl.startsWith(wUrl)
+        );
+      });
+      const whitelistSkipped = newResults.length - whitelistFiltered.length;
+      if (whitelistSkipped > 0) {
+        console.log(`[Scan Engine] Whitelist: Skipped ${whitelistSkipped} user-approved URLs`);
+      }
+    }
+
+    // Calculate API savings
+    const apiCallsSaved = knownUrls; // Each known URL saves 1 WHOIS + DNS lookup
+    const aiFilteringSaved = knownUrls; // Each known URL saves 1 AI filtering call
+
+    // Use filtered results for processing
+    const resultsToProcess = whitelistFiltered;
+
     // AI-POWERED FILTERING: Remove false positives before processing
-    // Can be disabled via environment variable for testing
+    // Only process NEW URLs (delta detection saves AI costs)
     const useAIFilter = process.env.DISABLE_AI_FILTER !== 'true';
     const aiConfidenceThreshold = parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.60'); // Lowered from 0.75 to 0.60 for better recall
 
-    let filteredResults = scanResults;
+    let filteredResults = resultsToProcess;
 
-    if (useAIFilter && scanResults.length > 0) {
-      filteredResults = await filterSearchResults(scanResults, product, aiConfidenceThreshold);
+    if (useAIFilter && resultsToProcess.length > 0) {
+      filteredResults = await filterSearchResults(resultsToProcess, product, aiConfidenceThreshold, intelligence);
 
       console.log(
-        `[Scan Engine] AI Filter: ${filteredResults.length}/${scanResults.length} results passed (${((filteredResults.length / scanResults.length) * 100).toFixed(1)}% pass rate)`
+        `[Scan Engine] AI Filter: ${filteredResults.length}/${resultsToProcess.length} NEW results passed (${resultsToProcess.length > 0 ? ((filteredResults.length / resultsToProcess.length) * 100).toFixed(1) : 0}% pass rate)`
       );
       console.log(
-        `[Scan Engine] Estimated AI filtering cost: $${estimateFilteringCost(scanResults.length).toFixed(4)}`
+        `[Scan Engine] Estimated AI filtering cost: $${estimateFilteringCost(resultsToProcess.length).toFixed(4)}`
       );
+      console.log(
+        `[Scan Engine] Delta Detection saved $${estimateFilteringCost(aiFilteringSaved).toFixed(4)} in AI costs`
+      );
+    } else if (resultsToProcess.length === 0) {
+      console.log('[Scan Engine] No new URLs to filter (all URLs already tracked)');
     } else {
-      console.log('[Scan Engine] AI filtering disabled, using all results');
+      console.log('[Scan Engine] AI filtering disabled, using all new results');
     }
 
-    // Calculate total revenue loss (from filtered results)
-    const totalRevenueLoss = filteredResults.reduce((sum, result) => sum + result.est_revenue_loss, 0);
+    // DEDUPLICATION: Remove duplicate URLs within the same scan batch
+    // Different platform scanners may find the same URL, causing unique constraint violations
+    const seenUrlHashes = new Set<string>();
+    const deduplicatedResults = filteredResults.filter((result) => {
+      const urlHash = generateUrlHash(result.source_url);
+      if (seenUrlHashes.has(urlHash)) {
+        return false;
+      }
+      seenUrlHashes.add(urlHash);
+      return true;
+    });
+
+    if (deduplicatedResults.length < filteredResults.length) {
+      console.log(
+        `[Scan Engine] Deduplication: Removed ${filteredResults.length - deduplicatedResults.length} duplicate URLs within scan batch`
+      );
+    }
+
+    // Calculate total revenue loss (from deduplicated results)
+    const totalRevenueLoss = deduplicatedResults.reduce((sum, result) => sum + result.est_revenue_loss, 0);
+
+    // Track actual inserted count
+    let actualInsertedCount = 0;
 
     // Insert infringements into database with evidence and priority scoring
-    if (filteredResults.length > 0) {
+    if (deduplicatedResults.length > 0) {
       const infringementsWithScoring = await Promise.all(
-        filteredResults.map(async (result) => {
+        deduplicatedResults.map(async (result) => {
           // Collect evidence and infrastructure data in parallel
           const [evidence, infrastructure] = await Promise.all([
             evidenceCollector.collectEvidence(
@@ -190,69 +285,159 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         })
       );
 
-      // Deduplicate before insert: check if URL hash already exists
-      const dedupedInfringements = [];
-      let updatedCount = 0;
+      // All results here are NEW and deduplicated (within-batch + delta detection)
+      // Use regular insert — deduplication already handles duplicates
+      const { data: insertedData, error: insertError } = await supabase
+        .from('infringements')
+        .insert(infringementsWithScoring)
+        .select('id');
 
-      for (const inf of infringementsWithScoring) {
-        // Check if URL hash already exists for this product
-        const { data: existing } = await supabase
-          .from('infringements')
-          .select('id, seen_count, status, verified_by_user_at')
-          .eq('product_id', inf.product_id)
-          .eq('url_hash', inf.url_hash)
-          .maybeSingle();
-
-        if (existing) {
-          // URL already exists - update last_seen_at and increment seen_count
-          await supabase
+      if (insertError) {
+        console.error('[Scan Engine] Batch insert failed:', insertError);
+        // Attempt individual inserts as fallback so partial results aren't lost
+        console.log('[Scan Engine] Attempting individual inserts as fallback...');
+        for (const infringement of infringementsWithScoring) {
+          const { error: singleError } = await supabase
             .from('infringements')
-            .update({
-              last_seen_at: inf.last_seen_at,
-              seen_count: existing.seen_count + 1,
-            })
-            .eq('id', existing.id);
-
-          updatedCount++;
-          console.log(
-            `Updated existing infringement: ${inf.url_normalized} (seen ${existing.seen_count + 1} times)`
-          );
-        } else {
-          // New unique URL - add to insert batch
-          dedupedInfringements.push(inf);
+            .insert(infringement);
+          if (!singleError) {
+            actualInsertedCount++;
+          } else {
+            console.error(`[Scan Engine] Failed to insert ${infringement.source_url}:`, singleError.message);
+          }
         }
-      }
-
-      // Insert only new unique infringements
-      if (dedupedInfringements.length > 0) {
-        const { error: insertError } = await supabase.from('infringements').insert(dedupedInfringements);
-
-        if (insertError) {
-          console.error('Error inserting infringements:', insertError);
-        } else {
-          console.log(
-            `Inserted ${dedupedInfringements.length} new unique infringements, updated ${updatedCount} existing`
-          );
-        }
+        console.log(`[Scan Engine] Fallback: Inserted ${actualInsertedCount}/${infringementsWithScoring.length} infringements individually`);
       } else {
-        console.log(`No new infringements found. Updated ${updatedCount} existing infringement(s).`);
+        actualInsertedCount = insertedData?.length ?? infringementsWithScoring.length;
+        console.log(`[Scan Engine] Inserted ${actualInsertedCount} new unique infringements`);
       }
     }
 
-    // Update scan status to completed
+    // Update last_seen_at and seen_count for known URLs that were re-discovered
+    if (knownUrls > 0) {
+      const now = new Date().toISOString();
+
+      // Build a map from url_hash to existing record for efficient lookup
+      const existingMap = new Map(
+        (existingInfringements || [])
+          .filter((inf) => inf.url_hash !== null)
+          .map((inf) => [inf.url_hash, { id: inf.id, seen_count: inf.seen_count || 1 }])
+      );
+
+      // Update each known URL with incremented seen_count
+      const updatePromises = scanResults
+        .filter((result) => {
+          const urlHash = generateUrlHash(result.source_url);
+          return existingUrlHashes.has(urlHash);
+        })
+        .map((result) => {
+          const urlHash = generateUrlHash(result.source_url);
+          const existing = existingMap.get(urlHash);
+          if (!existing) return Promise.resolve();
+
+          return supabase
+            .from('infringements')
+            .update({
+              last_seen_at: now,
+              seen_count: existing.seen_count + 1,
+            })
+            .eq('id', existing.id);
+        });
+
+      const results = await Promise.all(updatePromises);
+      const errors = results.filter((r) => r && 'error' in r && r.error);
+
+      if (errors.length > 0) {
+        console.error(`Error updating ${errors.length} existing infringements`);
+      } else {
+        console.log(`Updated ${knownUrls} existing infringements with new last_seen_at timestamp`);
+      }
+    }
+
+    // Calculate scan duration
+    const durationSeconds = Math.floor((Date.now() - scanStartTime) / 1000);
+
+    // Update scan status to completed (use actual inserted count, not filtered count)
     await supabase
       .from('scans')
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        infringement_count: filteredResults.length,
+        infringement_count: actualInsertedCount,
         est_revenue_loss: totalRevenueLoss,
       })
       .eq('id', scanId);
 
+    // Create scan_history entry
+    const { error: historyError } = await supabase.from('scan_history').insert({
+      scan_id: scanId,
+      run_number: runNumber,
+      run_at: new Date().toISOString(),
+      new_urls_found: scanResults.length,
+      total_urls_scanned: scanResults.length,
+      new_infringements_created: actualInsertedCount,
+      api_calls_saved: apiCallsSaved,
+      ai_filtering_saved: aiFilteringSaved,
+      duration_seconds: durationSeconds,
+      platforms_searched: ['google', 'telegram', 'cyberlockers', 'torrents', 'discord', 'forums'],
+      search_queries_used: product.keywords || [],
+    });
+
+    if (historyError) {
+      console.error('[Scan Engine] Error creating scan history:', historyError);
+    }
+
     console.log(
-      `[Scan Engine] Scan ${scanId} completed: ${filteredResults.length} verified infringements found (${scanResults.length - filteredResults.length} false positives filtered out)`
+      `[Scan Engine] Scan ${scanId} completed (Run #${runNumber}): ${actualInsertedCount} new infringements inserted (${deduplicatedResults.length} processed)`
     );
+    console.log(
+      `[Scan Engine] Delta Detection Savings: ${apiCallsSaved} API calls, ${aiFilteringSaved} AI filtering calls`
+    );
+    console.log(
+      `[Scan Engine] Total scanned: ${scanResults.length} URLs (${knownUrls} known, ${newResults.length} new)`
+    );
+
+    // ── Early Evidence Capture for P0 Results ────────────────────────
+    // Trigger lightweight evidence capture for P0 infringements at scan time
+    // so evidence exists before user verification
+    if (filteredResults.length > 0) {
+      const p0Results = filteredResults.filter((r: any) => r.priority === 'P0' || r.severity_score >= 80);
+      if (p0Results.length > 0) {
+        console.log(`[Scan Engine] Triggering early evidence capture for ${p0Results.length} P0 results`);
+
+        // Capture page content for P0 results (non-blocking, best-effort)
+        for (const result of p0Results.slice(0, 5)) { // Cap at 5 to avoid overloading
+          try {
+            const response = await fetch(result.source_url, {
+              headers: { 'User-Agent': 'ProductGuard-Scanner/1.0' },
+              signal: AbortSignal.timeout(8000),
+            });
+            if (response.ok) {
+              const html = await response.text();
+              const pageText = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 5000);
+              const contentHash = crypto.createHash('sha256').update(html).digest('hex');
+
+              // Store early capture as evidence_snapshot stub
+              await supabase.from('evidence_snapshots').insert({
+                infringement_id: null, // Will be linked after insert
+                user_id: product.user_id,
+                page_url: result.source_url,
+                content_hash: contentHash,
+                captured_at: new Date().toISOString(),
+                page_capture: {
+                  page_text: pageText,
+                  html_hash: contentHash,
+                  early_capture: true,
+                },
+              });
+              console.log(`[Scan Engine] Early evidence captured for: ${result.source_url}`);
+            }
+          } catch {
+            // Non-blocking — evidence capture failures don't affect scan
+          }
+        }
+      }
+    }
 
     // Track scan completion in GHL
     try {
@@ -291,14 +476,14 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         }
 
         // Track high severity infringements
-        const highSeverityResults = filteredResults.filter(r => r.severity_score >= 80);
+        const highSeverityResults = filteredResults.filter(r => (r as any).severity_score >= 80);
         for (const result of highSeverityResults) {
           await trackHighSeverityInfringement(
             product.user_id,
             userData.user.email,
-            '', // Will be the infringement ID
+            '',
             result.source_url,
-            result.severity_score,
+            (result as any).severity_score || 80,
             result.platform,
             product.name
           );
@@ -309,7 +494,48 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       // Don't fail the scan if GHL tracking fails
     }
 
-    // TODO: Send email notification via Resend (Phase 2)
+    // ── Email Notifications via Resend ──────────────────────────────
+    try {
+      const { data: userData } = await supabase.auth.admin.getUserById(product.user_id);
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', product.user_id)
+        .single();
+
+      if (userData?.user?.email) {
+        const userName = userProfile?.full_name || 'there';
+        const p0Count = filteredResults.filter((r: any) => r.priority === 'P0' || r.severity_score >= 80).length;
+
+        // Send scan complete notification
+        await notifyScanComplete({
+          to: userData.user.email,
+          userName,
+          productName: product.name,
+          scanId,
+          newInfringements: filteredResults.length,
+          totalScanned: scanResults.length,
+          p0Count,
+        });
+
+        // Send individual P0 alerts for critical findings
+        const highSeverityInfringements = filteredResults.filter((r: any) => r.severity_score >= 80);
+        for (const result of highSeverityInfringements.slice(0, 3)) {
+          await notifyHighSeverityInfringement({
+            to: userData.user.email,
+            userName,
+            productName: product.name,
+            sourceUrl: result.source_url,
+            platform: result.platform,
+            severityScore: (result as any).severity_score || 80,
+            estRevenueLoss: result.est_revenue_loss,
+            infringementId: '', // Not yet inserted, will have ID after insert
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[Scan Engine] Error sending email notifications:', error);
+    }
   } catch (error) {
     console.error(`Scan ${scanId} failed:`, error);
 
@@ -327,15 +553,15 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
 /**
  * Run all platform scanners and aggregate results
  */
-async function runPlatformScanners(product: Product): Promise<InfringementResult[]> {
+async function runPlatformScanners(product: Product, intelligence: IntelligenceData): Promise<InfringementResult[]> {
   const allResults: InfringementResult[] = [];
 
   try {
-    // Run all scanners in parallel
+    // Run all scanners in parallel (pass intelligence data to Google and Telegram)
     const [googleResults, telegramResults, cyberlockerResults, torrentResults, discordResults, forumResults] =
       await Promise.all([
-        scanGoogle(product),
-        scanTelegram(product),
+        scanGoogle(product, intelligence),
+        scanTelegram(product, intelligence),
         scanCyberlockers(product),
         scanTorrents(product),
         scanDiscord(product),

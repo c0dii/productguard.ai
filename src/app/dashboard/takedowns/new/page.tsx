@@ -43,12 +43,18 @@ export default async function NewTakedownPage({
     .eq('user_id', user.id)
     .order('name');
 
+  const isManual = !infringement;
+
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 text-pg-text">Send DMCA Takedown Notice</h1>
-        <p className="text-sm text-pg-text-muted">
-          Complete this form to generate a legally-compliant DMCA takedown notice
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-pg-text">
+          {isManual ? 'Report Infringing URL' : 'Send DMCA Takedown Notice'}
+        </h1>
+        <p className="text-xs sm:text-sm text-pg-text-muted">
+          {isManual
+            ? 'Manually report an infringing URL and generate a DMCA takedown notice'
+            : 'Complete this form to generate a legally-compliant DMCA takedown notice'}
         </p>
       </div>
 

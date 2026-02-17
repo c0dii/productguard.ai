@@ -27,6 +27,8 @@ interface InfringementListProps {
   title: string;
   emptyMessage?: string;
   showProductName?: boolean;
+  /** Hide the built-in country filter (when parent component provides its own) */
+  hideCountryFilter?: boolean;
 }
 
 export function InfringementList({
@@ -36,6 +38,7 @@ export function InfringementList({
   title,
   emptyMessage = 'No infringements found',
   showProductName = false,
+  hideCountryFilter = false,
 }: InfringementListProps) {
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
 
@@ -44,33 +47,27 @@ export function InfringementList({
     const countries = new Set<string>();
     infringements.forEach((inf) => {
       const country = inf.infrastructure?.country;
-      if (country) {
-        countries.add(country);
-      }
+      if (country) countries.add(country);
     });
     return Array.from(countries).sort();
   }, [infringements]);
 
-  // Filter infringements by selected country
-  const filteredInfringements = useMemo(() => {
-    if (selectedCountry === 'all') {
-      return infringements;
-    }
-    return infringements.filter(
-      (inf) => inf.infrastructure?.country === selectedCountry
-    );
-  }, [infringements, selectedCountry]);
+  // Filter by country (only when showing the built-in filter)
+  const displayInfringements = useMemo(() => {
+    if (hideCountryFilter || selectedCountry === 'all') return infringements;
+    return infringements.filter((inf) => inf.infrastructure?.country === selectedCountry);
+  }, [infringements, selectedCountry, hideCountryFilter]);
 
   // Group by risk level
-  const critical = filteredInfringements.filter((i) => i.risk_level === 'critical');
-  const high = filteredInfringements.filter((i) => i.risk_level === 'high');
-  const medium = filteredInfringements.filter((i) => i.risk_level === 'medium');
-  const low = filteredInfringements.filter((i) => i.risk_level === 'low');
+  const critical = useMemo(() => displayInfringements.filter((i) => i.risk_level === 'critical'), [displayInfringements]);
+  const high = useMemo(() => displayInfringements.filter((i) => i.risk_level === 'high'), [displayInfringements]);
+  const medium = useMemo(() => displayInfringements.filter((i) => i.risk_level === 'medium'), [displayInfringements]);
+  const low = useMemo(() => displayInfringements.filter((i) => i.risk_level === 'low'), [displayInfringements]);
 
   return (
     <div>
-      {/* Country Filter */}
-      {availableCountries.length > 0 && (
+      {/* Country Filter (shown on scan detail pages, hidden on infringements page where parent handles it) */}
+      {!hideCountryFilter && availableCountries.length > 0 && (
         <div className="mb-6">
           <label htmlFor="country-filter" className="block text-sm font-medium text-pg-text-muted mb-2">
             Filter by Country
@@ -83,9 +80,7 @@ export function InfringementList({
           >
             <option value="all">All Countries ({infringements.length})</option>
             {availableCountries.map((country) => {
-              const count = infringements.filter(
-                (inf) => inf.infrastructure?.country === country
-              ).length;
+              const count = infringements.filter((inf) => inf.infrastructure?.country === country).length;
               return (
                 <option key={country} value={country}>
                   {country} ({count})
@@ -94,14 +89,14 @@ export function InfringementList({
             })}
           </select>
           <p className="text-xs text-pg-text-muted mt-1">
-            💡 Tip: US-based sites are typically easier to take down (DMCA laws)
+            US-based sites are typically easier to take down (DMCA laws)
           </p>
         </div>
       )}
 
       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{title}</h2>
 
-      {filteredInfringements.length === 0 ? (
+      {displayInfringements.length === 0 ? (
         <Card>
           <p className="text-pg-text-muted text-center py-8">{emptyMessage}</p>
         </Card>

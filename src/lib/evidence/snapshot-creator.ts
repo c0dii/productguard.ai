@@ -121,7 +121,7 @@ export async function createEvidenceSnapshot(
     screenshot_url: screenshotUrl,
     html_archive_url: htmlArchiveUrl,
 
-    page_title: infringement.evidence?.page_title || '',
+    page_title: (infringement.evidence as any)?.page_title || '',
     page_url: infringement.source_url,
     captured_at: now,
 
@@ -133,8 +133,8 @@ export async function createEvidenceSnapshot(
       hosting_provider: infringement.infrastructure?.hosting_provider || null,
       country: infringement.infrastructure?.country || null,
       registrar: infringement.infrastructure?.registrar || null,
-      dns_records: infringement.infrastructure?.dns_records || null,
-      ssl_certificate: infringement.infrastructure?.ssl_certificate || null,
+      dns_records: (infringement.infrastructure as any)?.dns_records || null,
+      ssl_certificate: (infringement.infrastructure as any)?.ssl_certificate || null,
     },
 
     evidence_matches: (infringement.evidence?.matched_excerpts || []).map((excerpt: string) => ({

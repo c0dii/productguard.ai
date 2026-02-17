@@ -96,22 +96,35 @@ export async function POST(req: NextRequest) {
         const planTier = (subscription.metadata.plan_tier || 'starter') as PlanTier;
         const status = mapStripeStatus(subscription.status);
 
-        // Update profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ plan_tier: status === 'active' ? planTier : 'scout' })
-          .eq('id', userId);
+        // Only update plan_tier if subscription is truly active and not just scheduled to cancel.
+        // When cancel_at_period_end is true, user keeps current plan until period ends.
+        if (status === 'active' && !subscription.cancel_at_period_end) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ plan_tier: planTier })
+            .eq('id', userId);
 
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
+          if (profileError) {
+            console.error('Error updating profile:', profileError);
+          }
+        } else if (status !== 'active') {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ plan_tier: 'scout' })
+            .eq('id', userId);
+
+          if (profileError) {
+            console.error('Error updating profile:', profileError);
+          }
         }
 
-        // Update subscription record
+        // Update subscription record including cancel_at_period_end flag
         const { error: subError } = await supabase
           .from('subscriptions')
           .update({
             plan_tier: planTier,
             status,
+            cancel_at_period_end: subscription.cancel_at_period_end || false,
             current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
             current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           })
@@ -121,7 +134,7 @@ export async function POST(req: NextRequest) {
           console.error('Error updating subscription:', subError);
         }
 
-        console.log(`✅ Subscription updated for user ${userId}: ${status}`);
+        console.log(`✅ Subscription updated for user ${userId}: ${status}${subscription.cancel_at_period_end ? ' (canceling at period end)' : ''}`);
         break;
       }
 

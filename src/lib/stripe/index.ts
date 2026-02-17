@@ -98,12 +98,63 @@ export async function getSubscription(
 }
 
 /**
- * Cancel a subscription immediately
+ * Cancel a subscription immediately (used for account deletion)
  */
-export async function cancelSubscription(
+export async function cancelSubscriptionImmediately(
   subscriptionId: string
 ): Promise<Stripe.Subscription> {
   return await stripe.subscriptions.cancel(subscriptionId);
+}
+
+/**
+ * Cancel a subscription at the end of the current billing period.
+ * User retains full access until period ends, then Stripe fires customer.subscription.deleted.
+ */
+export async function cancelAtPeriodEnd(
+  subscriptionId: string
+): Promise<Stripe.Subscription> {
+  return await stripe.subscriptions.update(subscriptionId, {
+    cancel_at_period_end: true,
+  });
+}
+
+/**
+ * Pause subscription billing for a specified duration.
+ * Uses Stripe's pause_collection to void invoices until the resume date.
+ */
+export async function pauseSubscription(
+  subscriptionId: string,
+  resumeDate: Date
+): Promise<Stripe.Subscription> {
+  return await stripe.subscriptions.update(subscriptionId, {
+    pause_collection: {
+      behavior: 'void',
+      resumes_at: Math.floor(resumeDate.getTime() / 1000),
+    },
+  });
+}
+
+/**
+ * Resume a paused subscription immediately
+ */
+export async function resumeSubscription(
+  subscriptionId: string
+): Promise<Stripe.Subscription> {
+  return await stripe.subscriptions.update(subscriptionId, {
+    pause_collection: '',
+  });
+}
+
+/**
+ * Apply a retention discount coupon to an existing subscription
+ */
+export async function applyRetentionDiscount(
+  subscriptionId: string,
+  couponId: string
+): Promise<Stripe.Subscription> {
+  return await stripe.subscriptions.update(subscriptionId, {
+    coupon: couponId,
+  });
 }
 
 /**

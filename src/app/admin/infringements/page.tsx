@@ -85,11 +85,12 @@ export default async function AdminInfringementsPage() {
               </div>
               <div className="text-right text-xs text-pg-text-muted">
                 <p>{new Date(inf.created_at).toLocaleDateString()}</p>
-                {inf.estimated_revenue_loss && (
+                {/* Temporarily disabled - revenue loss calculations need refinement */}
+                {/* {inf.estimated_revenue_loss && (
                   <p className="text-pg-danger font-semibold">
                     ${inf.estimated_revenue_loss}
                   </p>
-                )}
+                )} */}
               </div>
             </div>
           </Card>

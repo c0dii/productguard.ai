@@ -17,18 +17,26 @@
 
 import { NextResponse } from 'next/server';
 import { deadlineTracker } from '@/lib/enforcement/deadline-tracker';
+import { timingSafeEqual } from 'crypto';
 
 export async function GET(request: Request) {
   try {
-    // Verify cron secret (recommended for production)
+    // Verify cron secret — mandatory, timing-safe comparison
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Invalid cron secret' },
-        { status: 401 }
-      );
+    if (!cronSecret) {
+      console.error('[Cron] CRON_SECRET environment variable is not configured');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const expected = `Bearer ${cronSecret}`;
+    if (
+      !authHeader ||
+      authHeader.length !== expected.length ||
+      !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    ) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     console.log('[Cron] Starting deadline check...');
@@ -76,7 +84,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: 'Deadline check failed',
       },
       { status: 500 }
     );

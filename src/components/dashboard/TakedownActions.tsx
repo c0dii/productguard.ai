@@ -32,7 +32,6 @@ export function TakedownActions({
 }: TakedownActionsProps) {
   const router = useRouter();
   const [showDisclaimer, setShowDisclaimer] = useState(false);
-  const [disclaimerAction, setDisclaimerAction] = useState<'send' | 'mark-sent'>('send');
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [whoisInfo, setWhoisInfo] = useState<WhoisInfo | null>(null);
   const [loadingWhois, setLoadingWhois] = useState(false);
@@ -79,12 +78,7 @@ export function TakedownActions({
 
   const handleDisclaimerAccept = async () => {
     setShowDisclaimer(false);
-
-    if (disclaimerAction === 'send') {
-      setShowSendDialog(true);
-    } else if (disclaimerAction === 'mark-sent') {
-      await handleManualMarkSent();
-    }
+    setShowSendDialog(true);
   };
 
   const handleDisclaimerCancel = () => {
@@ -139,13 +133,11 @@ export function TakedownActions({
   };
 
   const handleSendButtonClick = () => {
-    setDisclaimerAction('send');
     setShowDisclaimer(true);
   };
 
-  const handleMarkSent = () => {
-    setDisclaimerAction('mark-sent');
-    setShowDisclaimer(true);
+  const handleMarkSent = async () => {
+    await handleManualMarkSent();
   };
 
   const handleManualMarkSent = async () => {
@@ -252,9 +244,9 @@ export function TakedownActions({
 
       {/* Send Dialog */}
       {showSendDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">Send DMCA Notice</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 sm:p-4">
+          <Card className="max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-2xl">
+            <h2 className="text-lg sm:text-xl font-bold mb-4">Send DMCA Notice</h2>
 
             {/* WHOIS Info */}
             <div className="mb-6">

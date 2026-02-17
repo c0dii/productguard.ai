@@ -11,6 +11,7 @@
 
 import * as cheerio from 'cheerio';
 import type { EvidencePacket, Product } from '@/types';
+import { isGenericKeyword } from '@/lib/utils/keyword-quality';
 
 export interface EvidenceCollectionContext {
   productName: string;
@@ -143,12 +144,15 @@ export class EvidenceCollector {
       const pageText = $('body').text();
 
       // Build keyword list from product name and keywords
+      // Filter out generic keywords to prevent false positive evidence
       const searchTerms: string[] = [];
       if (context.productName) {
         searchTerms.push(context.productName.toLowerCase());
       }
       if (context.keywords) {
-        searchTerms.push(...context.keywords.map((k) => k.toLowerCase()));
+        // Only use product-specific keywords, not generic industry terms
+        const specificKeywords = context.keywords.filter(k => !isGenericKeyword(k));
+        searchTerms.push(...specificKeywords.map((k) => k.toLowerCase()));
       }
 
       const excerpts: string[] = [];

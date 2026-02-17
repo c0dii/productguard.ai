@@ -56,7 +56,8 @@ function generateTextReport(scan: any, infringements: any[]): string {
   const medium = infringements.filter((i) => i.risk_level === 'medium');
   const low = infringements.filter((i) => i.risk_level === 'low');
 
-  const totalRevenueLoss = infringements.reduce((sum, i) => sum + (i.est_revenue_loss || 0), 0);
+  // Temporarily disabled - revenue loss calculations need refinement
+  // const totalRevenueLoss = infringements.reduce((sum, i) => sum + (i.est_revenue_loss || 0), 0);
 
   let report = `
 =================================================================
@@ -77,8 +78,6 @@ Critical Threats: ${critical.length}
 High Risk: ${high.length}
 Medium Risk: ${medium.length}
 Low Risk: ${low.length}
-
-Estimated Revenue Loss: $${totalRevenueLoss.toLocaleString()}
 
 -----------------------------------------------------------------
                 DETAILED INFRINGEMENTS
@@ -139,7 +138,6 @@ ${index}. ${inf.source_url}
    Type: ${inf.type}
    Risk Level: ${inf.risk_level.toUpperCase()}
    Audience Size: ${inf.audience_size || 'Unknown'}
-   Est. Revenue Loss: $${(inf.est_revenue_loss || 0).toLocaleString()}
    Status: ${inf.status}
    Detected: ${new Date(inf.created_at).toLocaleDateString()}
 

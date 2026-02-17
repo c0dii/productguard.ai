@@ -8,7 +8,7 @@ export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed';
 export type RiskLevel = 'critical' | 'high' | 'medium' | 'low';
 export type PlatformType = 'telegram' | 'google' | 'cyberlocker' | 'torrent' | 'discord' | 'forum' | 'social';
 export type InfringementType = 'channel' | 'group' | 'bot' | 'indexed_page' | 'direct_download' | 'torrent' | 'server' | 'post';
-export type InfringementStatus = 'pending_verification' | 'active' | 'takedown_sent' | 'removed' | 'disputed' | 'false_positive';
+export type InfringementStatus = 'pending_verification' | 'active' | 'takedown_sent' | 'removed' | 'disputed' | 'false_positive' | 'archived';
 export type Priority = 'P0' | 'P1' | 'P2';
 export type MatchType = 'exact_hash' | 'near_hash' | 'keyword' | 'phrase' | 'partial' | 'manual';
 export type ActionType =
@@ -90,10 +90,45 @@ export interface Profile {
   email: string;
   full_name: string | null;
   company_name: string | null;
+  phone: string | null;
+  address: string | null;
+  dmca_reply_email: string | null;
+  is_copyright_owner: boolean;
   plan_tier: PlanTier;
   stripe_customer_id: string | null;
   theme: 'light' | 'dark' | 'system';
   is_admin: boolean;
+  email_threat_alerts: boolean;
+  email_scan_notifications: boolean;
+  email_takedown_updates: boolean;
+  email_account_only: boolean;
+  email_unsubscribe_all: boolean;
+  email_preferences_token: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CommunicationDirection = 'outbound' | 'inbound';
+export type CommunicationChannel = 'email' | 'web_form' | 'manual';
+export type CommunicationStatus = 'pending' | 'sent' | 'delivered' | 'bounced' | 'failed' | 'replied';
+
+export interface Communication {
+  id: string;
+  user_id: string;
+  infringement_id: string | null;
+  takedown_id: string | null;
+  direction: CommunicationDirection;
+  channel: CommunicationChannel;
+  from_email: string | null;
+  to_email: string | null;
+  reply_to_email: string | null;
+  subject: string | null;
+  body_preview: string | null;
+  status: CommunicationStatus;
+  external_message_id: string | null;
+  provider_name: string | null;
+  metadata: Record<string, any>;
+  sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -164,6 +199,7 @@ export interface AIExtractedData {
   unique_phrases: string[]; // Distinctive marketing copy, taglines
   keywords: string[]; // Industry terms, product features, specifications
   copyrighted_terms: string[]; // Terms with ©, ™, ® or explicitly copyrighted
+  product_description: string | null; // AI-generated 2-sentence description for DMCA letters
   content_fingerprint: string; // Hash or unique identifier for content matching
   extraction_metadata: ExtractionMetadata;
 }
@@ -186,6 +222,7 @@ export interface Product {
   brand_name: string | null;
   negative_keywords: string[] | null;
   whitelist_domains: string[] | null;
+  whitelist_urls: string[] | null;
   authorized_sellers: string[] | null;
   release_date: string | null;
   min_price_threshold: number | null;
@@ -251,6 +288,59 @@ export interface Scan {
   scan_progress: ScanProgress | null;
   last_updated_at: string;
   created_at: string;
+
+  // Living scan fields (for delta detection)
+  run_count: number; // Number of times this scan has been run
+  last_run_at: string; // Most recent run timestamp
+  initial_run_at: string; // When scan was first created
+}
+
+export interface ScanHistory {
+  id: string; // UUID
+  scan_id: string; // UUID, references scans
+  run_number: number; // Sequential run number
+  run_at: string; // When this run happened
+
+  // Metrics for this run
+  new_urls_found: number; // URLs discovered this run
+  total_urls_scanned: number; // Total URLs checked
+  new_infringements_created: number; // New threats added
+
+  // Resource savings from delta detection
+  api_calls_saved: number; // WHOIS/infrastructure lookups skipped
+  ai_filtering_saved: number; // AI calls skipped for known URLs
+
+  // Performance
+  duration_seconds: number | null; // How long this run took
+
+  // Run details
+  platforms_searched: string[] | null; // Which platforms were searched
+  search_queries_used: string[] | null; // Queries executed
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductScanStatus {
+  product_id: string;
+  product_name: string;
+  scan_id: string | null;
+  scan_status: ScanStatus | null;
+  run_count: number | null;
+  first_scanned_at: string | null;
+  last_run_at: string | null;
+  total_infringements: number | null;
+
+  // Infringement counts by status
+  pending_verification_count: number;
+  active_count: number;
+  resolved_count: number;
+  false_positive_count: number;
+
+  // Recent run stats
+  last_run_new_urls: number | null;
+  last_run_api_savings: number | null;
 }
 
 export interface Infringement {
@@ -406,6 +496,12 @@ export interface Subscription {
   status: SubscriptionStatus;
   current_period_start: string;
   current_period_end: string;
+  cancel_at_period_end: boolean;
+  cancel_reason: string | null;
+  cancel_reason_detail: string | null;
+  paused_at: string | null;
+  resume_at: string | null;
+  retention_offer_used: boolean;
   created_at: string;
   updated_at: string;
 }

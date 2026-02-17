@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import Link from 'next/link';
 import { InfringementActions } from '@/components/dashboard/InfringementActions';
+import { ReassignProductButton } from '@/components/dashboard/ReassignProductButton';
 
 export default async function InfringementDetailPage({
   params,
@@ -187,7 +188,8 @@ export default async function InfringementDetailPage({
           </Badge>
         </Card>
 
-        <Card>
+        {/* Temporarily disabled - revenue loss calculations need refinement */}
+        {/* <Card>
           <p className="text-sm text-pg-text-muted mb-1 flex items-center">
             Est. Revenue Loss
             <InfoTooltip
@@ -216,7 +218,7 @@ export default async function InfringementDetailPage({
           <p className="text-3xl font-bold text-pg-danger">
             ${(infringement.est_revenue_loss || 0).toLocaleString()}
           </p>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Main Details */}
@@ -280,6 +282,7 @@ export default async function InfringementDetailPage({
               </div>
             )}
           </div>
+
         </div>
       </Card>
 
@@ -689,14 +692,16 @@ export default async function InfringementDetailPage({
           infringementId={infringement.id}
           sourceUrl={infringement.source_url}
           isResolved={isResolved}
-          hasInfrastructureData={
-            !!(
-              infringement.infrastructure?.hosting_provider ||
-              infringement.infrastructure?.registrar ||
-              infringement.infrastructure?.cdn
-            )
-          }
+          isPending={infringement.status === 'pending_verification'}
         />
+        <div className="mt-4 pt-3 border-t border-pg-border">
+          <ReassignProductButton
+            infringementId={infringement.id}
+            currentProductId={infringement.product_id}
+            currentProductName={infringement.scans?.products?.name || 'Unknown Product'}
+            sourceUrl={infringement.source_url}
+          />
+        </div>
       </Card>
     </div>
   );
