@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       infringement_types,
       tone,
       additional_evidence,
+      notice_content: clientNoticeContent,
       ip_ownership,
       contact_info,
       signature,
@@ -81,8 +82,8 @@ export async function POST(request: Request) {
     const targetUrl = infringing_url || infringement?.source_url || '';
     const platformRecipient = getRecommendedRecipient(targetUrl);
 
-    // Generate comprehensive DMCA notice with all enhanced fields
-    const noticeContent = generateDMCANotice({
+    // Use client-provided notice content if available, otherwise generate server-side
+    const noticeContent = clientNoticeContent || generateDMCANotice({
       copyrightHolder: contact_info.name,
       copyrightHolderEmail: contact_info.email,
       copyrightHolderAddress: contact_info.address || profile.company_name || undefined,

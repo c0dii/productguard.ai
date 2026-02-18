@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { getPlatformContact, getRecommendedRecipient } from '@/lib/utils/platform-abuse-contacts';
 import { INFRINGEMENT_TYPES } from '@/lib/constants/infringement-types';
+import { generateDMCANotice } from '@/lib/utils/dmca-templates';
 
 interface TakedownFormProps {
   prefilledInfringement: any;
@@ -70,10 +72,94 @@ export function TakedownForm({
   const [copySelf, setCopySelf] = useState(true);
   const [signatureName, setSignatureName] = useState('');
   const [signatureConsent, setSignatureConsent] = useState(false);
+  const [generatedNotice, setGeneratedNotice] = useState('');
+  const [allProducts, setAllProducts] = useState<any[]>([]);
 
-  const selectedProductData = availableProducts.find((p) => p.id === selectedProduct);
+  const mergedProducts = allProducts.length > 0 ? allProducts : availableProducts;
+  const selectedProductData = mergedProducts.find((p) => p.id === selectedProduct);
   const isManualEntry = !prefilledInfringement;
   const effectiveUrl = prefilledInfringement?.source_url || manualUrl;
+
+  // Auto-populate contact info from profile + fetch all products on mount
+  useEffect(() => {
+    const fetchProfileAndProducts = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Fetch profile and all products in parallel
+        const [profileResult, productsResult] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('full_name, company_name, phone, address, dmca_reply_email')
+            .eq('id', user.id)
+            .single(),
+          supabase
+            .from('products')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('name'),
+        ]);
+
+        const profile = profileResult.data;
+        if (profile) {
+          setContactName(profile.full_name || profile.company_name || '');
+          setContactEmail(profile.dmca_reply_email || user.email || '');
+          setContactAddress(profile.address || '');
+          setContactPhone(profile.phone || '');
+          setSignatureName(profile.full_name || '');
+        } else {
+          setContactEmail(user.email || '');
+        }
+
+        if (productsResult.data && productsResult.data.length > 0) {
+          setAllProducts(productsResult.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile/products for DMCA form:', err);
+      }
+    };
+    fetchProfileAndProducts();
+  }, []);
+
+  // Pre-populate IP ownership fields when product changes
+  useEffect(() => {
+    if (!selectedProductData) return;
+
+    const p = selectedProductData;
+
+    // Copyright date: from copyright_info.year or product created_at
+    if (!copyrightDate) {
+      if (p.copyright_info?.year) {
+        setCopyrightDate(p.copyright_info.year);
+      } else if (p.created_at) {
+        setCopyrightDate(p.created_at.split('T')[0]);
+      }
+    }
+
+    // License info: from license_info or a default based on copyright_owner
+    if (!licenseInfo) {
+      const parts: string[] = [];
+      if (p.license_info?.type) parts.push(p.license_info.type);
+      if (p.copyright_owner) parts.push(`Copyright Owner: ${p.copyright_owner}`);
+      if (parts.length > 0) setLicenseInfo(parts.join('\n'));
+    }
+
+    // IP claims: from copyright_number, trademark_info, patent_info
+    if (!ipClaims) {
+      const claims: string[] = [];
+      if (p.copyright_number) claims.push(`Copyright Registration: ${p.copyright_number}`);
+      if (p.copyright_info?.registration_number) claims.push(`Copyright Reg #: ${p.copyright_info.registration_number}`);
+      if (p.trademark_info?.name) {
+        let tm = `Trademark: ${p.trademark_info.name}`;
+        if (p.trademark_info.registration_number) tm += ` (Reg #${p.trademark_info.registration_number})`;
+        claims.push(tm);
+      }
+      if (p.patent_info?.number) claims.push(`Patent: ${p.patent_info.number} (${p.patent_info.type})`);
+      if (claims.length > 0) setIpClaims(claims.join('\n'));
+    }
+  }, [selectedProduct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-populate evidence from infringement data
   useEffect(() => {
@@ -107,7 +193,7 @@ export function TakedownForm({
       // Add matched text excerpts
       if (evidenceData.matched_excerpts && Array.isArray(evidenceData.matched_excerpts) && evidenceData.matched_excerpts.length > 0) {
         const excerpts = evidenceData.matched_excerpts
-          .slice(0, 5) // Limit to first 5 excerpts
+          .slice(0, 5)
           .map((excerpt: string, idx: number) => `  ${idx + 1}. "${excerpt}"`)
           .join('\n');
         sections.push(`\nMATCHED CONTENT FROM INFRINGING SITE:\n${excerpts}`);
@@ -130,7 +216,7 @@ export function TakedownForm({
       // Add images found
       if (evidenceData.images && Array.isArray(evidenceData.images) && evidenceData.images.length > 0) {
         const images = evidenceData.images
-          .slice(0, 5) // Limit to first 5 images
+          .slice(0, 5)
           .map((img: string, idx: number) => `  ${idx + 1}. ${img}`)
           .join('\n');
         sections.push(`\nIMAGES FOUND ON INFRINGING SITE:\n${images}`);
@@ -139,7 +225,7 @@ export function TakedownForm({
       // Add external links found
       if (evidenceData.external_links && Array.isArray(evidenceData.external_links) && evidenceData.external_links.length > 0) {
         const links = evidenceData.external_links
-          .slice(0, 5) // Limit to first 5 links
+          .slice(0, 5)
           .map((link: string, idx: number) => `  ${idx + 1}. ${link}`)
           .join('\n');
         sections.push(`\nEXTERNAL LINKS ON PAGE:\n${links}`);
@@ -154,10 +240,6 @@ export function TakedownForm({
         if (prefilledInfringement.estimated_audience) {
           riskInfo.push(`Estimated Audience Reach: ${prefilledInfringement.estimated_audience.toLocaleString()}`);
         }
-        // Temporarily disabled - revenue loss calculations need refinement
-        // if (prefilledInfringement.est_revenue_loss) {
-        //   riskInfo.push(`Estimated Revenue Impact: $${prefilledInfringement.est_revenue_loss.toLocaleString()}`);
-        // }
         sections.push(`\nRISK ASSESSMENT:\n${riskInfo.join('\n')}`);
       }
 
@@ -190,6 +272,46 @@ export function TakedownForm({
     } else {
       setInfringementTypes([...infringementTypes, type]);
     }
+  };
+
+  // Generate the DMCA letter when entering step 4
+  const generateLetter = () => {
+    const notice = generateDMCANotice({
+      copyrightHolder: contactName,
+      copyrightHolderEmail: contactEmail,
+      copyrightHolderAddress: contactAddress || undefined,
+      copyrightHolderPhone: contactPhone || undefined,
+      productName: selectedProductData?.name || '',
+      productType: selectedProductData?.type || undefined,
+      productUrl: selectedProductData?.url || '',
+      infringingUrl: effectiveUrl,
+      platformName: prefilledInfringement?.platform || platformInfo?.name || 'Unknown',
+      recipientName: recommendedRecipient?.recipient,
+      infringementTypes,
+      tone,
+      additionalEvidence,
+      ipOwnership: {
+        copyright_date: copyrightDate,
+        license_info: licenseInfo,
+        ip_claims: ipClaims,
+        first_published_date: selectedProductData?.created_at,
+      },
+      infrastructure: prefilledInfringement?.infrastructure || undefined,
+      signature: signatureName ? {
+        full_name: signatureName,
+        date: new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+      } : undefined,
+    });
+    setGeneratedNotice(notice);
+  };
+
+  const goToStep4 = () => {
+    generateLetter();
+    setStep(4);
   };
 
   const handleSubmit = async () => {
@@ -243,6 +365,7 @@ export function TakedownForm({
           infringement_types: infringementTypes,
           tone,
           additional_evidence: additionalEvidence,
+          notice_content: generatedNotice,
           ip_ownership: {
             copyright_date: copyrightDate,
             license_info: licenseInfo,
@@ -338,7 +461,7 @@ export function TakedownForm({
               className="input-field w-full"
             >
               <option value="">-- Select Product --</option>
-              {availableProducts.map((product) => (
+              {mergedProducts.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.name} ({product.type})
                 </option>
@@ -442,76 +565,10 @@ export function TakedownForm({
             </div>
           </div>
 
-          {/* Contact Information */}
-          <div className="space-y-4 mb-6">
-            <h3 className="text-lg font-semibold text-pg-text">Your Contact Information</h3>
-            <p className="text-sm text-pg-text-muted">
-              Required for DMCA compliance. This information will appear in the notice.
-            </p>
-
-            <div>
-              <label className="block text-sm font-medium text-pg-text mb-2">
-                Your Name/Company Name <span className="text-pg-danger">*</span>
-              </label>
-              <input
-                type="text"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                className="input-field w-full"
-                placeholder="John Doe / Acme Corp"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-pg-text mb-2">
-                Contact Email <span className="text-pg-danger">*</span>
-              </label>
-              <input
-                type="email"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                className="input-field w-full"
-                placeholder="your@email.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-pg-text mb-2">
-                Mailing Address (Optional but Recommended)
-              </label>
-              <textarea
-                value={contactAddress}
-                onChange={(e) => setContactAddress(e.target.value)}
-                rows={3}
-                className="input-field w-full"
-                placeholder="123 Main Street&#10;City, State ZIP&#10;Country"
-              />
-              <p className="text-xs text-pg-text-muted mt-1">
-                Including your address strengthens your claim and provides alternative contact method
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-pg-text mb-2">
-                Phone Number (Optional but Recommended)
-              </label>
-              <input
-                type="tel"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                className="input-field w-full"
-                placeholder="+1 (555) 123-4567"
-              />
-              <p className="text-xs text-pg-text-muted mt-1">
-                Recommended by DMCA best practices for urgent contact
-              </p>
-            </div>
-          </div>
-
           <div className="flex justify-end">
             <Button
               onClick={() => setStep(2)}
-              disabled={!selectedProduct || !contactName || !contactEmail || (isManualEntry && !manualUrl)}
+              disabled={!selectedProduct || (isManualEntry && !manualUrl)}
             >
               Next: Infringement Type →
             </Button>
@@ -570,19 +627,16 @@ export function TakedownForm({
               onClick={() => setStep(3)}
               disabled={infringementTypes.length === 0}
             >
-              Next: Evidence →
+              Next: Evidence & Delivery →
             </Button>
           </div>
         </Card>
       )}
 
-      {/* Step 3: Additional Evidence */}
+      {/* Step 3: Evidence, Tone & Email Configuration */}
       {step === 3 && (
         <Card>
-          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 3: Additional Evidence</h2>
-          <p className="text-sm text-pg-text-muted mb-6">
-            Provide any additional proof or context to strengthen your claim
-          </p>
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 3: Evidence & Delivery</h2>
 
           {effectiveUrl && (
             <div className="mb-6 space-y-4">
@@ -605,7 +659,6 @@ export function TakedownForm({
               {platformInfo && (
                 <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                   <div className="flex items-start gap-3">
-                    <div className="text-2xl">🎯</div>
                     <div className="flex-1">
                       <h3 className="text-sm font-semibold text-pg-text mb-2">
                         Platform Detected: {platformInfo.name}
@@ -645,6 +698,7 @@ export function TakedownForm({
             </div>
           )}
 
+          {/* Evidence */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-pg-text mb-2">
               Additional Evidence & Details
@@ -652,9 +706,9 @@ export function TakedownForm({
             <textarea
               value={additionalEvidence}
               onChange={(e) => setAdditionalEvidence(e.target.value)}
-              rows={12}
+              rows={10}
               className="input-field w-full font-mono text-sm"
-              placeholder={`Evidence from the infringement scan will be auto-populated here.\n\nYou can edit, add, or modify any content to strengthen your case:\n\n- Add screenshots or comparisons\n- Include specific code snippets that were copied\n- Mention user reviews or complaints about confusion\n- Document any previous correspondence with the infringer\n- Add context about your product's creation timeline`}
+              placeholder={`Evidence from the infringement scan will be auto-populated here.\n\nYou can edit, add, or modify any content to strengthen your case.`}
             />
             <p className="text-xs text-pg-text-muted mt-1">
               {prefilledInfringement ? (
@@ -665,25 +719,41 @@ export function TakedownForm({
             </p>
           </div>
 
-          <div className="flex justify-between">
-            <Button variant="secondary" onClick={() => setStep(2)}>
-              ← Back
-            </Button>
-            <Button onClick={() => setStep(4)}>
-              Next: Tone & Review →
-            </Button>
+          {/* Tone Selection */}
+          <div className="mb-6 pb-6 border-b border-pg-border">
+            <h3 className="text-lg font-semibold text-pg-text mb-3">Notice Tone</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {TONE_OPTIONS.map((option) => (
+                <div
+                  key={option.value}
+                  onClick={() => setTone(option.value)}
+                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    tone === option.value
+                      ? 'border-pg-accent bg-pg-accent/10'
+                      : 'border-pg-border bg-pg-surface hover:border-pg-accent/50'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="radio"
+                      name="tone"
+                      checked={tone === option.value}
+                      onChange={() => {}}
+                      className="mt-1"
+                    />
+                    <div>
+                      <p className="font-semibold text-pg-text text-sm">{option.label}</p>
+                      <p className="text-xs text-pg-text-muted">{option.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </Card>
-      )}
-
-      {/* Step 4: Tone Selection & Review */}
-      {step === 4 && (
-        <Card>
-          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pg-text">Step 4: Tone & Review</h2>
 
           {/* Email Configuration */}
-          <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-lg bg-pg-bg border border-pg-border">
-            <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-3 sm:mb-4">📧 Email Configuration</h3>
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-pg-text mb-3">Email Delivery</h3>
 
             <div className="space-y-4">
               {/* Recipient Email */}
@@ -737,7 +807,7 @@ export function TakedownForm({
               </div>
 
               {/* Email Preview */}
-              <div className="p-3 rounded bg-pg-surface border border-pg-border">
+              <div className="p-3 rounded bg-pg-bg border border-pg-border">
                 <p className="text-xs font-semibold text-pg-text mb-2">Email Summary:</p>
                 <p className="text-xs text-pg-text-muted">
                   <strong>To:</strong> {recipientEmail || '(not set)'}
@@ -755,41 +825,53 @@ export function TakedownForm({
             </div>
           </div>
 
-          {/* Tone Selection */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-pg-text mb-4">Select Notice Tone</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {TONE_OPTIONS.map((option) => (
-                <div
-                  key={option.value}
-                  onClick={() => setTone(option.value)}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    tone === option.value
-                      ? 'border-pg-accent bg-pg-accent/10'
-                      : 'border-pg-border bg-pg-surface hover:border-pg-accent/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name="tone"
-                      checked={tone === option.value}
-                      onChange={() => {}}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="font-semibold text-pg-text">{option.label}</p>
-                      <p className="text-sm text-pg-text-muted">{option.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <div className="flex justify-between">
+            <Button variant="secondary" onClick={() => setStep(2)}>
+              ← Back
+            </Button>
+            <Button onClick={goToStep4}>
+              Next: Review Letter →
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Step 4: Full DMCA Letter Review & Send */}
+      {step === 4 && (
+        <Card>
+          <h2 className="text-xl sm:text-2xl font-bold mb-2 text-pg-text">Step 4: Review & Send</h2>
+          <p className="text-sm text-pg-text-muted mb-6">
+            Review the DMCA notice below. You can edit the text before sending.
+          </p>
+
+          {/* Editable DMCA Letter */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-pg-text mb-2">
+              DMCA Takedown Notice
+            </label>
+            <textarea
+              value={generatedNotice}
+              onChange={(e) => setGeneratedNotice(e.target.value)}
+              rows={24}
+              className="input-field w-full font-mono text-xs leading-relaxed"
+              style={{ whiteSpace: 'pre-wrap' }}
+            />
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-xs text-pg-text-muted">
+                This is the exact text that will be sent. Edit as needed.
+              </p>
+              <button
+                onClick={generateLetter}
+                className="text-xs text-pg-accent hover:underline"
+              >
+                Regenerate from form data
+              </button>
             </div>
           </div>
 
           {/* Signature Section */}
-          <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-lg bg-gradient-to-br from-pg-accent/5 to-blue-500/5 border-2 border-pg-accent/30">
-            <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-2">✍️ Electronic Signature (Required)</h3>
+          <div className="mb-6 p-4 sm:p-6 rounded-lg bg-gradient-to-br from-pg-accent/5 to-blue-500/5 border-2 border-pg-accent/30">
+            <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-2">Electronic Signature (Required)</h3>
             <p className="text-sm text-pg-text-muted mb-4">
               Your electronic signature legally certifies this notice under the DMCA and ESIGN Act.
             </p>
@@ -841,7 +923,7 @@ export function TakedownForm({
               </div>
 
               <div className="text-xs text-pg-text-muted bg-blue-500/10 p-3 rounded border border-blue-500/20">
-                <p className="font-semibold mb-1">🔒 Legal Validity</p>
+                <p className="font-semibold mb-1">Legal Validity</p>
                 <p>
                   Your typed signature with consent checkbox constitutes a legally binding electronic
                   signature under the ESIGN Act (15 U.S.C. § 7001). The signature timestamp and IP
@@ -849,73 +931,6 @@ export function TakedownForm({
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Review Summary */}
-          <div className="mb-6 p-4 sm:p-6 rounded-lg bg-pg-bg border border-pg-border space-y-4">
-            <h3 className="text-base sm:text-lg font-semibold text-pg-text">Review Your Submission</h3>
-
-            <div>
-              <p className="text-sm text-pg-text-muted">Product</p>
-              <p className="text-pg-text font-semibold">{selectedProductData?.name}</p>
-              {selectedProductData?.type && (
-                <p className="text-sm text-pg-text-muted capitalize">Type: {selectedProductData.type}</p>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm text-pg-text-muted">Infringement Types</p>
-              <div className="flex flex-wrap gap-2 mt-1">
-                {infringementTypes.map((type) => {
-                  const typeData = INFRINGEMENT_TYPES.find((t) => t.value === type);
-                  return (
-                    <Badge key={type} variant="warning">
-                      {typeData?.label}
-                    </Badge>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm text-pg-text-muted">Tone</p>
-              <p className="text-pg-text font-semibold capitalize">{tone.replace('_', ' ')}</p>
-            </div>
-
-            {copyrightDate && (
-              <div>
-                <p className="text-sm text-pg-text-muted">Copyright Date</p>
-                <p className="text-pg-text font-semibold">{copyrightDate}</p>
-              </div>
-            )}
-
-            <div>
-              <p className="text-sm text-pg-text-muted">Contact Information</p>
-              <p className="text-pg-text font-semibold">{contactName}</p>
-              <p className="text-sm text-pg-text-muted">{contactEmail}</p>
-              {contactPhone && <p className="text-sm text-pg-text-muted">{contactPhone}</p>}
-              {contactAddress && (
-                <p className="text-sm text-pg-text-muted whitespace-pre-line mt-1">{contactAddress}</p>
-              )}
-            </div>
-
-            {prefilledInfringement?.infrastructure && (
-              <div>
-                <p className="text-sm text-pg-text-muted">Infrastructure Evidence Available</p>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {prefilledInfringement.infrastructure.ip_address && (
-                    <Badge variant="default" className="text-xs">IP Address</Badge>
-                  )}
-                  {prefilledInfringement.infrastructure.hosting_provider && (
-                    <Badge variant="default" className="text-xs">Hosting Provider</Badge>
-                  )}
-                  {prefilledInfringement.infrastructure.registrar && (
-                    <Badge variant="default" className="text-xs">Registrar</Badge>
-                  )}
-                </div>
-                <p className="text-xs text-green-500 mt-1">✓ Technical evidence will be automatically included</p>
-              </div>
-            )}
           </div>
 
           <div className="flex justify-between">
@@ -927,12 +942,12 @@ export function TakedownForm({
               disabled={isSubmitting || !signatureName || !signatureConsent}
               className="bg-pg-danger hover:bg-red-600"
             >
-              {isSubmitting ? 'Submitting...' : '⚡ Submit DMCA Takedown'}
+              {isSubmitting ? 'Submitting...' : 'Submit DMCA Takedown'}
             </Button>
           </div>
           {(!signatureName || !signatureConsent) && (
             <p className="text-sm text-pg-warning mt-2 text-center">
-              ⚠️ You must provide your electronic signature and certify the information to submit
+              You must provide your electronic signature and certify the information to submit
             </p>
           )}
         </Card>
