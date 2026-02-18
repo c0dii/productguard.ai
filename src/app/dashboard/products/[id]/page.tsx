@@ -9,6 +9,8 @@ import { RunScanButton } from '@/components/dashboard/RunScanButton';
 import { ProductWorkflowBar } from '@/components/dashboard/ProductWorkflowBar';
 import type { Product, ProductTimelineData } from '@/types';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();

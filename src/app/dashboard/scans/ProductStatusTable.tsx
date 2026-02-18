@@ -73,9 +73,9 @@ export default function ProductStatusTable({ productStatuses }: ProductStatusTab
                 <div className="flex items-center">
                   <div>
                     <div className="text-xs sm:text-sm font-medium text-pg-text">{product.product_name}</div>
-                    {product.last_run_new_urls !== null && product.last_run_new_urls > 0 && (
+                    {product.last_run_new_infringements !== null && product.last_run_new_infringements > 0 && (
                       <div className="text-xs text-green-400">
-                        +{product.last_run_new_urls} new
+                        +{product.last_run_new_infringements} new infringement{product.last_run_new_infringements !== 1 ? 's' : ''}
                       </div>
                     )}
                   </div>

@@ -372,7 +372,7 @@ export interface ProductScanStatus {
   false_positive_count: number;
 
   // Recent run stats
-  last_run_new_urls: number | null;
+  last_run_new_infringements: number | null;
   last_run_api_savings: number | null;
 }
 

@@ -3,6 +3,8 @@ import Link from 'next/link';
 import ProductStatusTable from './ProductStatusTable';
 import type { ProductScanStatus } from '@/types';
 
+export const dynamic = 'force-dynamic';
+
 export default async function MonitoringDashboard() {
   const supabase = await createClient();
 

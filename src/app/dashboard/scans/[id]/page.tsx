@@ -10,6 +10,8 @@ import { ScanProgressTracker } from '@/components/dashboard/ScanProgressTracker'
 import { ScanningPlaceholder } from '@/components/dashboard/ScanningPlaceholder';
 import type { Infringement, Scan } from '@/types';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ScanDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Scan, ScanProgress, ScanStage } from '@/types';
 
 interface ScanProgressTrackerProps {
@@ -61,6 +62,7 @@ const DEFAULT_STAGES: ScanStage[] = [
 ];
 
 export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
+  const router = useRouter();
   const [progress, setProgress] = useState<ScanProgress>(
     scan.scan_progress || { current_stage: null, stages: DEFAULT_STAGES }
   );
@@ -68,32 +70,38 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
     scan.status === 'running' || scan.status === 'pending'
   );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [infringementCount, setInfringementCount] = useState(0);
 
   // Poll for updates when scan is running
+  const pollProgress = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/scans/${scan.id}/progress`);
+      if (response.ok) {
+        const data = await response.json();
+        setProgress(data.scan_progress || { current_stage: null, stages: DEFAULT_STAGES });
+
+        if (data.infringement_count !== undefined) {
+          setInfringementCount(data.infringement_count);
+        }
+
+        // Stop polling if scan is complete
+        if (data.status === 'completed' || data.status === 'failed') {
+          setIsPolling(false);
+          // Use Next.js router to refresh server data without full page reload
+          router.refresh();
+        }
+      }
+    } catch (error) {
+      console.error('Error polling scan progress:', error);
+    }
+  }, [scan.id, router]);
+
   useEffect(() => {
     if (!isPolling) return;
 
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(`/api/scans/${scan.id}/progress`);
-        if (response.ok) {
-          const data = await response.json();
-          setProgress(data.scan_progress || progress);
-
-          // Stop polling if scan is complete
-          if (data.status === 'completed' || data.status === 'failed') {
-            setIsPolling(false);
-            // Full page reload to guarantee server data is re-fetched
-            window.location.reload();
-          }
-        }
-      } catch (error) {
-        console.error('Error polling scan progress:', error);
-      }
-    }, 3000); // Poll every 3 seconds
-
+    const interval = setInterval(pollProgress, 3000);
     return () => clearInterval(interval);
-  }, [isPolling, scan.id, progress]);
+  }, [isPolling, pollProgress]);
 
   // Elapsed time counter
   useEffect(() => {
@@ -275,6 +283,9 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
           <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
             <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <p className="text-sm text-pg-text-muted">
+              {infringementCount > 0 && (
+                <span className="text-pg-accent font-medium">{infringementCount} infringement{infringementCount !== 1 ? 's' : ''} found so far. </span>
+              )}
               Scans typically take 2-5 minutes. This page will <span className="text-pg-accent font-medium">update automatically</span> when complete.
             </p>
           </div>

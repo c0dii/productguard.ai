@@ -18,10 +18,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch scan with progress data
+    // Fetch scan with progress data and product_id
     const { data: scan, error } = await supabase
       .from('scans')
-      .select('id, status, scan_progress, last_updated_at')
+      .select('id, status, scan_progress, last_updated_at, product_id, infringement_count')
       .eq('id', id)
       .eq('user_id', user.id)
       .single();
@@ -60,7 +60,11 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(scan);
+    // Include infringement count for real-time display
+    return NextResponse.json({
+      ...scan,
+      infringement_count: scan.infringement_count || 0,
+    });
   } catch (error) {
     console.error('Error fetching scan progress:', error);
     return NextResponse.json(
