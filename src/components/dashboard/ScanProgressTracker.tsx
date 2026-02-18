@@ -71,6 +71,28 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
   );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [infringementCount, setInfringementCount] = useState(0);
+  const [statusMessageIndex, setStatusMessageIndex] = useState(0);
+
+  // Rotating status messages shown while scan is running
+  const STATUS_MESSAGES = [
+    'Searching Google for unauthorized copies',
+    'Scanning marketplace platforms',
+    'Analyzing content signatures',
+    'Checking torrent networks',
+    'Investigating file sharing sites',
+    'Monitoring social media platforms',
+    'Cross-referencing known piracy domains',
+    'Analyzing search engine results',
+  ];
+
+  // Rotate status messages every 3 seconds
+  useEffect(() => {
+    if (!isPolling) return;
+    const interval = setInterval(() => {
+      setStatusMessageIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isPolling, STATUS_MESSAGES.length]);
 
   // Poll for updates when scan is running
   const pollProgress = useCallback(async () => {
@@ -131,9 +153,10 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
     return `${mins}m ${secs}s`;
   };
 
-  const currentStageName = stages.find((s) => s.status === 'in_progress')?.display_name
-    || stages.find((s) => s.name === progress.current_stage)?.display_name
-    || 'Initializing';
+  // Use actual stage name if available, otherwise show rotating status message
+  const activeStage = stages.find((s) => s.status === 'in_progress')?.display_name
+    || stages.find((s) => s.name === progress.current_stage)?.display_name;
+  const currentStageName = activeStage || STATUS_MESSAGES[statusMessageIndex];
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-pg-surface border border-pg-border">

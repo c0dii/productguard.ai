@@ -772,6 +772,8 @@ async function runTieredSearch(
           type: scored.type,
           audience_size: scored.audience_size,
           est_revenue_loss: scored.est_revenue_loss,
+          title: result.title,
+          snippet: result.snippet,
         });
       }
     }
@@ -830,6 +832,8 @@ async function runTieredSearch(
           type: scored.type,
           audience_size: scored.audience_size,
           est_revenue_loss: scored.est_revenue_loss,
+          title: result.title,
+          snippet: result.snippet,
         });
       }
     }
@@ -902,6 +906,8 @@ async function runTieredSearch(
               type: scored.type,
               audience_size: scored.audience_size,
               est_revenue_loss: scored.est_revenue_loss,
+              title: result.title,
+              snippet: result.snippet,
             });
           }
         }

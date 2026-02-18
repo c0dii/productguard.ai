@@ -29,25 +29,24 @@ export async function filterSearchResult(
   // Build system prompt with learned examples
   let systemPrompt = `You are an expert at identifying copyright infringement, piracy, and unauthorized distribution of digital products.
 
-Your task is to analyze search results and determine if they represent ACTUAL INFRINGEMENTS or FALSE POSITIVES.
+Your task is to analyze search results and determine if they COULD represent infringements. Results you approve will go to a human review queue — they are NOT automatically actioned. Therefore, when in doubt, lean toward flagging the result as a potential infringement and let the human decide.
 
-WHAT IS AN INFRINGEMENT:
+LIKELY INFRINGEMENTS (flag these):
 - Free downloads of paid content (torrents, direct downloads, file sharing)
 - Cracked, nulled, or pirated versions
 - Unauthorized redistribution on piracy sites
 - Counterfeit copies or clones
 - Unauthorized sales on unofficial platforms
 - Leaked premium content
+- Sites that aggregate or list the product alongside pirated content
+- URLs on known piracy domains even if context is unclear
 
-WHAT IS NOT AN INFRINGEMENT (False Positives):
-- Reviews, testimonials, or critiques
-- News articles or press releases
-- Educational content or tutorials about the product
-- Comparison sites or affiliate marketing
-- Official sales pages or authorized resellers
-- User discussions asking questions about the product
-- Social media posts mentioning the product
-- Videos explaining how to use the product`;
+CLEAR FALSE POSITIVES (only filter these out):
+- The product's own official website or authorized sales pages
+- Major review sites (e.g., Trustpilot, G2, Capterra)
+- News articles from established publications
+- The product creator's own social media accounts
+- Official documentation or help pages`;
 
   // Add learned pattern intelligence (from user feedback history)
   if (intelligence?.hasLearningData) {
@@ -104,10 +103,11 @@ SEARCH RESULT TO ANALYZE:
 - Platform: ${result.platform}
 - URL: ${result.source_url}
 - Risk Level: ${result.risk_level}
-- Audience Size: ${result.audience_size || 'unknown'}
+- Audience Size: ${result.audience_size || 'unknown'}${result.title ? `\n- Page Title: ${result.title}` : ''}${result.snippet ? `\n- Search Snippet: ${result.snippet}` : ''}
 
 TASK: Determine if this URL represents an actual infringement of the product or a false positive.
-Consider the URL domain, the platform type, and the context clues.
+Consider the URL domain, page title, search snippet, the platform type, and the context clues.
+When in doubt, lean toward marking it as a potential infringement — the user will verify it manually.
 
 Respond with JSON only.`;
 
@@ -176,19 +176,25 @@ export async function filterSearchResults(
     );
 
     // Filter results based on AI analysis
+    // Results go to pending_verification queue for manual review, so we lean permissive.
+    // Only filter out results the AI is very confident are NOT infringements.
     analyses.forEach((analysis, index) => {
       const result = batch[index];
       if (!result) return;
 
-      if (analysis.is_infringement && analysis.confidence >= minConfidence) {
-        // High confidence infringement - include it
+      // Pass if: AI says it's an infringement with sufficient confidence,
+      // OR if AI is uncertain (confidence between 0.3 and threshold) — let human decide
+      const isLikelyInfringement = analysis.is_infringement && analysis.confidence >= minConfidence;
+      const isUncertain = analysis.confidence >= 0.3 && analysis.confidence < minConfidence;
+
+      if (isLikelyInfringement || isUncertain) {
         filteredResults.push(result);
         passed++;
         console.log(
-          `[AI Filter] ✓ PASS (${(analysis.confidence * 100).toFixed(0)}%): ${result.source_url} - ${analysis.reasoning}`
+          `[AI Filter] ✓ PASS (${(analysis.confidence * 100).toFixed(0)}%${isUncertain ? ' uncertain' : ''}): ${result.source_url} - ${analysis.reasoning}`
         );
       } else {
-        // Low confidence or not an infringement - filter it out
+        // Only filter out results the AI is confident are NOT infringements
         filtered++;
         console.log(
           `[AI Filter] ✗ FILTERED (${(analysis.confidence * 100).toFixed(0)}%): ${result.source_url} - ${analysis.reasoning}`

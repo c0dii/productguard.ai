@@ -662,4 +662,7 @@ export interface InfringementResult {
   type: InfringementType;
   audience_size: string | null;
   est_revenue_loss: number;
+  // SERP context for AI filtering
+  title?: string;
+  snippet?: string;
 }
