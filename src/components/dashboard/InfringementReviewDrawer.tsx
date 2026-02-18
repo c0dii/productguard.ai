@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { TakedownForm } from '@/components/dashboard/TakedownForm';
+import { EnforcementPlan } from '@/components/dmca/EnforcementPlan';
 import { getPlatformDisplayName } from '@/lib/utils/platform-display';
 import type { Infringement } from '@/types';
 
@@ -115,7 +115,7 @@ export function InfringementReviewDrawer({
     <SlideOver
       isOpen={!!activeInfringement}
       onClose={handleClose}
-      title={view === 'takedown' ? 'Send DMCA Takedown' : 'Review Infringement'}
+      title={view === 'takedown' ? 'Take Action' : 'Review Infringement'}
       width={drawerWidth}
     >
       {!data ? (
@@ -321,16 +321,41 @@ export function InfringementReviewDrawer({
           </div>
         </div>
       ) : (
-        /* DMCA Takedown Form View */
-        <div className="p-4 sm:p-6">
-          <TakedownForm
-            prefilledInfringement={fullData || data}
-            prefilledProduct={fullData?.products || product}
-            availableProducts={fullData?.products ? [fullData.products] : product ? [product] : []}
-            userId={userId || ''}
-            inDrawer
-            onSuccess={handleTakedownSuccess}
-          />
+        /* Enforcement Plan View */
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            {/* Infringement context */}
+            <div className="mb-4 p-3 rounded-lg bg-pg-bg border border-pg-border">
+              <p className="text-xs text-pg-text-muted mb-1">Confirmed Infringement</p>
+              <a
+                href={data.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pg-accent hover:underline text-sm break-all"
+              >
+                {data.source_url}
+              </a>
+            </div>
+
+            <EnforcementPlan
+              infringementId={activeInfringement!.id}
+              productName={fullData?.products?.name || product?.name || ''}
+              infringementUrl={data.source_url}
+              status="active"
+              platform={data.platform || ''}
+            />
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 border-t border-pg-border p-4 sm:p-6 bg-pg-surface">
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={handleTakedownSuccess}
+            >
+              Done — Back to Queue
+            </Button>
+          </div>
         </div>
       )}
     </SlideOver>
