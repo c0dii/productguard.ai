@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runMonthlyWorkflowChecks } from '@/lib/ghl/workflow-automation';
+import { systemLogger } from '@/lib/logging/system-logger';
 import { timingSafeEqual } from 'crypto';
 
 /**
@@ -32,8 +33,13 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[Cron] Starting monthly workflow checks...');
+    const startMs = Date.now();
 
     await runMonthlyWorkflowChecks();
+
+    const durationMs = Date.now() - startMs;
+    await systemLogger.logCron('monthly-workflows', 'success', `Monthly workflow checks completed in ${durationMs}ms`, { job_name: 'monthly-workflows' }, durationMs);
+    await systemLogger.flush();
 
     return NextResponse.json({
       success: true,
@@ -42,6 +48,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Cron] Monthly workflow checks failed:', error);
+    await systemLogger.logCron('monthly-workflows', 'failure', `Monthly workflow checks failed: ${error.message}`, { job_name: 'monthly-workflows', error: error.message });
+    await systemLogger.flush();
 
     return NextResponse.json(
       {

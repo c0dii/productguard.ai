@@ -13,6 +13,7 @@ import { filterSearchResults, estimateFilteringCost } from '@/lib/ai/infringemen
 import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } from '@/lib/ghl/events';
 import { fetchIntelligenceForScan, optimizeSearchQueryFromIntelligence, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 import { notifyHighSeverityInfringement, notifyScanComplete, notifyScanError } from '@/lib/notifications/email';
+import { systemLogger } from '@/lib/logging/system-logger';
 import crypto from 'crypto';
 
 /**
@@ -152,6 +153,24 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     });
 
     logger.info('initialization', `Scan started (Run #${runNumber}, first=${isFirstRun})`);
+
+    // System-level scan start event
+    await systemLogger.log({
+      log_source: 'scan',
+      log_level: 'info',
+      operation: 'scan.start',
+      status: 'success',
+      message: `Scan started for "${product.name}" (Run #${runNumber})`,
+      trace_id: scanId,
+      user_id: product.user_id,
+      product_id: product.id,
+      context: {
+        scan_id: scanId,
+        product_name: product.name,
+        product_type: product.type,
+        run_number: runNumber,
+      },
+    });
 
     // Update scan status to running
     const stages = SCAN_STAGES.map((s) => ({ ...s })); // Deep copy
@@ -795,11 +814,54 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       });
     }
 
+    // System-level scan completion event
+    const scanDurationMs = Date.now() - scanStartTime;
+    await systemLogger.log({
+      log_source: 'scan',
+      log_level: 'info',
+      operation: 'scan.complete',
+      status: 'success',
+      message: `Scan completed for "${product.name}" in ${Math.round(scanDurationMs / 1000)}s`,
+      duration_ms: scanDurationMs,
+      trace_id: scanId,
+      user_id: product.user_id,
+      product_id: product.id,
+      context: {
+        scan_id: scanId,
+        product_name: product.name,
+        product_type: product.type,
+        run_number: runNumber,
+      },
+    });
+    await systemLogger.flush();
+
     // Final flush — persist all buffered logs
     await logger.flush();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
+
+    // System-level scan failure event
+    const scanDurationMs = Date.now() - scanStartTime;
+    await systemLogger.log({
+      log_source: 'scan',
+      log_level: 'error',
+      operation: 'scan.fail',
+      status: 'failure',
+      message: `Scan failed for "${product.name}": ${errorMessage}`,
+      duration_ms: scanDurationMs,
+      trace_id: scanId,
+      user_id: product.user_id,
+      product_id: product.id,
+      error_message: errorMessage,
+      error_stack: errorStack,
+      context: {
+        scan_id: scanId,
+        product_name: product.name,
+        product_type: product.type,
+      },
+    });
+    await systemLogger.flush();
 
     // Logger may not exist if error happened before initialization
     if (logger) {

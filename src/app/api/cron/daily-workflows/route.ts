@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runDailyWorkflowChecks } from '@/lib/ghl/workflow-automation';
+import { systemLogger } from '@/lib/logging/system-logger';
 import { timingSafeEqual } from 'crypto';
 
 /**
@@ -35,8 +36,13 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[Cron] Starting daily workflow checks...');
+    const startMs = Date.now();
 
     await runDailyWorkflowChecks();
+
+    const durationMs = Date.now() - startMs;
+    await systemLogger.logCron('daily-workflows', 'success', `Daily workflow checks completed in ${durationMs}ms`, { job_name: 'daily-workflows' }, durationMs);
+    await systemLogger.flush();
 
     return NextResponse.json({
       success: true,
@@ -45,6 +51,8 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Cron] Daily workflow checks failed:', error);
+    await systemLogger.logCron('daily-workflows', 'failure', `Daily workflow checks failed: ${error.message}`, { job_name: 'daily-workflows', error: error.message });
+    await systemLogger.flush();
 
     return NextResponse.json(
       {

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import type { AdminAlertCounts } from '@/types';
 
 export default async function AdminLayout({
   children,
@@ -28,9 +29,23 @@ export default async function AdminLayout({
     redirect('/dashboard');
   }
 
+  // Fetch alert counts for sidebar badge (graceful fallback if table doesn't exist yet)
+  let alertCounts: AdminAlertCounts | null = null;
+  try {
+    const { data } = await supabase
+      .from('admin_alert_counts')
+      .select('*')
+      .single();
+    if (data) {
+      alertCounts = data as AdminAlertCounts;
+    }
+  } catch {
+    // Table may not exist yet before migration runs
+  }
+
   return (
     <div className="flex min-h-screen bg-pg-bg">
-      <AdminSidebar profile={profile} />
+      <AdminSidebar profile={profile} alertCounts={alertCounts} />
       <main className="flex-1 p-8 ml-64">
         {children}
       </main>

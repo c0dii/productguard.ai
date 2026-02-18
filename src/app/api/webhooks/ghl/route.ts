@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { verifyGHLWebhook } from '@/lib/marketing/ghl-client';
+import { systemLogger } from '@/lib/logging/system-logger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -212,10 +213,14 @@ export async function POST(req: NextRequest) {
 
     // Unknown event — log but don't fail
     console.log(`[ghl-webhook] Unhandled event: ${event}`, { prospectId, tags });
+    await systemLogger.logWebhook('ghl', event || 'unknown', 'success', `GHL webhook: ${event}`, { provider: 'ghl', event_type: event, prospect_id: prospectId });
+    await systemLogger.flush();
     return NextResponse.json({ ok: true, skipped: 'unhandled event' });
 
   } catch (err) {
     console.error('[ghl-webhook] Error:', err);
+    await systemLogger.logWebhook('ghl', 'unknown', 'failure', `GHL webhook failed: ${err instanceof Error ? err.message : String(err)}`, { provider: 'ghl', error: err instanceof Error ? err.message : String(err) });
+    await systemLogger.flush();
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

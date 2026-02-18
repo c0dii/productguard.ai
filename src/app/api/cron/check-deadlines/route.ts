@@ -17,6 +17,7 @@
 
 import { NextResponse } from 'next/server';
 import { deadlineTracker } from '@/lib/enforcement/deadline-tracker';
+import { systemLogger } from '@/lib/logging/system-logger';
 import { timingSafeEqual } from 'crypto';
 
 export async function GET(request: Request) {
@@ -74,6 +75,9 @@ export async function GET(request: Request) {
       }
     }
 
+    await systemLogger.logCron('check-deadlines', 'success', `Deadline check completed in ${duration}ms: ${deadlineResults.updatedCount} overdue, ${reviewResults.reviewedCount} reviewed`, { job_name: 'check-deadlines', ...summary }, duration);
+    await systemLogger.flush();
+
     return NextResponse.json({
       success: true,
       summary,
@@ -81,6 +85,8 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('[Cron] Deadline check failed:', error);
+    await systemLogger.logCron('check-deadlines', 'failure', `Deadline check failed: ${error instanceof Error ? error.message : String(error)}`, { job_name: 'check-deadlines', error: error instanceof Error ? error.message : String(error) });
+    await systemLogger.flush();
     return NextResponse.json(
       {
         success: false,

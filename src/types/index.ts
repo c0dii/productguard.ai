@@ -651,6 +651,77 @@ export const PLAN_LIMITS: Record<PlanTier, PlanFeatures> = {
 };
 
 // ============================================================================
+// SYSTEM MONITORING TYPES
+// ============================================================================
+
+export type SystemLogSource = 'api_call' | 'scrape' | 'cron' | 'webhook' | 'email' | 'dmca' | 'user_action' | 'system' | 'scan';
+export type SystemLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type SystemLogStatus = 'success' | 'failure' | 'partial' | 'timeout' | 'skipped';
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+export type AlertCategory = 'scan_failure' | 'api_error' | 'cron_failure' | 'webhook_failure' | 'rate_limit' | 'system';
+
+export interface SystemLogEntry {
+  id: string;
+  log_source: SystemLogSource;
+  log_level: SystemLogLevel;
+  operation: string;
+  status: SystemLogStatus;
+  message: string;
+  duration_ms: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  trace_id: string | null;
+  user_id: string | null;
+  product_id: string | null;
+  context: Record<string, unknown>;
+  error_code: string | null;
+  error_message: string | null;
+  error_stack: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+  created_at: string;
+}
+
+export interface AdminAlert {
+  id: string;
+  severity: AlertSeverity;
+  category: AlertCategory;
+  title: string;
+  message: string;
+  log_id: string | null;
+  trace_id: string | null;
+  context: Record<string, unknown>;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+  created_at: string;
+}
+
+export interface AdminAlertCounts {
+  critical_count: number;
+  warning_count: number;
+  info_count: number;
+  total_unresolved: number;
+}
+
+export interface SystemHealthStats {
+  log_source: SystemLogSource;
+  total_count: number;
+  success_count: number;
+  failure_count: number;
+  timeout_count: number;
+  error_count: number;
+  fatal_count: number;
+  avg_duration_ms: number | null;
+  total_cost_usd: number | null;
+  unresolved_error_count: number;
+  unresolved_alert_count: number;
+}
+
+// ============================================================================
 // HELPER TYPES FOR API REQUESTS/RESPONSES
 // ============================================================================
 

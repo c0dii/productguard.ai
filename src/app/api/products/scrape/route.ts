@@ -5,7 +5,11 @@ import { generatePiracyKeywords } from '@/lib/ai/piracy-keyword-generator';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { filterGenericKeywords } from '@/lib/utils/keyword-quality';
+import { systemLogger } from '@/lib/logging/system-logger';
 import type { ProductType } from '@/types';
+
+// Ensure enough time for page fetch + AI analysis (default 10s is too short)
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
@@ -89,12 +93,27 @@ export async function POST(request: Request) {
     };
 
     // AI-powered analysis (if enabled and API key available)
-    let aiData = null;
-    let fullTextContent = null;
+    let aiData: any = null;
+    let fullTextContent: string | null = null;
+
+    const apiKeyExists = !!process.env.OPENAI_API_KEY;
+    const apiKeyLength = process.env.OPENAI_API_KEY?.length || 0;
+    const apiKeyPrefix = process.env.OPENAI_API_KEY?.substring(0, 7) || 'MISSING';
+    console.log(`[Scrape] AI decision: useAI=${useAI}, apiKeyExists=${apiKeyExists}, apiKeyLength=${apiKeyLength}, apiKeyPrefix=${apiKeyPrefix}...`);
 
     if (useAI && process.env.OPENAI_API_KEY) {
       try {
-        const analysis = await analyzeProductPage(html, productUrl.toString());
+        console.log('[Scrape] Entering AI analysis path...');
+        const aiStartTime = Date.now();
+
+        // Wrap AI product analysis with system logger
+        const analysis = await systemLogger.trackApiCall(
+          'openai.product-analysis',
+          () => analyzeProductPage(html, productUrl.toString()),
+          { userId: user.id, context: { provider: 'openai', endpoint: 'chat/completions', url: productUrl.toString() } }
+        );
+
+        console.log(`[Scrape] AI analysis completed in ${Date.now() - aiStartTime}ms, model=${analysis.aiExtractedData?.extraction_metadata?.model}`);
         aiData = analysis.aiExtractedData;
         fullTextContent = analysis.fullTextContent;
 
@@ -118,13 +137,17 @@ export async function POST(request: Request) {
 
         // Generate piracy-specific search intelligence (second AI call)
         try {
-          const piracyData = await generatePiracyKeywords(
-            analysis.productName || extractedData.name,
-            (extractedData.type || 'other') as ProductType,
-            null, // brand_name not available at scrape time
-            aiData,
-            fullTextContent || '',
-            productUrl.toString()
+          const piracyData = await systemLogger.trackApiCall(
+            'openai.piracy-keywords',
+            () => generatePiracyKeywords(
+              analysis.productName || extractedData.name,
+              (extractedData.type || 'other') as ProductType,
+              null, // brand_name not available at scrape time
+              aiData,
+              fullTextContent || '',
+              productUrl.toString()
+            ),
+            { userId: user.id, context: { provider: 'openai', endpoint: 'chat/completions', url: productUrl.toString() } }
           );
 
           aiData.piracy_search_terms = piracyData.piracy_search_terms;
@@ -136,10 +159,13 @@ export async function POST(request: Request) {
           console.error('[Scrape] Piracy keyword generation failed (non-blocking):', piracyError);
         }
       } catch (aiError) {
-        console.error('[Scrape] AI analysis failed, continuing with basic scraping:', aiError);
+        console.error('[Scrape] AI analysis failed, continuing with basic scraping:', aiError instanceof Error ? aiError.message : aiError);
+        console.error('[Scrape] AI error stack:', aiError instanceof Error ? aiError.stack : 'no stack');
       }
     } else if (useAI && !process.env.OPENAI_API_KEY) {
       console.warn('[Scrape] OPENAI_API_KEY not set — skipping AI analysis');
+    } else {
+      console.log(`[Scrape] AI skipped: useAI=${useAI}`);
     }
 
     // Smart fallback: extract intelligence from page content when AI didn't run
@@ -189,6 +215,26 @@ export async function POST(request: Request) {
       extractedData.keywords = [...new Set([...newSeeds, ...extractedData.keywords])].slice(0, 15);
     }
 
+    // Log overall scrape result
+    const aiModel = aiData?.extraction_metadata?.model || 'none';
+    await systemLogger.log({
+      log_source: 'scrape',
+      log_level: 'info',
+      operation: 'scrape.product-page',
+      status: 'success',
+      message: `Scraped ${productUrl.hostname}: "${extractedData.name}" (AI: ${aiModel})`,
+      user_id: user.id,
+      context: {
+        url: productUrl.toString(),
+        ai_enabled: useAI && !!process.env.OPENAI_API_KEY,
+        ai_model: aiModel,
+        fallback_used: aiModel === 'scrape-fallback',
+        piracy_terms_count: aiData?.piracy_search_terms?.length || 0,
+        fields_extracted: Object.keys(extractedData).filter(k => !!(extractedData as any)[k]),
+      },
+    });
+    await systemLogger.flush();
+
     return NextResponse.json({
       ...extractedData,
       ai_extracted_data: aiData,
@@ -196,6 +242,16 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Scraping error:', error);
+    await systemLogger.log({
+      log_source: 'scrape',
+      log_level: 'error',
+      operation: 'scrape.product-page',
+      status: 'failure',
+      message: `Scrape failed: ${error instanceof Error ? error.message : String(error)}`,
+      error_message: error instanceof Error ? error.message : String(error),
+      error_stack: error instanceof Error ? error.stack : undefined,
+    });
+    await systemLogger.flush();
     return NextResponse.json(
       { error: 'Failed to scrape product data. Please try again or enter details manually.' },
       { status: 500 }

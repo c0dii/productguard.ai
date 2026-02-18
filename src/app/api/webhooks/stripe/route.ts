@@ -10,6 +10,7 @@ import {
   trackSubscriptionUpgraded,
 } from '@/lib/ghl/events';
 import { notifyPaymentFailed } from '@/lib/notifications/email';
+import { systemLogger } from '@/lib/logging/system-logger';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -297,9 +298,13 @@ export async function POST(req: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    await systemLogger.logWebhook('stripe', event.type, 'success', `Stripe webhook processed: ${event.type}`, { provider: 'stripe', event_type: event.type, event_id: event.id });
+    await systemLogger.flush();
     return NextResponse.json({ received: true });
   } catch (err: any) {
     console.error('Error processing webhook:', err);
+    await systemLogger.logWebhook('stripe', 'unknown', 'failure', `Stripe webhook failed: ${err.message}`, { provider: 'stripe', error: err.message });
+    await systemLogger.flush();
     return NextResponse.json(
       { error: `Webhook handler failed: ${err.message}` },
       { status: 500 }
