@@ -73,24 +73,32 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
   const [infringementCount, setInfringementCount] = useState(0);
   const [statusMessageIndex, setStatusMessageIndex] = useState(0);
 
-  // Rotating status messages shown while scan is running
+  // Rotating status messages shown while scan is running (mix of real + fun)
   const STATUS_MESSAGES = [
     'Searching Google for unauthorized copies',
     'Scanning marketplace platforms',
-    'Analyzing content signatures',
     'Checking torrent networks',
+    'Politely asking pirates to reconsider their life choices',
     'Investigating file sharing sites',
-    'Monitoring social media platforms',
     'Cross-referencing known piracy domains',
+    'Teaching AI to tell the difference between fans and thieves',
+    'Monitoring social media platforms',
+    'Analyzing content signatures',
+    'Shaking down the dark corners of the internet',
     'Analyzing search engine results',
+    'Wondering why people think "free download" is a valid business model',
+    'Scanning platforms even your mom hasn\'t heard of',
+    'Running digital forensics like a cyber detective',
+    'Checking if anyone\'s selling your stuff out of a digital trench coat',
+    'Deploying internet bloodhounds',
   ];
 
-  // Rotate status messages every 3 seconds
+  // Rotate status messages every 7 seconds
   useEffect(() => {
     if (!isPolling) return;
     const interval = setInterval(() => {
       setStatusMessageIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
-    }, 3000);
+    }, 7000);
     return () => clearInterval(interval);
   }, [isPolling, STATUS_MESSAGES.length]);
 
@@ -141,10 +149,23 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
 
   const stages = progress.stages.length > 0 ? progress.stages : DEFAULT_STAGES;
 
-  // Calculate overall progress percentage
+  // Calculate stage-based progress from DB
   const completedStages = stages.filter((s) => s.status === 'completed').length;
   const inProgressStages = stages.filter((s) => s.status === 'in_progress').length;
-  const progressPercent = Math.round(((completedStages + inProgressStages * 0.5) / stages.length) * 100);
+  const stagePercent = Math.round(((completedStages + inProgressStages * 0.5) / stages.length) * 100);
+
+  // Time-based progress estimate (smooth fill over ~4 minutes, caps at 90%)
+  // Uses an ease-out curve so it starts fast and slows down near the end
+  const EXPECTED_DURATION_S = 240; // 4 minutes expected
+  const timeRatio = Math.min(elapsedSeconds / EXPECTED_DURATION_S, 1);
+  const timePercent = isPolling
+    ? Math.round(90 * (1 - Math.pow(1 - timeRatio, 2))) // ease-out quadratic, caps at 90%
+    : 100;
+
+  // Use whichever is higher — real stages overtake the estimate as they complete
+  const progressPercent = isPolling
+    ? Math.max(stagePercent, timePercent)
+    : 100;
 
   const formatElapsed = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -226,8 +247,19 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
         {/* Stages */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {stages.map((stage, index) => {
-            const isActive = stage.status === 'in_progress';
-            const isCompleted = stage.status === 'completed';
+            // Use real DB status if available, otherwise estimate from elapsed time
+            // Each stage gets an equal slice of the expected duration
+            const stageSlice = EXPECTED_DURATION_S / stages.length;
+            const stageStartTime = index * stageSlice;
+            const stageEndTime = (index + 1) * stageSlice;
+
+            const hasRealStatus = stage.status !== 'pending' || !isPolling;
+            const isActive = hasRealStatus
+              ? stage.status === 'in_progress'
+              : elapsedSeconds >= stageStartTime && elapsedSeconds < stageEndTime;
+            const isCompleted = hasRealStatus
+              ? stage.status === 'completed'
+              : elapsedSeconds >= stageEndTime;
             const isSkipped = stage.status === 'skipped';
 
             return (
