@@ -218,9 +218,12 @@ const indicatorProfile: ScanProfile = {
     'tosindicators.com',
     'software.informer.com',
     'etsy.com',
+    'forex-tsd.com',
+    'forexfactory.com',
+    'fxnori.com',
+    'earnforex.com',
   ],
   legitimateSites: [
-    'youtube.com',
     'investopedia.com',
     'babypips.com',
     'tradingview.com/chart',
@@ -236,17 +239,21 @@ const indicatorProfile: ScanProfile = {
     'replica',
     'unlock',
     'keygen',
+    'mega.nz',
+    'mediafire',
+    'telegram',
   ],
   penaltyTerms: [
-    'review',
-    'tutorial',
-    'how to use',
-    'backtest',
-    'performance',
-    'official',
+    // Removed: 'review', 'tutorial', 'backtest', 'performance' — too common in
+    // trading indicator contexts, causing mass false positives for niche products.
+    // Kept only terms that strongly indicate non-piracy content.
+    'official site',
     'documentation',
     'changelog',
     'update notes',
+    'pricing page',
+    'buy now',
+    'add to cart',
   ],
   platformWeights: {
     google: 1.0,

@@ -30,10 +30,15 @@ export default async function AdminSystemPage() {
   const envVars = [
     { key: 'NEXT_PUBLIC_APP_URL', value: process.env.NEXT_PUBLIC_APP_URL },
     { key: 'NEXT_PUBLIC_SUPABASE_URL', value: process.env.NEXT_PUBLIC_SUPABASE_URL },
+    { key: 'OPENAI_API_KEY', value: process.env.OPENAI_API_KEY ? 'Set ✓' : 'Missing ✗' },
     { key: 'STRIPE_SECRET_KEY', value: process.env.STRIPE_SECRET_KEY ? 'Set ✓' : 'Missing ✗' },
     { key: 'SUPABASE_SERVICE_ROLE_KEY', value: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set ✓' : 'Missing ✗' },
     { key: 'SERPER_API_KEY', value: process.env.SERPER_API_KEY ? 'Set ✓' : 'Missing ✗' },
     { key: 'RESEND_API_KEY', value: process.env.RESEND_API_KEY ? 'Set ✓' : 'Missing ✗' },
+    { key: 'TELEGRAM_BOT_TOKEN', value: process.env.TELEGRAM_BOT_TOKEN ? 'Set ✓' : 'Missing ✗' },
+    { key: 'WHOIS_API_KEY', value: process.env.WHOIS_API_KEY ? 'Set ✓' : 'Missing ✗' },
+    { key: 'GHL_API_KEY', value: process.env.GHL_API_KEY ? 'Set ✓' : 'Missing ✗' },
+    { key: 'CRON_SECRET', value: process.env.CRON_SECRET ? 'Set ✓' : 'Missing ✗' },
   ];
 
   return (
@@ -119,6 +124,19 @@ export default async function AdminSystemPage() {
               }
             >
               {process.env.SERPER_API_KEY ? '✓ Ready' : '⚠ Serper API Key Missing'}
+            </Badge>
+          </Card>
+          <Card>
+            <p className="text-sm text-pg-text-muted mb-2">AI Engine (OpenAI)</p>
+            <Badge
+              variant="default"
+              className={
+                process.env.OPENAI_API_KEY
+                  ? 'bg-pg-accent bg-opacity-10 text-pg-accent'
+                  : 'bg-red-500 bg-opacity-10 text-red-400'
+              }
+            >
+              {process.env.OPENAI_API_KEY ? '✓ Ready' : '✗ OPENAI_API_KEY Missing'}
             </Badge>
           </Card>
         </div>

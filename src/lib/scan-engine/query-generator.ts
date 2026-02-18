@@ -51,6 +51,12 @@ interface NormalizedProduct {
 
 /**
  * Normalize product name into multiple forms for query generation.
+ *
+ * IMPORTANT: The short form only strips articles (the, a, an, etc.),
+ * NOT product-type suffixes like "Indicator", "Course", "Software".
+ * These suffixes are integral to product identity. "Earnings Hot Zone Indicator"
+ * without "Indicator" becomes "Earnings Hot Zone" which is too generic
+ * and misses pirated copies shared with the full name.
  */
 function normalizeProductName(product: Product): NormalizedProduct {
   const name = product.name;
@@ -58,13 +64,9 @@ function normalizeProductName(product: Product): NormalizedProduct {
   // Canonical: full name as-is
   const canonical = name;
 
-  // Short: remove common articles and product-type suffixes
+  // Short: only remove common articles, keep product-type words intact
   const short = name
     .replace(/\b(the|a|an|by|for|of|and)\b/gi, '')
-    .replace(
-      /\b(indicator|course|template|software|tool|system|ebook|book|guide)\b/gi,
-      ''
-    )
     .replace(/\s+/g, ' ')
     .trim();
 

@@ -244,14 +244,27 @@ export function scoreResult(
   if (boostCount > 0) reasons.push(`${boostCount} piracy indicators`);
 
   // ── Profile penalty terms ──
+  // Reduced from -10 to -5 per term. Penalty terms like "review" and "tutorial"
+  // appear in nearly every search result for niche products, causing mass false positives.
+  // The -5 still suppresses pure review/tutorial pages but allows mixed-signal results
+  // (e.g., "Earnings Hot Zone Indicator review + free download") to survive.
   let penaltyCount = 0;
   for (const term of profile.penaltyTerms) {
     if (combined.includes(term.toLowerCase())) {
       penaltyCount++;
-      score -= 10;
+      score -= 5;
     }
   }
   if (penaltyCount > 0) reasons.push(`${penaltyCount} non-piracy indicators`);
+
+  // Mixed-signal recovery: if result has BOTH boost terms AND penalty terms,
+  // the penalty was already too harsh — partially restore confidence.
+  // A page with "free download" AND "review" is still suspicious.
+  if (boostCount > 0 && penaltyCount > 0) {
+    const recovery = Math.min(penaltyCount, boostCount) * 3;
+    score += recovery;
+    reasons.push(`mixed-signal recovery (+${recovery})`);
+  }
 
   // ── Dedicated piracy site ──
   const isDedicatedSite = profile.dedicatedSites.some((site) =>
@@ -314,9 +327,15 @@ export function scoreResult(
   const audience_size = estimateAudienceSize(input.url, input.position, platform);
   const est_revenue_loss = estimateRevenueLoss(audience_size, product.price, platform);
 
+  // False positive determination:
+  // - confidence < 30: too low to be credible
+  // - whitelist domains: user explicitly approved these domains
+  // NOTE: isLegitSite is NOT a hard false positive trigger. The -30 score penalty
+  // already suppresses most legitimate results. But a YouTube video titled
+  // "FREE Earnings Hot Zone Indicator CRACKED download" should still pass
+  // if enough piracy signals push confidence above 30.
   const isFalsePositive =
     confidence < 30 ||
-    isLegitSite ||
     (product.whitelist_domains?.some((d) => urlLower.includes(d)) ?? false);
 
   return {
