@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { TagInput } from '@/components/ui/TagInput';
-import { createClient } from '@/lib/supabase/client';
 import { filterGenericKeywords } from '@/lib/utils/keyword-quality';
 import type { ProductType, AIExtractedData } from '@/types';
 
@@ -163,8 +162,6 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
     setSaveError('');
 
     try {
-      const supabase = createClient();
-
       const productData = {
         name: data.name.trim(),
         type: data.type || 'other',
@@ -181,18 +178,24 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
         brand_name: data.brand_name.trim() || null,
         copyright_number: data.copyright_number.trim() || null,
         copyright_owner: data.copyright_owner.trim() || null,
-        user_id: userId,
       };
 
-      const { data: newProduct, error } = await supabase
-        .from('products')
-        .insert(productData)
-        .select('id, name')
-        .single();
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(productData),
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      onComplete({ id: newProduct.id, name: newProduct.name });
+      if (!response.ok) {
+        if (response.status === 403 && result.hint) {
+          throw new Error(`${result.error}\n\n${result.hint}`);
+        }
+        throw new Error(result.error || 'Failed to create product');
+      }
+
+      onComplete({ id: result.id, name: result.name });
     } catch (err: any) {
       console.error('Error creating product:', err);
       setSaveError(err.message || 'Failed to create product. Please try again.');

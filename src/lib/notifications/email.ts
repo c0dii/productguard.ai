@@ -329,6 +329,223 @@ export async function notifyTakedownSuccess(
 }
 
 // ============================================================================
+// Payment & Deadline Notifications
+// ============================================================================
+
+/**
+ * Send notification when a payment fails (account-level — always sends)
+ */
+export async function notifyPaymentFailed(
+  payload: NotificationPayload & {
+    amount: number;
+    currency: string;
+    nextRetryDate: string | null;
+    updatePaymentUrl: string;
+  }
+): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  try {
+    const retryInfo = payload.nextRetryDate
+      ? `<p style="margin: 0 0 16px 0;">We'll automatically retry the payment on <strong>${payload.nextRetryDate}</strong>. To avoid service interruption, please update your payment method before then.</p>`
+      : `<p style="margin: 0 0 16px 0; color: #ef4444;">This was the final retry attempt. Please update your payment method to continue using ProductGuard.</p>`;
+
+    const { error } = await resend.emails.send({
+      from: `ProductGuard <${FROM_EMAIL}>`,
+      to: payload.to,
+      subject: `Payment failed for your ProductGuard subscription`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); padding: 24px; border-radius: 12px; color: white; margin-bottom: 20px;">
+            <h1 style="margin: 0 0 8px 0; font-size: 20px;">Payment Failed</h1>
+            <p style="margin: 0; opacity: 0.8; font-size: 14px;">Action required to maintain your subscription</p>
+          </div>
+
+          <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+            <p style="margin: 0 0 16px 0;">Hi ${payload.userName},</p>
+            <p style="margin: 0 0 16px 0;">We were unable to process your payment of <strong>${payload.currency} $${payload.amount.toFixed(2)}</strong> for your ProductGuard subscription.</p>
+            ${retryInfo}
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${payload.updatePaymentUrl}"
+               style="display: inline-block; background: #00D4AA; color: #000; font-weight: 600; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px;">
+              Update Payment Method
+            </a>
+          </div>
+
+          <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 32px;">
+            This is an account notification and cannot be unsubscribed from.
+          </p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('[Notifications] Failed to send payment failed email:', error);
+      return false;
+    }
+
+    console.log(`[Notifications] Payment failed email sent to ${payload.to}`);
+    return true;
+  } catch (error) {
+    console.error('[Notifications] Error sending payment failed email:', error);
+    return false;
+  }
+}
+
+/**
+ * Send notification when an enforcement action deadline passes with no response
+ */
+export async function notifyDeadlineOverdue(
+  payload: NotificationPayload & {
+    productName: string;
+    actionType: string;
+    targetEntity: string;
+    daysSinceDeadline: number;
+    suggestedNextStep: string;
+    infringementId: string;
+  }
+): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  const prefs = await getUserEmailPrefs(payload.to);
+  if (!shouldSendEmail(prefs, 'threat_alerts')) return false;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: `ProductGuard Alerts <${FROM_EMAIL}>`,
+      to: payload.to,
+      subject: `[Action Required] No response to DMCA notice for "${payload.productName}"`,
+      headers: getUnsubscribeHeaders(prefs?.email_preferences_token),
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #78350f 0%, #92400e 100%); padding: 24px; border-radius: 12px; color: white; margin-bottom: 20px;">
+            <h1 style="margin: 0 0 8px 0; font-size: 20px;">Enforcement Deadline Passed</h1>
+            <p style="margin: 0; opacity: 0.8; font-size: 14px;">No response received — escalation recommended</p>
+          </div>
+
+          <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+            <p style="margin: 0 0 16px 0;">Hi ${payload.userName},</p>
+            <p style="margin: 0 0 16px 0;">
+              Your <strong>${payload.actionType.replace(/_/g, ' ')}</strong> notice sent to
+              <strong>${payload.targetEntity}</strong> for <strong>"${payload.productName}"</strong>
+              has not received a response after <strong>${payload.daysSinceDeadline} days</strong>.
+            </p>
+            <div style="background: #fefce8; border: 1px solid #facc15; border-radius: 8px; padding: 12px; margin: 16px 0;">
+              <p style="margin: 0; font-size: 14px; color: #854d0e;">
+                <strong>Recommended next step:</strong> ${payload.suggestedNextStep.replace(/_/g, ' ')}
+              </p>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${APP_URL}/dashboard/infringements/${payload.infringementId}"
+               style="display: inline-block; background: #00D4AA; color: #000; font-weight: 600; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px;">
+              Review &amp; Escalate
+            </a>
+          </div>
+
+          ${getEmailFooter(prefs?.email_preferences_token)}
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('[Notifications] Failed to send deadline overdue email:', error);
+      return false;
+    }
+
+    console.log(`[Notifications] Deadline overdue email sent to ${payload.to}`);
+    return true;
+  } catch (error) {
+    console.error('[Notifications] Error sending deadline overdue email:', error);
+    return false;
+  }
+}
+
+/**
+ * Send notification when previously removed content reappears (re-listing)
+ */
+export async function notifyRelisting(
+  payload: NotificationPayload & {
+    productName: string;
+    sourceUrl: string;
+    platform: string;
+    originalRemovalDate: string;
+    infringementId: string;
+  }
+): Promise<boolean> {
+  if (!process.env.RESEND_API_KEY) return false;
+
+  const prefs = await getUserEmailPrefs(payload.to);
+  if (!shouldSendEmail(prefs, 'threat_alerts')) return false;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: `ProductGuard Alerts <${FROM_EMAIL}>`,
+      to: payload.to,
+      subject: `[Alert] Previously removed content has reappeared — "${payload.productName}"`,
+      headers: getUnsubscribeHeaders(prefs?.email_preferences_token),
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); padding: 24px; border-radius: 12px; color: white; margin-bottom: 20px;">
+            <h1 style="margin: 0 0 8px 0; font-size: 20px;">Content Re-Listed</h1>
+            <p style="margin: 0; opacity: 0.8; font-size: 14px;">Previously removed content has reappeared</p>
+          </div>
+
+          <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+            <p style="margin: 0 0 16px 0;">Hi ${payload.userName},</p>
+            <p style="margin: 0 0 16px 0;">
+              Content that was previously removed for <strong>"${payload.productName}"</strong> on
+              <strong>${payload.platform}</strong> has been detected again.
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">URL</td>
+                <td style="padding: 8px 0; font-size: 13px; word-break: break-all;">
+                  <a href="${payload.sourceUrl}" style="color: #3b82f6;">${payload.sourceUrl}</a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Originally Removed</td>
+                <td style="padding: 8px 0; font-weight: 600;">${payload.originalRemovalDate}</td>
+              </tr>
+            </table>
+
+            <p style="margin: 16px 0 0 0; color: #6b7280; font-size: 13px;">
+              We've automatically re-opened this infringement and set it back to active status.
+              You may want to send a new takedown notice.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${APP_URL}/dashboard/infringements/${payload.infringementId}"
+               style="display: inline-block; background: #00D4AA; color: #000; font-weight: 600; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px;">
+              Take Action
+            </a>
+          </div>
+
+          ${getEmailFooter(prefs?.email_preferences_token)}
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('[Notifications] Failed to send relisting email:', error);
+      return false;
+    }
+
+    console.log(`[Notifications] Relisting alert sent to ${payload.to}`);
+    return true;
+  } catch (error) {
+    console.error('[Notifications] Error sending relisting email:', error);
+    return false;
+  }
+}
+
+// ============================================================================
 // Admin Scan Error Alerts
 // ============================================================================
 

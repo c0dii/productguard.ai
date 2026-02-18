@@ -186,23 +186,27 @@ export default function ProductsPage() {
         console.log('Product updated successfully:', data);
         alert('Product updated successfully!');
       } else {
-        // Create new product
+        // Create new product via API (enforces plan limits)
         console.log('Creating new product...');
-        const { error: insertError, data } = await supabase
-          .from('products')
-          .insert({
-            ...sanitized,
-            user_id: userId,
-          })
-          .select();
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sanitized),
+        });
 
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          alert('Failed to create product: ' + insertError.message);
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error('Insert error:', result);
+          if (response.status === 403 && result.hint) {
+            alert(`${result.error}\n\n${result.hint}`);
+          } else {
+            alert('Failed to create product: ' + (result.error || 'Unknown error'));
+          }
           return;
         }
 
-        console.log('Product created successfully:', data);
+        console.log('Product created successfully:', result);
         alert('Product created successfully!');
       }
 

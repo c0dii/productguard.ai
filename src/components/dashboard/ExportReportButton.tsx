@@ -27,7 +27,7 @@ export function ExportReportButton({ scanId, productName }: ExportReportButtonPr
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${productName.replace(/[^a-z0-9]/gi, '_')}_scan_report_${scanId.slice(0, 8)}.txt`;
+      a.download = `${productName.replace(/[^a-z0-9]/gi, '_')}_scan_report_${scanId.slice(0, 8)}.pdf`;
       document.body.appendChild(a);
       a.click();
 

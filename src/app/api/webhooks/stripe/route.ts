@@ -9,6 +9,7 @@ import {
   trackSubscriptionCancelled,
   trackSubscriptionUpgraded,
 } from '@/lib/ghl/events';
+import { notifyPaymentFailed } from '@/lib/notifications/email';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -259,7 +260,36 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(`⚠️ Payment failed for subscription ${subscriptionId}`);
-        // TODO: Send email notification to user about failed payment
+
+        // Send payment failure notification to user
+        try {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const userId = subscription.metadata?.user_id;
+
+          if (userId) {
+            const { data: userProfile } = await supabase
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', userId)
+              .single();
+
+            if (userProfile?.email) {
+              await notifyPaymentFailed({
+                to: userProfile.email,
+                userName: userProfile.full_name || 'there',
+                amount: (invoice.amount_due || 0) / 100,
+                currency: (invoice.currency || 'usd').toUpperCase(),
+                nextRetryDate: invoice.next_payment_attempt
+                  ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                  : null,
+                updatePaymentUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://productguard.ai'}/dashboard/settings`,
+              });
+            }
+          }
+        } catch (notifyError) {
+          console.error('[Stripe Webhook] Failed to send payment failure notification:', notifyError);
+        }
+
         break;
       }
 

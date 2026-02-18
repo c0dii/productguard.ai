@@ -367,6 +367,7 @@ export default async function AdminUserDetailPage({
             grantedTier={user.granted_tier}
             isAdmin={user.is_admin}
             hasSubscription={!!subscription}
+            relistingMonitoringEnabled={user.relisting_monitoring_enabled !== false}
           />
         </div>
       </div>

@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/monthly-workflows",
       "schedule": "0 0 1 * *"
+    },
+    {
+      "path": "/api/cron/check-deadlines",
+      "schedule": "0 9 * * *"
     }
   ]
 }

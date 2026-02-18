@@ -89,23 +89,77 @@ export class EvidenceCollector {
   }
 
   /**
-   * Capture screenshots using screenshot API
-   * Uses screenshot.rocks (free, no API key required)
+   * Capture screenshots using screenshot API and upload to Supabase Storage
    */
   private async captureScreenshots(url: string): Promise<string[]> {
     try {
-      // Use screenshot.rocks free API
-      // Alternative: screenshotapi.net, apiflash.com, or self-hosted Puppeteer
       const screenshotUrl = `https://api.screenshotmachine.com/?key=demo&url=${encodeURIComponent(url)}&device=desktop&dimension=1920x1080&format=jpg&cacheLimit=0&delay=2000`;
 
       console.log(`[Evidence Collector] Capturing screenshot of: ${url}`);
 
-      // TODO Phase 2: Upload to Supabase Storage and return permanent URL
-      // For now, return the screenshot API URL (expires after some time)
+      // Try to upload to Supabase Storage for permanent URL
+      const permanentUrl = await this.uploadToStorage(screenshotUrl, url);
+      if (permanentUrl) {
+        return [permanentUrl];
+      }
+
+      // Fallback to external URL if upload fails
       return [screenshotUrl];
     } catch (error) {
       console.error('[Evidence Collector] Screenshot capture failed:', error);
       return [];
+    }
+  }
+
+  /**
+   * Upload a screenshot to Supabase Storage for permanent storage
+   */
+  private async uploadToStorage(imageUrl: string, sourceUrl: string): Promise<string | null> {
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/server');
+      const supabase = createAdminClient();
+
+      // Fetch the screenshot image
+      const response = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!response.ok) {
+        console.warn('[Evidence Collector] Failed to fetch screenshot for upload');
+        return null;
+      }
+
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Generate a unique path: evidence-screenshots/{date}/{hash}.jpg
+      const date = new Date().toISOString().split('T')[0];
+      const urlHash = Buffer.from(sourceUrl).toString('base64url').slice(0, 32);
+      const filePath = `${date}/${urlHash}-${Date.now()}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('evidence-screenshots')
+        .upload(filePath, buffer, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.warn('[Evidence Collector] Storage upload failed:', uploadError.message);
+        return null;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('evidence-screenshots')
+        .getPublicUrl(filePath);
+
+      console.log(`[Evidence Collector] Screenshot uploaded to storage: ${filePath}`);
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.warn('[Evidence Collector] Storage upload error:', error);
+      return null;
     }
   }
 

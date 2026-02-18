@@ -1,16 +1,26 @@
 import { createClient } from '@/lib/supabase/server';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { RelistingToggle } from '@/components/admin/RelistingToggle';
 import Link from 'next/link';
 
 export default async function AdminScansPage() {
   const supabase = await createClient();
 
-  const { data: scans } = await supabase
-    .from('scans')
-    .select('*, profiles(email, full_name), products(name)')
-    .order('created_at', { ascending: false })
-    .limit(100);
+  const [{ data: scans }, { data: relistingSetting }] = await Promise.all([
+    supabase
+      .from('scans')
+      .select('*, profiles(email, full_name), products(name)')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'relisting_monitoring_global')
+      .single(),
+  ]);
+
+  const relistingEnabled = (relistingSetting?.value as any)?.enabled !== false;
 
   const stats = {
     total: scans?.length || 0,
@@ -43,6 +53,14 @@ export default async function AdminScansPage() {
           <p className="text-sm text-pg-text-muted mb-1">Failed</p>
           <p className="text-3xl font-bold text-pg-danger">{stats.failed}</p>
         </Card>
+      </div>
+
+      <div className="mb-6">
+        <RelistingToggle
+          initialEnabled={relistingEnabled}
+          scope="global"
+          label="Re-listing Monitoring (Global)"
+        />
       </div>
 
       <div className="space-y-3">

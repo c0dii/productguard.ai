@@ -10,6 +10,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/server';
+import { notifyDeadlineOverdue } from '@/lib/notifications/email';
 import type { EnforcementAction } from '@/types';
 
 export interface DeadlineCheckResult {
@@ -84,8 +85,43 @@ export class DeadlineTracker {
     // Generate escalation suggestions
     const escalationSuggestions = this.generateEscalationSuggestions(overdueActions as EnforcementAction[]);
 
-    // TODO: Send email notifications to users about overdue actions
-    // TODO: Create auto-escalation enforcement actions for P0 priorities
+    // Send email notifications to users about overdue actions
+    for (const suggestion of escalationSuggestions) {
+      try {
+        // Look up user email and product name for the notification
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', suggestion.userId)
+          .single();
+
+        if (!profile?.email) continue;
+
+        // Get product name from the infringement
+        const { data: infringement } = await supabase
+          .from('infringements')
+          .select('product_id, products(name)')
+          .eq('id', suggestion.infringementId)
+          .single();
+
+        const productName = (infringement as any)?.products?.name || 'your product';
+
+        await notifyDeadlineOverdue({
+          to: profile.email,
+          userName: profile.full_name || 'there',
+          productName,
+          actionType: suggestion.currentActionType,
+          targetEntity: suggestion.reason.split('sent to ')[1]?.split(' received')[0] || 'target',
+          daysSinceDeadline: this.getDaysSinceDeadline(
+            overdueActions.find(a => a.id === suggestion.actionId)?.deadline_at || new Date().toISOString()
+          ),
+          suggestedNextStep: suggestion.suggestedNextStep,
+          infringementId: suggestion.infringementId,
+        });
+      } catch (notifyError) {
+        console.error(`[Deadline Tracker] Failed to notify user ${suggestion.userId}:`, notifyError);
+      }
+    }
 
     return {
       overdueActions: overdueActions as EnforcementAction[],

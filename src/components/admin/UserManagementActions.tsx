@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { RelistingToggle } from '@/components/admin/RelistingToggle';
 import { useRouter } from 'next/navigation';
 
 interface UserManagementActionsProps {
@@ -12,6 +13,7 @@ interface UserManagementActionsProps {
   grantedTier: string | null;
   isAdmin: boolean;
   hasSubscription: boolean;
+  relistingMonitoringEnabled?: boolean;
 }
 
 export function UserManagementActions({
@@ -21,6 +23,7 @@ export function UserManagementActions({
   grantedTier,
   isAdmin,
   hasSubscription,
+  relistingMonitoringEnabled = true,
 }: UserManagementActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -388,6 +391,15 @@ export function UserManagementActions({
           >
             👤 Impersonate User
           </Button>
+        </div>
+
+        <div className="border-t border-pg-border pt-3">
+          <RelistingToggle
+            initialEnabled={relistingMonitoringEnabled}
+            scope="user"
+            userId={userId}
+            label="Re-listing Monitoring"
+          />
         </div>
 
         <div className="border-t border-pg-border pt-3">

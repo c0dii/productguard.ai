@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { logCommunication } from '@/lib/communications/log-communication';
+import { sendDMCANotice } from '@/lib/dmca/send-email';
+import type { BuiltNotice } from '@/lib/dmca/notice-builder';
+import type { ProviderInfo } from '@/lib/dmca/provider-database';
 
 export async function POST(
   request: Request,
@@ -45,19 +48,54 @@ export async function POST(
       .single();
 
     const replyToEmail = profile?.dmca_reply_email || profile?.email || user.email;
+    const senderName = profile?.full_name || 'ProductGuard User';
 
-    // TODO: Implement email sending via Resend or another service
-    // For now, we'll just update the database to mark it as sent
-    // In production, you'd use Resend API here:
-    // await resend.emails.send({
-    //   from: 'takedowns@productguard.ai',
-    //   to: recipientEmail,
-    //   replyTo: replyToEmail,
-    //   subject: 'DMCA Takedown Notice',
-    //   text: takedown.notice_content,
-    // });
+    // Build objects for sendDMCANotice
+    const builtNotice = {
+      subject: 'DMCA Takedown Notice',
+      body: takedown.notice_content || '',
+      recipient_email: recipientEmail,
+      recipient_name: providerName || 'DMCA Agent',
+      recipient_form_url: null,
+      legal_references: [],
+      evidence_links: takedown.infringing_url ? [takedown.infringing_url] : [],
+      sworn_statement: '',
+      comparison_items: [],
+      profile: 'full_reupload',
+    } as BuiltNotice;
 
-    // Update takedown status
+    const provider: ProviderInfo = {
+      name: providerName || 'Unknown Provider',
+      dmcaEmail: recipientEmail,
+      dmcaFormUrl: null,
+      agentName: providerName || 'DMCA Agent',
+      requirements: '',
+      prefersWebForm: false,
+    };
+
+    // Send the DMCA notice via Resend
+    const sendResult = await sendDMCANotice(
+      builtNotice,
+      provider,
+      replyToEmail || user.email || '',
+      senderName,
+    );
+
+    if (!sendResult.success) {
+      // Revert status to draft if send failed
+      await supabase
+        .from('takedowns')
+        .update({ status: 'draft' })
+        .eq('id', id);
+
+      return NextResponse.json({
+        error: `Email send failed: ${sendResult.error}`,
+        method: sendResult.method,
+        formUrl: sendResult.formUrl || null,
+      }, { status: 500 });
+    }
+
+    // Update takedown status to sent
     const { error } = await supabase
       .from('takedowns')
       .update({
@@ -81,15 +119,19 @@ export async function POST(
       to_email: recipientEmail,
       reply_to_email: replyToEmail || undefined,
       subject: 'DMCA Takedown Notice',
-      body_preview: takedown.notice_content || undefined,
+      body_preview: (takedown.notice_content || '').substring(0, 500),
       status: 'sent',
+      external_message_id: sendResult.messageId || undefined,
       provider_name: providerName || undefined,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'DMCA notice marked as sent',
-      note: 'Email integration coming soon. For now, copy the notice and send manually.',
+      message: 'DMCA notice sent successfully',
+      delivery: {
+        method: sendResult.method,
+        messageId: sendResult.messageId || null,
+      },
     });
   } catch (error) {
     console.error('Send DMCA error:', error);

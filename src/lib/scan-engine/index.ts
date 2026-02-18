@@ -424,7 +424,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       const existingMap = new Map(
         (existingInfringements || [])
           .filter((inf) => inf.url_hash !== null)
-          .map((inf) => [inf.url_hash, { id: inf.id, seen_count: inf.seen_count || 1 }])
+          .map((inf) => [inf.url_hash, { id: inf.id, seen_count: inf.seen_count || 1, status: inf.status }])
       );
 
       // Update each known URL with incremented seen_count
@@ -456,6 +456,110 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         logger.info('finalization', `Updated ${knownUrls} existing infringements with new last_seen_at timestamp`, {
           updated_count: knownUrls,
         });
+      }
+
+      // Re-listing detection: check if any previously removed URLs have reappeared
+      const removedUrls = scanResults.filter((result) => {
+        const urlHash = generateUrlHash(result.source_url);
+        const existing = existingMap.get(urlHash);
+        return existing && existing.status === 'removed';
+      });
+
+      if (removedUrls.length > 0) {
+        // Check global + per-user re-listing monitoring settings
+        let relistingEnabled = true;
+
+        try {
+          const { data: globalSetting } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'relisting_monitoring_global')
+            .single();
+
+          if (globalSetting?.value && (globalSetting.value as any).enabled === false) {
+            relistingEnabled = false;
+            logger.info('finalization', 'Re-listing monitoring disabled globally');
+          }
+        } catch {
+          // If system_settings table doesn't exist yet, default to enabled
+        }
+
+        if (relistingEnabled) {
+          try {
+            const { data: userProfile } = await supabase
+              .from('profiles')
+              .select('relisting_monitoring_enabled')
+              .eq('id', product.user_id)
+              .single();
+
+            if (userProfile?.relisting_monitoring_enabled === false) {
+              relistingEnabled = false;
+              logger.info('finalization', `Re-listing monitoring disabled for user ${product.user_id}`);
+            }
+          } catch {
+            // Default to enabled if column doesn't exist yet
+          }
+        }
+
+        if (relistingEnabled) {
+          logger.info('finalization', `Re-listing detection: ${removedUrls.length} previously removed URLs reappeared`);
+
+          for (const result of removedUrls) {
+            const urlHash = generateUrlHash(result.source_url);
+            const existing = existingMap.get(urlHash);
+            if (!existing) continue;
+
+            // Re-activate the infringement
+            await supabase
+              .from('infringements')
+              .update({ status: 'active' })
+              .eq('id', existing.id);
+
+            // Log the status transition
+            await supabase.from('status_transitions').insert({
+              infringement_id: existing.id,
+              from_status: 'removed',
+              to_status: 'active',
+              reason: 'Re-listing detected: previously removed content reappeared during scan',
+              changed_by: 'system',
+            });
+
+            logger.info('finalization', `Re-listed infringement ${existing.id}: removed → active (${result.source_url})`);
+          }
+
+          // Send re-listing notification emails
+          try {
+            const { notifyRelisting } = await import('@/lib/notifications/email');
+            const { data: userData } = await supabase.auth.admin.getUserById(product.user_id);
+            const userEmail = userData?.user?.email;
+
+            if (userEmail) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', product.user_id)
+                .single();
+
+              for (const result of removedUrls) {
+                const urlHash = generateUrlHash(result.source_url);
+                const existing = existingMap.get(urlHash);
+                if (!existing) continue;
+
+                await notifyRelisting({
+                  to: userEmail,
+                  userName: profile?.full_name || 'there',
+                  productName: product.name,
+                  sourceUrl: result.source_url,
+                  platform: result.platform,
+                  originalRemovalDate: now, // approximate
+                  infringementId: existing.id,
+                });
+              }
+            }
+          } catch (notifyError) {
+            logger.warn('finalization', `Failed to send re-listing notifications: ${notifyError}`, 'EMAIL_FAIL');
+          }
+        }
       }
     }
 
