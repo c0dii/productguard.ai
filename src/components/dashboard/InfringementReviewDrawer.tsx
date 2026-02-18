@@ -176,6 +176,7 @@ export function InfringementReviewDrawer({
               <MetricCard
                 label="Est. Revenue Loss"
                 value={data.est_revenue_loss > 0 ? `$${data.est_revenue_loss.toLocaleString()}` : 'N/A'}
+                tooltip="Based on estimated audience size, platform type, and your product price. Assumes a small percentage of viewers would have been paying customers."
               />
             </div>
 
@@ -336,11 +337,33 @@ export function InfringementReviewDrawer({
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function MetricCard({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
+  const [showTooltip, setShowTooltip] = useState(false);
   return (
-    <div className="bg-pg-bg rounded-lg p-3 border border-pg-border">
-      <p className="text-xs text-pg-text-muted">{label}</p>
+    <div className="bg-pg-bg rounded-lg p-3 border border-pg-border relative">
+      <div className="flex items-center gap-1">
+        <p className="text-xs text-pg-text-muted">{label}</p>
+        {tooltip && (
+          <button
+            onClick={() => setShowTooltip(!showTooltip)}
+            className="w-3.5 h-3.5 rounded-full bg-pg-border text-pg-text-muted hover:bg-pg-accent hover:text-white text-[9px] font-bold leading-none flex items-center justify-center transition-colors"
+          >
+            ?
+          </button>
+        )}
+      </div>
       <p className="text-lg font-bold text-pg-text mt-0.5">{value}</p>
+      {tooltip && showTooltip && (
+        <div className="absolute z-10 top-full left-0 right-0 mt-1 p-2.5 bg-pg-surface border border-pg-border rounded-lg shadow-lg text-xs text-pg-text-muted leading-relaxed">
+          {tooltip}
+          <button
+            onClick={() => setShowTooltip(false)}
+            className="absolute top-1 right-1.5 text-pg-text-muted hover:text-pg-text text-xs"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
