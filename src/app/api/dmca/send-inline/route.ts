@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       target_type,
       infringement_types,
       signature_name,
+      cc_emails: clientCcEmails,
     } = body;
 
     if (!infringement_id || !notice_content || !recipient_email || !signature_name) {
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
         status: 'sent',
         notice_content: signedNotice,
         recipient_email,
-        cc_emails: [],
+        cc_emails: Array.isArray(clientCcEmails) ? clientCcEmails : [],
         infringing_url: infringement.source_url,
         submitted_at: now,
         sent_at: now,

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { INFRINGEMENT_TYPES } from '@/lib/constants/infringement-types';
+import { createClient } from '@/lib/supabase/client';
 
 interface GeneratedDMCANotice {
   subject: string;
@@ -55,6 +56,8 @@ interface InlineDMCASendFlowProps {
 
 type FlowStep = 1 | 2 | 3;
 
+const STEP_LABELS = ['Type', 'Delivery', 'Review & Send'];
+
 export function InlineDMCASendFlow({
   notice,
   quality,
@@ -66,18 +69,56 @@ export function InlineDMCASendFlow({
   onSent,
 }: InlineDMCASendFlowProps) {
   const [step, setStep] = useState<FlowStep>(1);
+
+  // Step 1 state
+  const [infringementTypes, setInfringementTypes] = useState<string[]>([]);
+
+  // Step 2 state
+  const [editedRecipientEmail, setEditedRecipientEmail] = useState(notice.recipient_email);
+  const [editedRecipientName, setEditedRecipientName] = useState(notice.recipient_name);
+  const [ccSelf, setCcSelf] = useState(true);
+  const [ccEmails, setCcEmails] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+
+  // Step 3 state
   const [editedSubject, setEditedSubject] = useState(notice.subject);
   const [editedBody, setEditedBody] = useState(notice.body);
-  const [isEditing, setIsEditing] = useState(false);
-  const [infringementTypes, setInfringementTypes] = useState<string[]>([]);
   const [signatureName, setSignatureName] = useState('');
   const [signatureConsent, setSignatureConsent] = useState(false);
+  const [liabilityConsent, setLiabilityConsent] = useState(false);
+
+  // Shared state
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentTakedownId, setSentTakedownId] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<string | null>(null);
 
   const isSent = !!sentTakedownId;
+
+  // Fetch user email + profile name on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        setUserEmail(user.email || '');
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.full_name) {
+          setSignatureName(profile.full_name);
+        }
+      } catch {
+        // Ignore errors
+      }
+    };
+    fetchUser();
+  }, []);
 
   const handleTypeToggle = (value: string) => {
     setInfringementTypes((prev) =>
@@ -86,10 +127,17 @@ export function InlineDMCASendFlow({
   };
 
   const handleSend = async () => {
-    if (!signatureName || !signatureConsent) return;
+    if (!signatureName || !signatureConsent || !liabilityConsent) return;
 
     setIsSending(true);
     setSendError(null);
+
+    // Build CC list
+    const ccList: string[] = [];
+    if (ccSelf && userEmail) ccList.push(userEmail);
+    if (ccEmails) {
+      ccList.push(...ccEmails.split(',').map(e => e.trim()).filter(e => e));
+    }
 
     try {
       const response = await fetch('/api/dmca/send-inline', {
@@ -99,12 +147,13 @@ export function InlineDMCASendFlow({
           infringement_id: infringementId,
           notice_content: editedBody,
           notice_subject: editedSubject,
-          recipient_email: notice.recipient_email,
-          recipient_name: notice.recipient_name,
+          recipient_email: editedRecipientEmail,
+          recipient_name: editedRecipientName,
           provider_name: target.provider.name,
           target_type: target.type,
           infringement_types: infringementTypes,
           signature_name: signatureName,
+          cc_emails: ccList,
         }),
       });
 
@@ -133,8 +182,8 @@ export function InlineDMCASendFlow({
       ``,
       `Subject: ${editedSubject}`,
       ``,
-      `To: ${notice.recipient_name}`,
-      `Email: ${notice.recipient_email}`,
+      `To: ${editedRecipientName}`,
+      `Email: ${editedRecipientEmail}`,
       `Provider: ${target.provider.name}`,
       ``,
       `---`,
@@ -202,7 +251,7 @@ export function InlineDMCASendFlow({
                       ) : s}
                     </div>
                     <span className={`text-xs hidden sm:inline ${s === step ? 'text-pg-accent font-medium' : 'text-pg-text-muted'}`}>
-                      {s === 1 ? 'Review' : s === 2 ? 'Type' : 'Send'}
+                      {STEP_LABELS[s - 1]}
                     </span>
                     {s < 3 && <div className="w-6 h-px bg-pg-border mx-1" />}
                   </div>
@@ -217,111 +266,38 @@ export function InlineDMCASendFlow({
           </button>
         </div>
 
-        {/* STEP 1: Review Notice */}
+        {/* STEP 1: Product & Infringement Type */}
         {step === 1 && !isSent && (
           <div>
-            {/* Quality Score */}
-            {quality && strengthStyle && (
-              <div className={`mb-4 p-3 rounded-lg ${strengthStyle.bg} border ${strengthStyle.border}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-900 dark:text-gray-900">
-                    Notice Strength: {strengthStyle.label}
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold text-gray-900 ${strengthStyle.barColor}/30`}>
-                    {quality.score}/100
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${strengthStyle.barColor}`}
-                    style={{ width: `${quality.score}%` }}
-                  />
-                </div>
-                {quality.errors.length > 0 && (
-                  <div className="mt-2">
-                    {quality.errors.map((err, i) => (
-                      <p key={i} className="text-xs text-gray-900 dark:text-gray-900">
-                        <strong>✕ {err.message}</strong> — {err.fix}
-                      </p>
-                    ))}
-                  </div>
-                )}
+            {/* Product & Infringement Context */}
+            <div className="mb-4 p-3 rounded-lg bg-pg-bg border border-pg-border space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-pg-text-muted">Product</span>
+                <span className="font-semibold text-pg-text">{productName}</span>
               </div>
-            )}
-
-            {/* Recipient */}
-            <div className="mb-4 p-3 bg-pg-bg rounded-lg text-sm">
-              <p className="font-semibold text-pg-text">{notice.recipient_name}</p>
-              {notice.recipient_email && <p className="text-pg-accent text-xs">{notice.recipient_email}</p>}
-              {notice.recipient_form_url && (
-                <div className="mt-2 pt-2 border-t border-pg-border">
-                  <span className="text-xs text-pg-text-muted">This provider prefers web form: </span>
-                  <a href={notice.recipient_form_url} target="_blank" rel="noopener noreferrer" className="text-xs text-pg-accent hover:underline">
-                    Open Form →
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Subject */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-pg-text">Subject</h3>
-                {!isEditing && (
-                  <button onClick={() => setIsEditing(true)} className="text-xs text-pg-accent hover:underline">Edit</button>
-                )}
+              <div className="text-sm">
+                <span className="text-pg-text-muted">Infringing URL</span>
+                <a
+                  href={infringementUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-pg-accent hover:underline text-xs break-all mt-0.5"
+                >
+                  {infringementUrl}
+                </a>
               </div>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={editedSubject}
-                  onChange={(e) => setEditedSubject(e.target.value)}
-                  className="w-full px-3 py-2 bg-pg-bg border border-pg-border rounded-lg text-pg-text text-sm focus:outline-none focus:ring-2 focus:ring-pg-accent"
-                />
-              ) : (
-                <p className="text-sm text-pg-text bg-pg-bg p-2 rounded">{editedSubject}</p>
-              )}
-            </div>
-
-            {/* Body */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-pg-text">Notice Body</h3>
-                {!isEditing && (
-                  <button onClick={() => setIsEditing(true)} className="text-xs text-pg-accent hover:underline">Edit</button>
-                )}
+              <div className="flex justify-between text-sm">
+                <span className="text-pg-text-muted">Target</span>
+                <span className="text-pg-text">{target.provider.name}</span>
               </div>
-              {isEditing ? (
-                <>
-                  <textarea
-                    value={editedBody}
-                    onChange={(e) => setEditedBody(e.target.value)}
-                    rows={14}
-                    className="w-full px-3 py-2 bg-pg-bg border border-pg-border rounded-lg text-pg-text font-mono text-xs focus:outline-none focus:ring-2 focus:ring-pg-accent resize-none"
-                  />
-                  <button onClick={() => setIsEditing(false)} className="text-xs text-pg-accent hover:underline mt-1">Done Editing</button>
-                </>
-              ) : (
-                <div className="p-3 bg-pg-bg rounded-lg border border-pg-border max-h-64 overflow-y-auto">
-                  <pre className="whitespace-pre-wrap font-sans text-xs text-pg-text leading-relaxed">{editedBody}</pre>
-                </div>
-              )}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-pg-border">
-              <Button onClick={() => setStep(2)}>Next: Select Type →</Button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: Infringement Type */}
-        {step === 2 && !isSent && (
-          <div>
-            <p className="text-sm text-pg-text-muted mb-4">
+            {/* Infringement Type Selection */}
+            <p className="text-sm text-pg-text-muted mb-3">
               Select all infringement types that apply. Multiple selections strengthen your claim.
             </p>
 
-            <div className="space-y-2 mb-6 max-h-[50vh] overflow-y-auto">
+            <div className="space-y-2 mb-6 max-h-[45vh] overflow-y-auto">
               {INFRINGEMENT_TYPES.map((type) => (
                 <div
                   key={type.value}
@@ -356,39 +332,186 @@ export function InlineDMCASendFlow({
               ))}
             </div>
 
-            <div className="flex justify-between pt-3 border-t border-pg-border">
-              <Button variant="secondary" onClick={() => setStep(1)}>← Back</Button>
-              <Button onClick={() => setStep(3)} disabled={infringementTypes.length === 0}>
-                Next: Confirm & Send →
+            <div className="flex justify-end pt-3 border-t border-pg-border">
+              <Button onClick={() => setStep(2)} disabled={infringementTypes.length === 0}>
+                Next: Delivery →
               </Button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Confirm & Send */}
+        {/* STEP 2: Delivery Configuration */}
+        {step === 2 && !isSent && (
+          <div>
+            <p className="text-sm text-pg-text-muted mb-4">
+              Configure where and how the DMCA notice will be delivered.
+            </p>
+
+            <div className="space-y-4 mb-6">
+              {/* Recipient Name */}
+              <div>
+                <label className="block text-xs font-medium text-pg-text mb-1">
+                  Recipient Name
+                </label>
+                <input
+                  type="text"
+                  value={editedRecipientName}
+                  onChange={(e) => setEditedRecipientName(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="Copyright Agent"
+                />
+              </div>
+
+              {/* Recipient Email */}
+              <div>
+                <label className="block text-xs font-medium text-pg-text mb-1">
+                  Send DMCA Notice To <span className="text-pg-danger">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={editedRecipientEmail}
+                  onChange={(e) => setEditedRecipientEmail(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="copyright@platform.com"
+                />
+                {notice.recipient_email && editedRecipientEmail === notice.recipient_email && (
+                  <p className="text-xs text-green-500 mt-1">
+                    Auto-detected from {target.provider.name}
+                  </p>
+                )}
+              </div>
+
+              {/* Web form link */}
+              {notice.recipient_form_url && (
+                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                  <span className="text-xs text-pg-text-muted">This provider also accepts web form submissions: </span>
+                  <a
+                    href={notice.recipient_form_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-pg-accent hover:underline"
+                  >
+                    Open Form →
+                  </a>
+                </div>
+              )}
+
+              {/* CC Self */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="ccSelf"
+                  checked={ccSelf}
+                  onChange={(e) => setCcSelf(e.target.checked)}
+                  className="rounded border-pg-border"
+                />
+                <label htmlFor="ccSelf" className="text-sm text-pg-text cursor-pointer">
+                  Send a copy to myself {userEmail && `(${userEmail})`}
+                </label>
+              </div>
+
+              {/* Additional CC */}
+              <div>
+                <label className="block text-xs font-medium text-pg-text mb-1">
+                  Additional CC Recipients (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={ccEmails}
+                  onChange={(e) => setCcEmails(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="email1@example.com, email2@example.com"
+                />
+                <p className="text-xs text-pg-text-muted mt-1">Separate multiple emails with commas</p>
+              </div>
+
+              {/* Email Summary */}
+              <div className="p-3 rounded bg-pg-bg border border-pg-border">
+                <p className="text-xs font-semibold text-pg-text mb-2">Delivery Summary</p>
+                <p className="text-xs text-pg-text-muted">
+                  <strong>To:</strong> {editedRecipientName} &lt;{editedRecipientEmail || '(not set)'}&gt;
+                </p>
+                {(ccSelf || ccEmails) && (
+                  <p className="text-xs text-pg-text-muted">
+                    <strong>CC:</strong>{' '}
+                    {[
+                      ccSelf && userEmail,
+                      ...ccEmails.split(',').map(e => e.trim()).filter(e => e)
+                    ].filter(Boolean).join(', ') || 'None'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-3 border-t border-pg-border">
+              <Button variant="secondary" onClick={() => setStep(1)}>← Back</Button>
+              <Button onClick={() => setStep(3)} disabled={!editedRecipientEmail}>
+                Next: Review & Send →
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: Review, Sign & Send */}
         {step === 3 && !isSent && (
           <div>
-            {/* Summary */}
-            <div className="mb-4 p-3 rounded-lg bg-pg-bg border border-pg-border space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-pg-text-muted">Provider</span>
-                <span className="font-semibold text-pg-text">{target.provider.name}</span>
+            {/* Quality Score */}
+            {quality && strengthStyle && (
+              <div className={`mb-4 p-3 rounded-lg ${strengthStyle.bg} border ${strengthStyle.border}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-gray-900 dark:text-gray-900">
+                    Notice Strength: {strengthStyle.label}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold text-gray-900 ${strengthStyle.barColor}/30`}>
+                    {quality.score}/100
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-black/20 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${strengthStyle.barColor}`}
+                    style={{ width: `${quality.score}%` }}
+                  />
+                </div>
+                {quality.errors.length > 0 && (
+                  <div className="mt-2">
+                    {quality.errors.map((err, i) => (
+                      <p key={i} className="text-xs text-gray-900 dark:text-gray-900">
+                        <strong>✕ {err.message}</strong> — {err.fix}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-pg-text-muted">Recipient</span>
-                <span className="text-pg-accent text-xs">{notice.recipient_email}</span>
-              </div>
-              <div className="text-sm">
-                <span className="text-pg-text-muted">Types: </span>
-                <span className="text-pg-text">
-                  {infringementTypes.map((t) => INFRINGEMENT_TYPES.find((it) => it.value === t)?.label).join(', ')}
-                </span>
-              </div>
+            )}
+
+            {/* Subject */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-pg-text mb-1">Subject Line</label>
+              <input
+                type="text"
+                value={editedSubject}
+                onChange={(e) => setEditedSubject(e.target.value)}
+                className="input-field w-full text-sm"
+              />
+            </div>
+
+            {/* Notice Body */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-pg-text mb-1">DMCA Notice</label>
+              <textarea
+                value={editedBody}
+                onChange={(e) => setEditedBody(e.target.value)}
+                rows={14}
+                className="w-full px-3 py-2 bg-pg-bg border border-pg-border rounded-lg text-pg-text font-mono text-xs focus:outline-none focus:ring-2 focus:ring-pg-accent resize-none leading-relaxed"
+              />
+              <p className="text-xs text-pg-text-muted mt-1">
+                This is the exact text that will be sent. Edit as needed.
+              </p>
             </div>
 
             {/* Signature */}
             <div className="mb-4 p-4 rounded-lg bg-gradient-to-br from-pg-accent/5 to-blue-500/5 border-2 border-pg-accent/30">
-              <h3 className="text-sm font-semibold text-pg-text mb-3">Electronic Signature (Required)</h3>
+              <h3 className="text-sm font-semibold text-pg-text mb-3">Electronic Signature</h3>
 
               <div className="mb-3">
                 <label className="block text-xs font-medium text-pg-text mb-1">
@@ -410,7 +533,8 @@ export function InlineDMCASendFlow({
                 )}
               </div>
 
-              <label className="flex items-start gap-2 cursor-pointer p-3 rounded-lg bg-pg-surface border border-pg-border">
+              {/* Perjury Certification */}
+              <label className="flex items-start gap-2 cursor-pointer p-3 rounded-lg bg-pg-surface border border-pg-border mb-3">
                 <input
                   type="checkbox"
                   checked={signatureConsent}
@@ -428,6 +552,27 @@ export function InlineDMCASendFlow({
                   </p>
                 </div>
               </label>
+
+              {/* Liability Waiver */}
+              <label className="flex items-start gap-2 cursor-pointer p-3 rounded-lg bg-pg-surface border border-pg-border">
+                <input
+                  type="checkbox"
+                  checked={liabilityConsent}
+                  onChange={(e) => setLiabilityConsent(e.target.checked)}
+                  className="mt-0.5 rounded border-pg-border"
+                />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-pg-text mb-0.5">
+                    Limitation of liability <span className="text-pg-danger">*</span>
+                  </p>
+                  <p className="text-[11px] text-pg-text-muted leading-relaxed">
+                    I acknowledge that ProductGuard.ai provides tools for generating and sending DMCA notices but does not
+                    provide legal advice. I accept full responsibility for the accuracy and legal validity of this notice.
+                    I agree that ProductGuard.ai, its officers, employees, and affiliates shall not be held liable for any
+                    damages, litigation, claims, or losses arising from the submission of this notice.
+                  </p>
+                </div>
+              </label>
             </div>
 
             {sendError && (
@@ -440,7 +585,7 @@ export function InlineDMCASendFlow({
               <Button variant="secondary" onClick={() => setStep(2)}>← Back</Button>
               <Button
                 onClick={handleSend}
-                disabled={!signatureName || !signatureConsent || isSending}
+                disabled={!signatureName || !signatureConsent || !liabilityConsent || isSending}
               >
                 {isSending ? (
                   <span className="flex items-center gap-2">
@@ -472,7 +617,7 @@ export function InlineDMCASendFlow({
               Your DMCA takedown notice has been sent to <strong className="text-pg-text">{target.provider.name}</strong>
             </p>
             <p className="text-xs text-pg-text-muted mb-6">
-              {notice.recipient_email} &middot; {sentAt ? new Date(sentAt).toLocaleDateString() : 'Just now'}
+              {editedRecipientEmail} &middot; {sentAt ? new Date(sentAt).toLocaleDateString() : 'Just now'}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
