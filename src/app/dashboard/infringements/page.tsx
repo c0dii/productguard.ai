@@ -31,7 +31,7 @@ export default async function InfringementsPage() {
   // Calculate stats (3 groups matching the tab structure)
   const needsAttentionCount = allInfringements?.filter((i) => ['pending_verification', 'active'].includes(i.status)).length || 0;
   const inProgressCount = allInfringements?.filter((i) => ['takedown_sent', 'disputed'].includes(i.status)).length || 0;
-  const resolvedCount = allInfringements?.filter((i) => ['removed', 'false_positive', 'archived'].includes(i.status)).length || 0;
+  const resolvedCount = allInfringements?.filter((i) => i.status === 'removed').length || 0;
 
   return (
     <div>

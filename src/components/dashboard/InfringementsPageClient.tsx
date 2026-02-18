@@ -32,7 +32,7 @@ interface InfringementsPageClientProps {
   totalRevenueLoss: number;
 }
 
-type FilterOption = 'actionable' | 'in_progress' | 'resolved' | 'all';
+type FilterOption = 'actionable' | 'in_progress' | 'resolved' | 'dismissed' | 'all';
 
 const STATUS_FILTERS: { key: FilterOption; label: string; statuses: string[]; activeClass: string }[] = [
   {
@@ -50,8 +50,14 @@ const STATUS_FILTERS: { key: FilterOption; label: string; statuses: string[]; ac
   {
     key: 'resolved',
     label: 'Resolved',
-    statuses: ['removed', 'false_positive', 'archived'],
+    statuses: ['removed'],
     activeClass: 'bg-green-600 text-white shadow-lg shadow-green-600/30',
+  },
+  {
+    key: 'dismissed',
+    label: 'Dismissed',
+    statuses: ['false_positive', 'archived'],
+    activeClass: 'bg-gray-500 text-white shadow-lg shadow-gray-500/30',
   },
   {
     key: 'all',
@@ -140,6 +146,7 @@ export function InfringementsPageClient({ infringements, allProducts, totalReven
       case 'actionable': return 'Needs Your Attention';
       case 'in_progress': return 'In Progress';
       case 'resolved': return 'Resolved';
+      case 'dismissed': return 'Dismissed';
       default: return 'All Infringements';
     }
   };
@@ -149,6 +156,7 @@ export function InfringementsPageClient({ infringements, allProducts, totalReven
       case 'actionable': return 'Nothing needs your attention right now. All detected threats have been addressed.';
       case 'in_progress': return 'No takedowns in progress.';
       case 'resolved': return 'No resolved infringements yet.';
+      case 'dismissed': return 'No dismissed or whitelisted items.';
       default: return 'No infringements found. Run a scan to start detecting threats.';
     }
   };
