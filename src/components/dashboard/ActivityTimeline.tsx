@@ -1,41 +1,58 @@
+'use client';
+
+import { useState } from 'react';
 import { TimelineItem } from '@/components/dashboard/TimelineItem';
 import Link from 'next/link';
 import type { DashboardData } from '@/types';
+
+const COLLAPSED_COUNT = 5;
 
 interface ActivityTimelineProps {
   events: DashboardData['timeline'];
 }
 
 export function ActivityTimeline({ events }: ActivityTimelineProps) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? events : events.slice(0, COLLAPSED_COUNT);
+  const hasMore = events.length > COLLAPSED_COUNT;
+
   return (
-    <div className="p-5 rounded-xl bg-pg-surface border border-pg-border">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-bold text-pg-text">Recent Activity</h3>
+    <div className="p-4 sm:p-5 rounded-xl bg-pg-surface border border-pg-border">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-bold text-pg-text">Recent Activity</h3>
         <Link href="/dashboard/infringements" className="text-xs text-pg-accent hover:underline">
           View all →
         </Link>
       </div>
 
       {events.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-sm text-pg-text-muted">No activity yet</p>
-          <p className="text-xs text-pg-text-muted mt-1">
-            Activity will appear here as scans run and threats are resolved.
-          </p>
-        </div>
+        <p className="text-xs text-pg-text-muted py-4 text-center">
+          No activity yet. Run a scan to get started.
+        </p>
       ) : (
-        <div>
-          {events.map((event, i) => (
-            <TimelineItem
-              key={event.id}
-              type={event.type}
-              title={event.title}
-              subtitle={event.subtitle}
-              timestamp={event.timestamp}
-              isLast={i === events.length - 1}
-            />
-          ))}
-        </div>
+        <>
+          <div>
+            {visible.map((event) => (
+              <TimelineItem
+                key={event.id}
+                type={event.type}
+                title={event.title}
+                subtitle={event.subtitle}
+                timestamp={event.timestamp}
+                href={event.href}
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="w-full mt-2 py-1.5 text-xs text-pg-accent hover:underline"
+            >
+              {expanded ? 'Show less' : `Show ${events.length - COLLAPSED_COUNT} more`}
+            </button>
+          )}
+        </>
       )}
     </div>
   );

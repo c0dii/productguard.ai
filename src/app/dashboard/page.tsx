@@ -123,12 +123,12 @@ export default async function DashboardPage() {
     // ── Timeline: 3 parallel queries merged in JS ────────────────────
     supabase
       .from('status_transitions')
-      .select('id, to_status, created_at, infringements!inner(source_url, products!inner(name))')
+      .select('id, infringement_id, to_status, created_at, infringements!inner(source_url, products!inner(name))')
       .order('created_at', { ascending: false })
       .limit(10),
     supabase
       .from('takedowns')
-      .select('id, status, sent_at, created_at, infringements!inner(source_url, products!inner(name))')
+      .select('id, infringement_id, status, sent_at, created_at, infringements!inner(source_url, products!inner(name))')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5),
@@ -216,6 +216,7 @@ export default async function DashboardPage() {
   if (recentTransitions) {
     for (const t of recentTransitions) {
       const inf = (t as any).infringements;
+      const infId = (t as any).infringement_id;
       const productName = inf?.products?.name ?? 'Unknown';
       let domain = '';
       try { domain = inf?.source_url ? new URL(inf.source_url).hostname.replace('www.', '') : ''; } catch {}
@@ -227,6 +228,7 @@ export default async function DashboardPage() {
         title: getTransitionTitle(t.to_status),
         subtitle: `${productName}${domain ? ` · ${domain}` : ''}`,
         timestamp: t.created_at,
+        href: infId ? `/dashboard/infringements/${infId}` : '/dashboard/infringements',
         status: t.to_status,
       });
     }
@@ -235,6 +237,7 @@ export default async function DashboardPage() {
   if (recentTakedowns) {
     for (const td of recentTakedowns) {
       const inf = (td as any).infringements;
+      const infId = (td as any).infringement_id;
       const productName = inf?.products?.name ?? 'Unknown';
       timeline.push({
         id: `td-${td.id}`,
@@ -242,6 +245,7 @@ export default async function DashboardPage() {
         title: `Takedown ${td.status}`,
         subtitle: productName,
         timestamp: td.sent_at ?? td.created_at,
+        href: infId ? `/dashboard/infringements/${infId}` : `/dashboard/takedowns/${td.id}`,
       });
     }
   }
@@ -255,6 +259,7 @@ export default async function DashboardPage() {
         title: `Scan ${s.status}`,
         subtitle: productName,
         timestamp: s.completed_at ?? s.created_at,
+        href: `/dashboard/scans/${s.id}`,
       });
     }
   }

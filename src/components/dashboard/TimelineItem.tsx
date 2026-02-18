@@ -1,56 +1,30 @@
+import Link from 'next/link';
+
 interface TimelineItemProps {
   type: 'detection' | 'takedown' | 'removal' | 'scan';
   title: string;
   subtitle: string;
   timestamp: string;
-  isLast?: boolean;
+  href: string;
 }
 
-const TYPE_CONFIG: Record<TimelineItemProps['type'], { icon: string; dotClass: string; textClass: string }> = {
-  detection: {
-    icon: '!',
-    dotClass: 'bg-yellow-500/20 border-yellow-500/50',
-    textClass: 'text-yellow-400',
-  },
-  takedown: {
-    icon: '\u2709',
-    dotClass: 'bg-blue-500/20 border-blue-500/50',
-    textClass: 'text-blue-400',
-  },
-  removal: {
-    icon: '\u2713',
-    dotClass: 'bg-green-500/20 border-green-500/50',
-    textClass: 'text-green-400',
-  },
-  scan: {
-    icon: '\u21BB',
-    dotClass: 'bg-pg-accent/20 border-pg-accent/50',
-    textClass: 'text-pg-accent',
-  },
+const TYPE_CONFIG: Record<TimelineItemProps['type'], { dot: string; textClass: string }> = {
+  detection: { dot: 'bg-yellow-500', textClass: 'text-yellow-400' },
+  takedown: { dot: 'bg-blue-500', textClass: 'text-blue-400' },
+  removal: { dot: 'bg-green-500', textClass: 'text-green-400' },
+  scan: { dot: 'bg-pg-accent', textClass: 'text-pg-accent' },
 };
 
-export function TimelineItem({ type, title, subtitle, timestamp, isLast }: TimelineItemProps) {
+export function TimelineItem({ type, title, subtitle, timestamp, href }: TimelineItemProps) {
   const config = TYPE_CONFIG[type];
 
   return (
-    <div className="relative flex gap-3">
-      {/* Connector line */}
-      {!isLast && (
-        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-pg-border" />
-      )}
-
-      {/* Dot */}
-      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 z-10 border ${config.dotClass}`}>
-        <span className={config.textClass}>{config.icon}</span>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 pb-4">
-        <p className={`text-sm font-medium ${config.textClass}`}>{title}</p>
-        <p className="text-xs text-pg-text-muted truncate mt-0.5">{subtitle}</p>
-        <p className="text-[10px] text-pg-text-muted mt-0.5 opacity-60">{formatTimeAgo(timestamp)}</p>
-      </div>
-    </div>
+    <Link href={href} className="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-md hover:bg-pg-bg transition-colors group">
+      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
+      <span className={`text-xs font-medium shrink-0 ${config.textClass} group-hover:underline`}>{title}</span>
+      <span className="text-xs text-pg-text-muted truncate">{subtitle}</span>
+      <span className="text-[10px] text-pg-text-muted opacity-60 shrink-0 ml-auto">{formatTimeAgo(timestamp)}</span>
+    </Link>
   );
 }
 

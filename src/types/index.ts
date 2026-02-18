@@ -719,6 +719,7 @@ export interface DashboardData {
     title: string;
     subtitle: string;
     timestamp: string;
+    href: string;
     status?: string;
   }>;
 
