@@ -24,6 +24,7 @@ export default async function DashboardPage() {
     { count: pendingCount },
     { count: activeCount },
     { data: removedInfringements },
+    { data: activeInfringementRevenue },
     { data: actionItems },
     { data: platformData },
     { data: recentScans },
@@ -69,6 +70,12 @@ export default async function DashboardPage() {
       .select('est_revenue_loss')
       .eq('user_id', user.id)
       .eq('status', 'removed'),
+    // Revenue at risk — direct sum from active threats only (NOT from view which has cartesian join bug)
+    supabase
+      .from('infringements')
+      .select('est_revenue_loss')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'takedown_sent', 'disputed', 'pending_verification']),
     // Top 5 pending by severity for action center
     supabase
       .from('infringements')
@@ -144,6 +151,10 @@ export default async function DashboardPage() {
 
   const removedCount = removedInfringements?.length ?? 0;
   const revenueProtected = removedInfringements?.reduce(
+    (sum, inf) => sum + (inf.est_revenue_loss || 0),
+    0
+  ) ?? 0;
+  const revenueAtRisk = activeInfringementRevenue?.reduce(
     (sum, inf) => sum + (inf.est_revenue_loss || 0),
     0
   ) ?? 0;
@@ -264,7 +275,7 @@ export default async function DashboardPage() {
 
   const dashboardData: DashboardData = {
     protectionScore,
-    revenueAtRisk: stats?.total_est_loss ?? 0,
+    revenueAtRisk,
     revenueProtected,
 
     stats: {

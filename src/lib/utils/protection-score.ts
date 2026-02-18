@@ -1,11 +1,11 @@
 /**
  * Protection Score (0-100)
  *
- * Formula:
+ * Uses logarithmic scaling so the score degrades gradually:
  *   base = 100
- *   - 5 per active/takedown_sent/disputed infringement
- *   - 2 per pending_verification infringement
- *   + 3 per removed infringement (capped at +20)
+ *   - min(20 * log2(1 + activeCount), 80)   — 1→20, 3→40, 7→60, 15→80
+ *   - min(8 * log2(1 + pendingCount), 20)    — 1→8, 3→16, 7→20
+ *   + min(removedCount * 3, 20)
  *   + 10 if at least one scan was run in the last 7 days
  *
  * Clamped to [0, 100].
@@ -18,13 +18,14 @@ export function computeProtectionScore(params: {
 }): number {
   const { activeCount, pendingCount, removedCount, hasRecentScan } = params;
 
-  let score = 100;
-  score -= activeCount * 5;
-  score -= pendingCount * 2;
-  score += Math.min(removedCount * 3, 20);
+  const activePenalty = Math.min(20 * Math.log2(1 + activeCount), 80);
+  const pendingPenalty = Math.min(8 * Math.log2(1 + pendingCount), 20);
+  const removedBonus = Math.min(removedCount * 3, 20);
+
+  let score = 100 - activePenalty - pendingPenalty + removedBonus;
   if (hasRecentScan) score += 10;
 
-  return Math.max(0, Math.min(100, score));
+  return Math.round(Math.max(0, Math.min(100, score)));
 }
 
 export function getScoreLabel(score: number): string {
