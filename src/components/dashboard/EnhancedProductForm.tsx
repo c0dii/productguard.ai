@@ -441,6 +441,18 @@ export function EnhancedProductForm({
             )}
           </div>
 
+          {/* Piracy Search Intelligence */}
+          {((aiExtractedData.piracy_search_terms?.length ?? 0) > 0 ||
+            (aiExtractedData.auto_alternative_names?.length ?? 0) > 0 ||
+            (aiExtractedData.auto_unique_identifiers?.length ?? 0) > 0) && (
+            <PiracyIntelligenceDisplay
+              aiData={aiExtractedData}
+              onUpdate={setAiExtractedData}
+              formData={formData}
+              setFormData={setFormData}
+            />
+          )}
+
           <p className="text-sm text-gray-700 font-medium mt-4 border-t border-gray-200 pt-4">
             {aiDataPendingApproval ?
               'This data will be saved and used for infringement detection once you save the product' :
@@ -805,5 +817,192 @@ export function EnhancedProductForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// ── Piracy Intelligence Display (for AI Analysis section) ───────────
+
+function PiracyIntelligenceDisplay({
+  aiData,
+  onUpdate,
+  formData,
+  setFormData,
+}: {
+  aiData: AIExtractedData;
+  onUpdate: (data: AIExtractedData) => void;
+  formData: { alternative_names: string[]; unique_identifiers: string[] };
+  setFormData: (updater: (prev: any) => any) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const piracyTerms = aiData.piracy_search_terms || [];
+  const altNames = aiData.auto_alternative_names || [];
+  const uniqueIds = aiData.auto_unique_identifiers || [];
+  const platformTerms = aiData.platform_search_terms || {};
+  const platformCount = Object.values(platformTerms).flat().length;
+  const totalCount = piracyTerms.length + altNames.length + uniqueIds.length + platformCount;
+
+  if (totalCount === 0) return null;
+
+  const removeItem = (field: 'piracy_search_terms' | 'auto_alternative_names' | 'auto_unique_identifiers', idx: number) => {
+    const current = aiData[field] || [];
+    onUpdate({
+      ...aiData,
+      [field]: current.filter((_: string, i: number) => i !== idx),
+    });
+  };
+
+  const hasUnusedAltNames = altNames.length > 0 && formData.alternative_names.length === 0;
+  const hasUnusedUniqueIds = uniqueIds.length > 0 && formData.unique_identifiers.length === 0;
+
+  return (
+    <div className="mt-4 border border-purple-300 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-gray-900">Piracy Search Intelligence</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-300">
+            {totalCount} terms
+          </span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="p-4 space-y-4 border-t border-purple-200 bg-white">
+          <p className="text-xs text-gray-600">
+            AI-generated terms that pirates would use to find your product. These power the scan engine.
+          </p>
+
+          {piracyTerms.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold text-gray-900">Piracy Search Terms</h4>
+              <div className="flex flex-wrap gap-2">
+                {piracyTerms.map((term, idx) => (
+                  <span
+                    key={idx}
+                    className="group relative px-3 py-1.5 pr-8 rounded bg-purple-50 text-gray-900 text-sm border border-purple-200 hover:bg-purple-100 transition-colors"
+                  >
+                    {term}
+                    <button
+                      type="button"
+                      onClick={() => removeItem('piracy_search_terms', idx)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-800 font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {altNames.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900">Auto Alternative Names</h4>
+                {hasUnusedAltNames && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev: any) => ({
+                      ...prev,
+                      alternative_names: [...new Set([...prev.alternative_names, ...altNames])],
+                    }))}
+                    className="text-xs px-2 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 transition-colors"
+                  >
+                    Use AI suggestions
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {altNames.map((name, idx) => (
+                  <span
+                    key={idx}
+                    className="group relative px-3 py-1.5 pr-8 rounded bg-teal-50 text-gray-900 text-sm border border-teal-200 hover:bg-teal-100 transition-colors"
+                  >
+                    {name}
+                    <button
+                      type="button"
+                      onClick={() => removeItem('auto_alternative_names', idx)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-800 font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {uniqueIds.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900">Auto File Identifiers</h4>
+                {hasUnusedUniqueIds && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev: any) => ({
+                      ...prev,
+                      unique_identifiers: [...new Set([...prev.unique_identifiers, ...uniqueIds])],
+                    }))}
+                    className="text-xs px-2 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 transition-colors"
+                  >
+                    Use AI suggestions
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {uniqueIds.map((id, idx) => (
+                  <span
+                    key={idx}
+                    className="group relative px-3 py-1.5 pr-8 rounded bg-amber-50 text-gray-900 text-sm border border-amber-200 hover:bg-amber-100 transition-colors"
+                  >
+                    {id}
+                    <button
+                      type="button"
+                      onClick={() => removeItem('auto_unique_identifiers', idx)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-800 font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {platformCount > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold text-gray-900">Platform-Specific Terms</h4>
+              <div className="space-y-2">
+                {Object.entries(platformTerms).map(([platform, terms]) => {
+                  if (!terms || terms.length === 0) return null;
+                  return (
+                    <div key={platform} className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-gray-500 min-w-[80px] pt-1.5 capitalize">{platform}:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {terms.map((term, idx) => (
+                          <span key={idx} className="px-2 py-1 rounded bg-gray-100 border border-gray-200 text-xs text-gray-900">
+                            {term}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

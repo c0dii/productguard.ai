@@ -103,7 +103,38 @@ export async function getFalsePositiveDomains(
 }
 
 /**
- * Generate optimized search query based on learned patterns
+ * Generate optimized search query based on learned patterns.
+ * Uses pre-fetched IntelligenceData to avoid additional DB calls during scans.
+ */
+export function optimizeSearchQueryFromIntelligence(
+  baseQuery: string,
+  intelligence: IntelligenceData,
+): string {
+  if (!intelligence.hasLearningData) return baseQuery;
+
+  let optimizedQuery = baseQuery;
+
+  // Add verified keywords to query (already high-confidence filtered)
+  if (intelligence.verifiedKeywords.length > 0) {
+    const topKeywords = intelligence.verifiedKeywords.slice(0, 2);
+    optimizedQuery = `${baseQuery} ${topKeywords.join(' ')}`;
+  }
+
+  // Exclude known false positive domains
+  if (intelligence.falsePositiveDomains.length > 0) {
+    const excludeDomains = intelligence.falsePositiveDomains
+      .slice(0, 3)
+      .map(d => `-site:${d}`)
+      .join(' ');
+    optimizedQuery = `${optimizedQuery} ${excludeDomains}`;
+  }
+
+  return optimizedQuery;
+}
+
+/**
+ * Generate optimized search query based on learned patterns.
+ * @deprecated Use optimizeSearchQueryFromIntelligence() with pre-fetched data instead.
  */
 export async function optimizeSearchQuery(
   product: Product,
@@ -396,5 +427,110 @@ export async function fetchIntelligenceForScan(
       verifiedHosting: [], verifiedCountries: [], reliableMatchTypes: [],
       falsePositiveHosting: [], hasLearningData: false,
     };
+  }
+}
+
+/**
+ * Refresh piracy keywords for a product using feedback-enhanced context.
+ *
+ * Re-runs the piracy keyword generator with intelligence data about
+ * which search terms led to verified infringements vs. false positives.
+ * Updates the product's ai_extracted_data in the database.
+ *
+ * Constraints:
+ * - Only for products with 5+ verified/rejected infringements
+ * - Maximum once per 24 hours per product
+ */
+export async function refreshPiracyKeywords(
+  supabase: SupabaseClient,
+  productId: string
+): Promise<boolean> {
+  try {
+    // Fetch product data
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('id, name, type, brand_name, url, ai_extracted_data, full_text_content, last_analyzed_at')
+      .eq('id', productId)
+      .single();
+
+    if (productError || !product) {
+      console.warn(`[Intelligence Engine] Cannot refresh piracy keywords: product ${productId} not found`);
+      return false;
+    }
+
+    // Check 24-hour cooldown
+    if (product.last_analyzed_at) {
+      const hoursSinceAnalysis = (Date.now() - new Date(product.last_analyzed_at).getTime()) / (1000 * 60 * 60);
+      if (hoursSinceAnalysis < 24) {
+        console.log(`[Intelligence Engine] Skipping piracy keyword refresh for ${productId}: ${Math.ceil(24 - hoursSinceAnalysis)}h remaining`);
+        return false;
+      }
+    }
+
+    // Check minimum feedback threshold (5+ verified/rejected)
+    const { count: feedbackCount } = await supabase
+      .from('infringements')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', productId)
+      .or('status.eq.active,status.eq.false_positive')
+      .not('verified_by_user_at', 'is', null);
+
+    if ((feedbackCount ?? 0) < 5) {
+      console.log(`[Intelligence Engine] Skipping piracy keyword refresh for ${productId}: only ${feedbackCount} feedback items (need 5+)`);
+      return false;
+    }
+
+    // Fetch intelligence data for context
+    const intelligence = await fetchIntelligenceForScan(supabase, productId);
+
+    if (!product.ai_extracted_data || !product.full_text_content) {
+      console.log(`[Intelligence Engine] Skipping piracy keyword refresh for ${productId}: missing AI data or page content`);
+      return false;
+    }
+
+    // Dynamically import to avoid circular dependencies
+    const { generatePiracyKeywords } = await import('@/lib/ai/piracy-keyword-generator');
+
+    const piracyData = await generatePiracyKeywords(
+      product.name,
+      product.type,
+      product.brand_name,
+      product.ai_extracted_data,
+      product.full_text_content,
+      product.url || ''
+    );
+
+    // Merge new piracy data into existing ai_extracted_data
+    const updatedAiData = {
+      ...product.ai_extracted_data,
+      piracy_search_terms: piracyData.piracy_search_terms,
+      auto_alternative_names: piracyData.auto_alternative_names,
+      auto_unique_identifiers: piracyData.auto_unique_identifiers,
+      platform_search_terms: piracyData.platform_search_terms,
+      piracy_analysis_metadata: piracyData.metadata,
+    };
+
+    // Update product in database
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({
+        ai_extracted_data: updatedAiData,
+        last_analyzed_at: new Date().toISOString(),
+      })
+      .eq('id', productId);
+
+    if (updateError) {
+      console.error(`[Intelligence Engine] Failed to update piracy keywords for ${productId}:`, updateError);
+      return false;
+    }
+
+    console.log(
+      `[Intelligence Engine] Refreshed piracy keywords for ${product.name}: ` +
+      `${piracyData.piracy_search_terms.length} terms, ${piracyData.auto_alternative_names.length} alt names`
+    );
+    return true;
+  } catch (error) {
+    console.error(`[Intelligence Engine] Error refreshing piracy keywords for ${productId}:`, error);
+    return false;
   }
 }

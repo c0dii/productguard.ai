@@ -166,3 +166,52 @@ export function isEvidenceWorthy(keyword: string, productName: string, brandName
   // Multi-word phrases with at least one specific word are evidence-worthy
   return keywordSpecificityScore(keyword) >= 0.5;
 }
+
+/**
+ * Validate that a piracy search term is anchored to a specific product.
+ *
+ * Unlike filterGenericKeywords(), piracy terms CAN contain generic piracy words
+ * ("crack", "free download", "nulled") — those are intentional.
+ * But they MUST also contain at least one product-specific anchor word
+ * to avoid purely generic piracy terms.
+ */
+export function validatePiracySearchTerm(
+  term: string,
+  productName: string,
+  brandName?: string | null,
+  brandIdentifiers?: string[]
+): boolean {
+  const lower = term.toLowerCase().trim();
+  if (lower.length === 0) return false;
+
+  const anchors = [
+    productName.toLowerCase(),
+    ...(brandName ? [brandName.toLowerCase()] : []),
+    ...(brandIdentifiers || []).map(b => b.toLowerCase().replace(/[®™©]/g, '').trim()),
+  ];
+
+  return anchors.some(anchor => {
+    if (!anchor || anchor.length === 0) return false;
+    // Check full anchor phrase
+    if (lower.includes(anchor)) return true;
+    // Check individual significant words from anchor (4+ chars)
+    return anchor
+      .split(/\s+/)
+      .filter(w => w.length >= 4)
+      .some(w => lower.includes(w));
+  });
+}
+
+/**
+ * Filter piracy search terms to only those anchored to the product.
+ */
+export function filterPiracySearchTerms(
+  terms: string[],
+  productName: string,
+  brandName?: string | null,
+  brandIdentifiers?: string[]
+): string[] {
+  return terms.filter(t =>
+    validatePiracySearchTerm(t, productName, brandName, brandIdentifiers)
+  );
+}

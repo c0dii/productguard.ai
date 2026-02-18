@@ -5,7 +5,7 @@
  */
 
 import { generateCompletion, AI_MODELS } from './client';
-import type { Product, InfringementResult } from '@/types';
+import type { Product, InfringementResult, ProductType } from '@/types';
 import { getAIPromptExamples, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 
 export interface FilterResult {
@@ -13,6 +13,75 @@ export interface FilterResult {
   confidence: number; // 0.0 to 1.0
   reasoning: string;
   infringement_type?: 'piracy' | 'unauthorized_sale' | 'counterfeit' | 'unknown';
+}
+
+/**
+ * Get type-specific AI filtering instructions.
+ * These help the AI understand what constitutes a real infringement
+ * vs. a false positive for each product type.
+ */
+function getTypeSpecificInstructions(productType: ProductType): string {
+  const instructions: Record<ProductType, string> = {
+    course: `
+TYPE-SPECIFIC RULES FOR ONLINE COURSES:
+- Telegram groups/channels sharing course content are HIGH confidence infringements
+- Sites like courseclub.me, freecourseweb.com, getfreecourses.co, paidcoursesforfree.com are KNOWN piracy sites
+- YouTube videos with mega/drive links offering "full course free" are infringements
+- Legitimate coupon/discount pages (e.g., "udemy coupon", "skillshare free trial") are NOT infringements
+- Course review pages with "is it worth it?" or "honest review" content are NOT infringements
+- Preview/demo lessons published by the creator are NOT infringements
+- Pages with "enroll", "pricing", or "signup" buttons are likely legitimate marketplace pages`,
+
+    indicator: `
+TYPE-SPECIFIC RULES FOR TRADING INDICATORS:
+- Decompiled .ex4/.mq4/.mq5 files shared on forums are HIGH confidence infringements
+- TradingView scripts that clone proprietary indicator logic are infringements
+- Forum posts on forex-station.com offering "cracked" or "nulled" indicators are infringements
+- Telegram channels distributing premium indicator files for free are infringements
+- MQL5 marketplace listings by the ORIGINAL author are NOT infringements
+- Backtest results, performance reviews, and "indicator comparison" posts are NOT infringements
+- Pine Script repositories implementing common technical analysis (RSI, MACD, etc.) are NOT infringements even if names overlap
+- Trading signal channels that USE the indicator (not redistribute it) are NOT infringements`,
+
+    software: `
+TYPE-SPECIFIC RULES FOR SOFTWARE:
+- Sites offering "crack", "keygen", "serial key", "license key", "activator" are HIGH confidence infringements
+- GitHub repositories containing the full proprietary source code are infringements
+- Sites like filecr.com, getintopc.com, crackedpc.org are KNOWN crack/warez sites
+- Open source alternatives or independent clones with different names are NOT infringements
+- Official download pages, documentation, and changelog pages are NOT infringements
+- Software review/comparison sites (G2, Capterra, AlternativeTo) are NOT infringements
+- "Portable" versions on known crack sites are infringements
+- AppSumo deals or legitimate bundle offers are NOT infringements`,
+
+    template: `
+TYPE-SPECIFIC RULES FOR TEMPLATES/THEMES:
+- "Nulled" versions on sites like nulled.to, themelock.com, gpldl.com are infringements
+- GPL redistribution sites are a gray area — flag with MODERATE confidence (0.5-0.7)
+- Template preview/demo pages on the original marketplace (ThemeForest, CreativeMarket) are NOT infringements
+- Design inspiration galleries (Dribbble, Behance) showing the template are NOT infringements
+- Figma Community files that are different designs are NOT infringements
+- Sites selling the template at a different price may be unauthorized resale — flag with MODERATE confidence`,
+
+    ebook: `
+TYPE-SPECIFIC RULES FOR EBOOKS:
+- Library Genesis (libgen.is, libgen.rs), Z-Library (z-lib.org, b-ok.cc) are HIGH confidence infringement sites
+- PDF download sites offering the full book for free are infringements
+- Amazon, Kindle, Kobo, Barnes & Noble product pages are NOT infringements (legitimate marketplaces)
+- Book review sites, Goodreads pages, and book summaries/synopses are NOT infringements
+- "Read online free" pages showing the full text are infringements
+- Sample chapters or previews published by the author/publisher are NOT infringements
+- Archive.org with controlled digital lending may or may not be infringement — flag with MODERATE confidence (0.5-0.6)`,
+
+    other: `
+TYPE-SPECIFIC RULES FOR OTHER DIGITAL PRODUCTS:
+- Apply general piracy detection rules
+- Free download links on file-sharing sites for paid content are infringements
+- Membership/subscription content leaked on Telegram or forums is an infringement
+- Official sales pages and the creator's own marketing content are NOT infringements`,
+  };
+
+  return instructions[productType] || instructions.other;
 }
 
 /**
@@ -53,6 +122,9 @@ FALSE POSITIVES (filter out — confidence below 0.3):
 - Forums discussing the product legitimately (reviews, support questions)
 - App stores and official marketplaces (Apple App Store, Google Play, MQL5 marketplace)
 - Comparison sites or "alternatives to" pages`;
+
+  // Add type-specific filtering instructions
+  systemPrompt += getTypeSpecificInstructions(product.type);
 
   // Add learned pattern intelligence (from user feedback history)
   if (intelligence?.hasLearningData) {
@@ -264,6 +336,18 @@ function buildProductContext(product: Product): string {
 
   if (product.keywords && product.keywords.length > 0) {
     context += `\n- Keywords: ${product.keywords.slice(0, 5).join(', ')}`;
+  }
+
+  if (product.negative_keywords && product.negative_keywords.length > 0) {
+    context += `\n- Negative Keywords (should NOT trigger infringement): ${product.negative_keywords.slice(0, 5).join(', ')}`;
+  }
+
+  if (product.unique_identifiers && product.unique_identifiers.length > 0) {
+    context += `\n- Unique Identifiers (file names, version codes): ${product.unique_identifiers.slice(0, 3).join(', ')}`;
+  }
+
+  if (product.authorized_sellers && product.authorized_sellers.length > 0) {
+    context += `\n- Authorized Sellers: ${product.authorized_sellers.join(', ')} (sales from these are NOT infringements)`;
   }
 
   return context;

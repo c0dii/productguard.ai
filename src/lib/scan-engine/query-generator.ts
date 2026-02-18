@@ -14,7 +14,7 @@
  * to stay within the 50-call SerpAPI budget.
  */
 
-import type { Product } from '@/types';
+import type { Product, ProductType } from '@/types';
 import {
   getProfile,
   DEAD_SITES,
@@ -24,6 +24,8 @@ import {
   CODE_REPOS,
 } from './profiles';
 import type { IntelligenceData } from '@/lib/intelligence/intelligence-engine';
+import { getDiscoveryProfile } from '@/lib/discovery-engine/discovery-profiles';
+import type { DiscoveryCategory } from '@/lib/discovery-engine/types';
 
 // ============================================================================
 // TYPES
@@ -114,9 +116,20 @@ function buildExclusions(
   // Profile legitimate sites (top 5 to keep query length manageable)
   profile.legitimateSites.slice(0, 5).forEach((d) => domains.add(d));
 
-  return Array.from(domains)
+  let exclusionStr = Array.from(domains)
     .map((d) => `-site:${d}`)
     .join(' ');
+
+  // Append negative keyword exclusions (max 3 to keep query length manageable)
+  if (product.negative_keywords?.length) {
+    const negTerms = product.negative_keywords
+      .slice(0, 3)
+      .map((nk) => `-"${nk}"`)
+      .join(' ');
+    exclusionStr = `${exclusionStr} ${negTerms}`.trim();
+  }
+
+  return exclusionStr;
 }
 
 /**
@@ -124,6 +137,21 @@ function buildExclusions(
  */
 function filterAliveSites(sites: string[]): string[] {
   return sites.filter((s) => !DEAD_SITES.has(s));
+}
+
+/**
+ * Map ProductType to DiscoveryCategory for bridging discovery profile queries.
+ * Returns null for types without a matching discovery profile.
+ */
+function mapProductTypeToDiscoveryCategory(type: ProductType): DiscoveryCategory | null {
+  const mapping: Partial<Record<ProductType, DiscoveryCategory>> = {
+    course: 'course',
+    indicator: 'trading_indicator',
+    software: 'software',
+    template: 'design_asset',
+    ebook: 'ebook',
+  };
+  return mapping[type] ?? null;
 }
 
 // ============================================================================
@@ -141,16 +169,32 @@ function generateTier1(
   const q = (query: string, category: string) =>
     queries.push({ query, tier: 1, num: 30, category });
 
-  // Core piracy searches with product name
-  q(`"${names.canonical}" free download ${exclusions}`.trim(), 'piracy-core');
-  q(`"${names.canonical}" torrent ${exclusions}`.trim(), 'piracy-core');
-  q(`"${names.canonical}" leaked ${exclusions}`.trim(), 'piracy-core');
-  q(`"${names.canonical}" cracked ${exclusions}`.trim(), 'piracy-core');
+  // AI-generated piracy search terms (product-specific, highest priority)
+  const aiPiracyTerms = product.ai_extracted_data?.piracy_search_terms || [];
+  for (const term of aiPiracyTerms.slice(0, 4)) {
+    q(`${term} ${exclusions}`.trim(), 'ai-piracy');
+  }
+
+  // Core piracy searches — type-specific terms from profile (reduced when AI terms exist)
+  const profileTermCount = aiPiracyTerms.length > 0 ? 2 : 4;
+  const typePiracyTerms = profile.piracyTerms.slice(0, profileTermCount);
+  for (const term of typePiracyTerms) {
+    q(`"${names.canonical}" ${term} ${exclusions}`.trim(), 'piracy-core');
+  }
 
   // Short name variations (if meaningfully different from canonical)
   if (names.short && names.short !== names.canonical && names.short.length > 3) {
     q(`"${names.short}" free download ${exclusions}`.trim(), 'piracy-short');
     q(`"${names.short}" nulled ${exclusions}`.trim(), 'piracy-short');
+  }
+
+  // User-specified keywords as additional search terms
+  if (product.keywords?.length) {
+    for (const keyword of product.keywords.slice(0, 3)) {
+      if (!names.canonical.toLowerCase().includes(keyword.toLowerCase())) {
+        q(`"${keyword}" "${names.canonical}" ${exclusions}`.trim(), 'user-keyword');
+      }
+    }
   }
 
   // Brand + product search
@@ -168,6 +212,23 @@ function generateTier1(
     const topPhrases = aiData.unique_phrases.slice(0, 2);
     for (const phrase of topPhrases) {
       q(`"${phrase}" ${exclusions}`.trim(), 'ai-phrase');
+    }
+  }
+
+  // Platform-specific Google terms (AI-optimized for Google search)
+  const googleTerms = aiData?.platform_search_terms?.google || [];
+  for (const term of googleTerms.slice(0, 2)) {
+    q(`${term} ${exclusions}`.trim(), 'platform-google');
+  }
+
+  // Bridge discovery profile genericQueries (type-specific pre-built patterns)
+  const discoveryCategory = mapProductTypeToDiscoveryCategory(product.type);
+  if (discoveryCategory) {
+    const discoveryProfile = getDiscoveryProfile(discoveryCategory);
+    if (discoveryProfile) {
+      for (const gq of discoveryProfile.genericQueries.slice(0, 2)) {
+        q(`"${names.canonical}" ${gq} ${exclusions}`.trim(), 'discovery-supplement');
+      }
     }
   }
 
@@ -200,30 +261,48 @@ function generateTier2(
   const q = (query: string, category: string) =>
     queries.push({ query, tier: 2, num: 10, category });
 
+  const weights = profile.platformWeights;
+
   // Profile-specific dedicated sites
   for (const site of profile.dedicatedSites.filter((s) => !DEAD_SITES.has(s))) {
     q(`site:${site} "${names.canonical}"`, 'dedicated-site');
   }
 
-  // Telegram
-  q(`site:t.me "${names.canonical}"`, 'telegram');
-  q(`site:t.me "${names.canonical}" free`, 'telegram');
-
-  // Torrent sites (alive only, top 5)
-  const aliveTorrents = filterAliveSites(TORRENT_SITES).slice(0, 5);
-  for (const site of aliveTorrents) {
-    q(`site:${site} "${names.canonical}"`, 'torrent');
+  // Telegram — prefer AI platform-specific terms when available
+  const telegramTerms = product.ai_extracted_data?.platform_search_terms?.telegram || [];
+  if (telegramTerms.length > 0) {
+    for (const term of telegramTerms.slice(0, 2)) {
+      q(`site:t.me ${term}`, 'telegram-ai');
+    }
+  } else {
+    q(`site:t.me "${names.canonical}"`, 'telegram');
+    q(`site:t.me "${names.canonical}" free`, 'telegram');
   }
 
-  // Cyberlocker sites (alive only, top 5)
-  const aliveCyberlockers = filterAliveSites(CYBERLOCKER_SITES).slice(0, 5);
-  for (const site of aliveCyberlockers) {
-    q(`site:${site} "${names.canonical}"`, 'cyberlocker');
+  // Torrent sites — count varies by platform weight
+  if ((weights.torrent ?? 0) >= 0.6) {
+    const count = (weights.torrent ?? 0) >= 0.8 ? 5 : 3;
+    const aliveTorrents = filterAliveSites(TORRENT_SITES).slice(0, count);
+    for (const site of aliveTorrents) {
+      q(`site:${site} "${names.canonical}"`, 'torrent');
+    }
   }
 
-  // Warez forums (top 3)
-  for (const site of WAREZ_FORUMS.slice(0, 3)) {
-    q(`site:${site} "${names.canonical}"`, 'warez-forum');
+  // Cyberlocker sites — count varies by platform weight
+  if ((weights.cyberlocker ?? 0) >= 0.6) {
+    const count = (weights.cyberlocker ?? 0) >= 0.8 ? 5 : 3;
+    const aliveCyberlockers = filterAliveSites(CYBERLOCKER_SITES).slice(0, count);
+    for (const site of aliveCyberlockers) {
+      q(`site:${site} "${names.canonical}"`, 'cyberlocker');
+    }
+  }
+
+  // Warez forums — count varies by platform weight
+  if ((weights.forum ?? 0) >= 0.6) {
+    const count = (weights.forum ?? 0) >= 0.7 ? 3 : 2;
+    for (const site of WAREZ_FORUMS.slice(0, count)) {
+      q(`site:${site} "${names.canonical}"`, 'warez-forum');
+    }
   }
 
   // Code repos (for software/indicator types only)
@@ -240,6 +319,12 @@ function generateTier2(
       `"${names.canonical}" filetype:${ext.replace('.', '')}`,
       'file-ext'
     );
+  }
+
+  // AI-detected file identifiers (e.g., "10xbars.ex4", "v2.1")
+  const autoIdentifiers = product.ai_extracted_data?.auto_unique_identifiers || [];
+  for (const id of autoIdentifiers.slice(0, 2)) {
+    q(`"${id}" free download`, 'auto-identifier');
   }
 
   return queries;
@@ -278,10 +363,18 @@ function generateTier3(
     }
   }
 
-  // Alternative names
-  if (product.alternative_names?.length) {
-    for (const altName of product.alternative_names.slice(0, 2)) {
-      q(`"${altName}" free download`, 'alt-name');
+  // Alternative names (merge user-provided + AI auto-detected, deduplicated)
+  const userAltNames = product.alternative_names || [];
+  const autoAltNames = aiData?.auto_alternative_names || [];
+  const allAltNames = [...new Set([...userAltNames, ...autoAltNames])];
+  for (const altName of allAltNames.slice(0, 3)) {
+    q(`"${altName}" free download`, 'alt-name');
+  }
+
+  // Unique identifiers (file names, version codes, serial patterns)
+  if (product.unique_identifiers?.length) {
+    for (const identifier of product.unique_identifiers.slice(0, 2)) {
+      q(`"${identifier}" free download`, 'unique-id');
     }
   }
 

@@ -552,6 +552,11 @@ function Step2Url({
                     {data.keywords.length} keywords
                   </span>
                 )}
+                {(data.ai_extracted_data.piracy_search_terms?.length ?? 0) > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-purple-500/10 text-purple-400">
+                    {data.ai_extracted_data.piracy_search_terms?.length} piracy terms
+                  </span>
+                )}
               </div>
             )}
 
@@ -704,6 +709,9 @@ function Step3Review({
         )}
       </div>
 
+      {/* Piracy Detection Intelligence (collapsible) */}
+      <PiracyIntelligenceSection ai={ai} setData={setData} />
+
       {ai.brand_identifiers?.length === 0 && ai.copyrighted_terms?.length === 0 &&
        ai.unique_phrases?.length === 0 && ai.keywords?.length === 0 && (
         <div className="mt-4 p-4 rounded-lg bg-pg-surface-light border border-pg-border text-center">
@@ -755,6 +763,127 @@ function ChipSection({
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Piracy Intelligence Section (collapsible, for Step 3) ───────────
+
+function PiracyIntelligenceSection({
+  ai,
+  setData,
+}: {
+  ai: AIExtractedData;
+  setData: React.Dispatch<React.SetStateAction<WizardData>>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const piracyTerms = ai.piracy_search_terms || [];
+  const altNames = ai.auto_alternative_names || [];
+  const uniqueIds = ai.auto_unique_identifiers || [];
+  const platformTerms = ai.platform_search_terms || {};
+  const platformCount = Object.values(platformTerms).flat().length;
+
+  const totalCount = piracyTerms.length + altNames.length + uniqueIds.length + platformCount;
+  if (totalCount === 0) return null;
+
+  const removePiracyItem = (field: 'piracy_search_terms' | 'auto_alternative_names' | 'auto_unique_identifiers', idx: number) => {
+    setData((prev) => {
+      if (!prev.ai_extracted_data) return prev;
+      const current = prev.ai_extracted_data[field] || [];
+      return {
+        ...prev,
+        ai_extracted_data: {
+          ...prev.ai_extracted_data,
+          [field]: current.filter((_: string, i: number) => i !== idx),
+        },
+      };
+    });
+  };
+
+  return (
+    <div className="mt-4 border border-pg-border rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-3 bg-pg-surface-light hover:bg-pg-surface transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-pg-text">Piracy Detection Intelligence</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400">
+            {totalCount} terms generated
+          </span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-pg-text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="p-3 space-y-4 border-t border-pg-border">
+          <p className="text-xs text-pg-text-muted">
+            AI-generated search terms that pirates would use to find your product.
+            These power our scan engine. Remove any that look incorrect.
+          </p>
+
+          {piracyTerms.length > 0 && (
+            <ChipSection
+              title="Piracy Search Terms"
+              subtitle="How pirates would search for your product"
+              items={piracyTerms}
+              onRemove={(idx) => removePiracyItem('piracy_search_terms', idx)}
+              color="purple-400"
+            />
+          )}
+
+          {altNames.length > 0 && (
+            <ChipSection
+              title="Alternative Names"
+              subtitle="Abbreviations, misspellings, and variations"
+              items={altNames}
+              onRemove={(idx) => removePiracyItem('auto_alternative_names', idx)}
+              color="teal-400"
+            />
+          )}
+
+          {uniqueIds.length > 0 && (
+            <ChipSection
+              title="File Identifiers"
+              subtitle="File names, version numbers, and technical identifiers"
+              items={uniqueIds}
+              onRemove={(idx) => removePiracyItem('auto_unique_identifiers', idx)}
+              color="amber-400"
+            />
+          )}
+
+          {platformCount > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-pg-text">Platform-Specific Terms</h4>
+              <p className="text-xs text-pg-text-muted mb-2">Search terms optimized for each platform</p>
+              <div className="space-y-2">
+                {Object.entries(platformTerms).map(([platform, terms]) => {
+                  if (!terms || terms.length === 0) return null;
+                  return (
+                    <div key={platform} className="flex items-start gap-2">
+                      <span className="text-xs font-medium text-pg-text-muted min-w-[80px] pt-1.5 capitalize">{platform}:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {terms.map((term, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-1 rounded bg-pg-surface-light border border-pg-border text-xs text-pg-text">
+                            {term}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

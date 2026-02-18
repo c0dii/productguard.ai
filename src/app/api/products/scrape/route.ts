@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { analyzeProductPage } from '@/lib/ai/product-analyzer';
+import { generatePiracyKeywords } from '@/lib/ai/piracy-keyword-generator';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import type { ProductType } from '@/types';
 
 export async function POST(request: Request) {
   try {
@@ -109,6 +111,26 @@ export async function POST(request: Request) {
         // Prefer AI-generated description (DMCA-ready) over generic meta description
         if (aiData.product_description) {
           extractedData.description = aiData.product_description;
+        }
+
+        // Generate piracy-specific search intelligence (second AI call)
+        try {
+          const piracyData = await generatePiracyKeywords(
+            analysis.productName || extractedData.name,
+            (extractedData.type || 'other') as ProductType,
+            null, // brand_name not available at scrape time
+            aiData,
+            fullTextContent || '',
+            productUrl.toString()
+          );
+
+          aiData.piracy_search_terms = piracyData.piracy_search_terms;
+          aiData.auto_alternative_names = piracyData.auto_alternative_names;
+          aiData.auto_unique_identifiers = piracyData.auto_unique_identifiers;
+          aiData.platform_search_terms = piracyData.platform_search_terms;
+          aiData.piracy_analysis_metadata = piracyData.metadata;
+        } catch (piracyError) {
+          console.error('[Scrape] Piracy keyword generation failed (non-blocking):', piracyError);
         }
       } catch (aiError) {
         console.error('[Scrape] AI analysis failed, continuing with basic scraping:', aiError);

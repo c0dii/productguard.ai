@@ -217,6 +217,22 @@ export function scoreResult(
   if (input.tier === 2) score += 10; // Targeted platform match
   if (input.tier === 3) score += 15; // Deep-dive signal
 
+  // ── Platform detection (early, needed for weight scoring) ──
+  const platform = detectPlatform(input.url);
+
+  // ── Platform weight scoring (type-aware) ──
+  const platformWeight = profile.platformWeights[platform] ?? 0.5;
+  if (platformWeight >= 0.8) {
+    score += 8;
+    reasons.push(`high-priority platform (${platform})`);
+  } else if (platformWeight >= 0.6) {
+    score += 4;
+    reasons.push(`relevant platform (${platform})`);
+  } else if (platformWeight < 0.4) {
+    score -= 5;
+    reasons.push(`low-priority platform (${platform})`);
+  }
+
   // ── Profile boost terms ──
   let boostCount = 0;
   for (const term of profile.boostTerms) {
@@ -293,7 +309,6 @@ export function scoreResult(
   const confidence = Math.max(0, Math.min(100, score));
 
   // ── Derived fields ──
-  const platform = detectPlatform(input.url);
   const type = detectInfringementType(input.url, input.query);
   const risk_level = confidenceToRiskLevel(confidence);
   const audience_size = estimateAudienceSize(input.url, input.position, platform);

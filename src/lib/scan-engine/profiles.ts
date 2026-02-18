@@ -551,3 +551,39 @@ const PROFILES: Record<ProductType, ScanProfile> = {
 export function getProfile(type: ProductType): ScanProfile {
   return PROFILES[type] || PROFILES.other;
 }
+
+/**
+ * Minimum platformWeight to activate a platform scanner.
+ * Platforms below this threshold are skipped to save API budget.
+ */
+export const PLATFORM_WEIGHT_THRESHOLD = 0.6;
+
+/**
+ * Platforms that have dedicated scanner implementations.
+ */
+const SCANNABLE_PLATFORMS = new Set(['discord', 'forum', 'torrent', 'cyberlocker']);
+
+/**
+ * Get platforms that should be actively scanned for this product type.
+ * Returns only platforms whose weight meets or exceeds the threshold
+ * and have dedicated scanner implementations.
+ */
+export function getRelevantPlatforms(
+  type: ProductType,
+  threshold: number = PLATFORM_WEIGHT_THRESHOLD
+): Array<{ platform: string; weight: number }> {
+  const profile = getProfile(type);
+  return Object.entries(profile.platformWeights)
+    .filter(([platform, weight]) => weight >= threshold && SCANNABLE_PLATFORMS.has(platform))
+    .sort((a, b) => b[1] - a[1])
+    .map(([platform, weight]) => ({ platform, weight }));
+}
+
+/**
+ * Get the top N piracy terms for a product type.
+ * Terms are ordered by relevance in each profile definition.
+ */
+export function getTopPiracyTerms(type: ProductType, count: number = 4): string[] {
+  const profile = getProfile(type);
+  return profile.piracyTerms.slice(0, count);
+}

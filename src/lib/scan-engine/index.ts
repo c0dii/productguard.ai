@@ -1,16 +1,17 @@
 import { createAdminClient } from '@/lib/supabase/server';
-import type { Product, InfringementResult, ScanStage } from '@/types';
+import type { Product, InfringementResult, ScanStage, MatchType } from '@/types';
 import { SerpClient } from './serp-client';
 import { ScanLogger } from './scan-logger';
 import { generateQueries, type GeneratedQuery } from './query-generator';
 import { scoreResult } from './scoring';
 import { scanTelegram } from './platforms/telegram';
+import { runPlatformScanners } from './platform-router';
 import { evidenceCollector } from '@/lib/enforcement/evidence-collector';
 import { priorityScorer } from '@/lib/enforcement/priority-scorer';
 import { infrastructureProfiler } from '@/lib/enforcement/infrastructure-profiler';
 import { filterSearchResults, estimateFilteringCost } from '@/lib/ai/infringement-filter';
 import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } from '@/lib/ghl/events';
-import { fetchIntelligenceForScan, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
+import { fetchIntelligenceForScan, optimizeSearchQueryFromIntelligence, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 import { notifyHighSeverityInfringement, notifyScanComplete, notifyScanError } from '@/lib/notifications/email';
 import crypto from 'crypto';
 
@@ -80,6 +81,44 @@ function normalizeUrl(url: string): string {
 function generateUrlHash(url: string): string {
   const normalized = normalizeUrl(url);
   return crypto.createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Determine the match type based on how the result was detected.
+ * Replaces the previously hardcoded 'keyword' match_type.
+ */
+function determineMatchType(
+  result: InfringementResult,
+  product: Product,
+): MatchType {
+  const combined = `${result.title || ''} ${result.snippet || ''}`.toLowerCase();
+  const productNameLower = product.name.toLowerCase();
+
+  // Check for unique identifier matches (highest precision)
+  const identifiers = product.unique_identifiers || [];
+  if (identifiers.some((id) => combined.includes(id.toLowerCase()))) {
+    return 'exact_hash';
+  }
+
+  // Check for AI unique phrase matches
+  const uniquePhrases = product.ai_extracted_data?.unique_phrases || [];
+  if (uniquePhrases.some((p) => combined.includes(p.toLowerCase()))) {
+    return 'phrase';
+  }
+
+  // Check for full product name match in title
+  if (result.title?.toLowerCase().includes(productNameLower)) {
+    return 'keyword';
+  }
+
+  // Check for partial name match
+  const nameWords = productNameLower.split(/\s+/).filter((w) => w.length > 3);
+  const matchedWords = nameWords.filter((w) => combined.includes(w));
+  if (matchedWords.length > 0 && matchedWords.length < nameWords.length) {
+    return 'partial';
+  }
+
+  return 'keyword';
 }
 
 /**
@@ -339,7 +378,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
             // Enhanced fields
             severity_score: scoring.severityScore,
             priority: scoring.priority,
-            match_type: 'keyword' as const, // TODO: Get from detection
+            match_type: determineMatchType(result, product),
             match_confidence: matchConfidence,
             match_evidence: evidence.matched_excerpts,
             audience_size: result.audience_size,
@@ -588,7 +627,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       api_calls_saved: apiCallsSaved,
       ai_filtering_saved: aiFilteringSaved,
       duration_seconds: durationSeconds,
-      platforms_searched: ['tiered-search', 'telegram-bot-api'],
+      platforms_searched: ['tiered-search', 'telegram-bot-api', 'type-routed-scanners'],
       search_queries_used: product.keywords || [],
     });
 
@@ -837,6 +876,19 @@ async function runTieredSearch(
   // Generate Tier 1 + Tier 2 queries (Tier 3 needs Tier 1/2 URLs)
   const { tier1, tier2 } = generateQueries(product, intelligence);
 
+  // Optimize Tier 1 queries using intelligence patterns (if learning data exists)
+  if (intelligence.hasLearningData) {
+    for (let i = 0; i < tier1.length; i++) {
+      const query = tier1[i];
+      if (!query) continue;
+      const optimized = optimizeSearchQueryFromIntelligence(query.query, intelligence);
+      if (optimized !== query.query) {
+        logger?.info('keyword_search', `Intelligence optimized: "${query.query}" → "${optimized}"`);
+        tier1[i] = { ...query, query: optimized };
+      }
+    }
+  }
+
   // ── TIER 1: Broad Discovery ──────────────────────────────────────
   logger?.info('keyword_search', `Tier 1: ${tier1.length} broad queries (budget: ${client.remaining})`, {
     tier: 1,
@@ -1062,7 +1114,35 @@ async function runTieredSearch(
     logger?.selfHeal('platform_scan', 'TELEGRAM_FAIL', 'Continued scan without Telegram results');
   }
 
-  // Progress: Telegram complete
+  // ── PLATFORM SCANNERS (type-routed) ─────────────────────────
+  if (!isTimedOut()) {
+    try {
+      const platformBudget = Math.min(client.remaining, 12);
+      const { results: platformResults, platformsRun } =
+        await runPlatformScanners(product, platformBudget, intelligence, logger);
+
+      if (platformResults.length > 0) {
+        logger?.info('platform_scan',
+          `Platform scanners: +${platformResults.length} results from ${platformsRun.join(', ')}`, {
+          platform_results: platformResults.length,
+          platforms_run: platformsRun,
+        });
+        allResults.push(...platformResults);
+      }
+    } catch (error) {
+      logger?.error('platform_scan',
+        `Platform scanners error: ${error instanceof Error ? error.message : String(error)}`,
+        'UNKNOWN');
+      logger?.selfHeal('platform_scan', 'UNKNOWN', 'Continued scan without platform scanner results');
+    }
+  } else {
+    logger?.selfHeal('platform_scan', 'TIMEOUT', 'Skipped platform scanners due to time limit', {
+      elapsed_ms: Date.now() - scanStartTime,
+      max_duration_ms: maxDurationMs,
+    });
+  }
+
+  // Progress: All platform scans complete
   setStageStatus(stages, 'platform_scan', 'completed', allResults.length);
 
   logger?.info('platform_scan', `Total raw results: ${allResults.length}`, {
