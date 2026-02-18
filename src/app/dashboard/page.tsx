@@ -1,11 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
-import { DashboardNeedsReview } from '@/components/dashboard/DashboardNeedsReview';
-import { OnboardingCard } from '@/components/dashboard/OnboardingCard';
-import { OnboardingBanner } from '@/components/dashboard/OnboardingBanner';
+import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
+import { computeProtectionScore } from '@/lib/utils/protection-score';
+import type { DashboardData, PlanTier, PlatformType, RiskLevel } from '@/types';
+
+export const revalidate = 30;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -16,393 +14,320 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
-  // Fetch all data in parallel
+  // ── Parallel data fetching ───────────────────────────────────────────
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+
   const [
     { data: stats },
-    { count: activeInfringementsCount },
+    { data: profile },
     { count: pendingCount },
-    { data: pendingInfringements },
-    { data: products },
-    { data: recentActivity },
-    { data: userProfile },
+    { count: activeCount },
+    { data: removedInfringements },
+    { data: actionItems },
+    { data: platformData },
+    { data: recentScans },
+    { data: allProducts },
+    // 30-day trend data
+    { count: pendingCountPrev },
+    { count: activeCountPrev },
+    { count: takedownsCountPrev },
+    // Timeline queries (3 parallel instead of UNION ALL)
+    { data: recentTransitions },
+    { data: recentTakedowns },
+    { data: recentScanActivity },
+    // 30-day detection trend
+    { data: detectionDays },
   ] = await Promise.all([
-    // Dashboard stats
+    // Dashboard stats view
     supabase
       .from('user_dashboard_stats')
       .select('*')
       .eq('user_id', user.id)
       .single(),
-    // Active verified infringements count
+    // Profile
     supabase
-      .from('infringements')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .in('status', ['active', 'takedown_sent', 'disputed']),
-    // Pending review count
+      .from('profiles')
+      .select('full_name, phone, address, dmca_reply_email, plan_tier')
+      .eq('id', user.id)
+      .single(),
+    // Pending count
     supabase
       .from('infringements')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('status', 'pending_verification'),
-    // Top 5 pending infringements for quick review
+    // Active count (active + takedown_sent + disputed)
     supabase
       .from('infringements')
-      .select('*, products(name)')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['active', 'takedown_sent', 'disputed']),
+    // Removed infringements (for revenue protected + score)
+    supabase
+      .from('infringements')
+      .select('est_revenue_loss')
+      .eq('user_id', user.id)
+      .eq('status', 'removed'),
+    // Top 5 pending by severity for action center
+    supabase
+      .from('infringements')
+      .select('id, source_url, platform, risk_level, severity_score, audience_size, est_revenue_loss, detected_at, products(name)')
       .eq('user_id', user.id)
       .eq('status', 'pending_verification')
       .order('severity_score', { ascending: false })
       .limit(5),
-    // All products with infringement counts
+    // Platform breakdown (all non-removed, non-false-positive)
+    supabase
+      .from('infringements')
+      .select('platform')
+      .eq('user_id', user.id)
+      .not('status', 'in', '("removed","false_positive","archived")'),
+    // Recent scans
+    supabase
+      .from('scans')
+      .select('completed_at')
+      .eq('user_id', user.id)
+      .order('completed_at', { ascending: false })
+      .limit(1),
+    // Products
     supabase
       .from('products')
-      .select('id, name, type, product_image_url, created_at')
+      .select('id')
+      .eq('user_id', user.id),
+    // ── 30-day trend: counts from 30-60 days ago for comparison ───────
+    supabase
+      .from('infringements')
+      .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false }),
-    // Recent activity from status transitions
+      .eq('status', 'pending_verification')
+      .lt('created_at', thirtyDaysAgo),
+    supabase
+      .from('infringements')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .in('status', ['active', 'takedown_sent', 'disputed'])
+      .lt('created_at', thirtyDaysAgo),
+    supabase
+      .from('takedowns')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .lt('created_at', thirtyDaysAgo),
+    // ── Timeline: 3 parallel queries merged in JS ────────────────────
     supabase
       .from('status_transitions')
-      .select('*, infringements!inner(source_url, products!inner(name))')
+      .select('id, to_status, created_at, infringements!inner(source_url, products!inner(name))')
       .order('created_at', { ascending: false })
-      .limit(8),
-    // Profile for onboarding completeness check
+      .limit(10),
     supabase
-      .from('profiles')
-      .select('full_name, phone, address, dmca_reply_email')
-      .eq('id', user.id)
-      .single(),
+      .from('takedowns')
+      .select('id, status, sent_at, created_at, infringements!inner(source_url, products!inner(name))')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('scans')
+      .select('id, status, completed_at, created_at, products!inner(name)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    // 30-day detection sparkline
+    supabase
+      .from('infringements')
+      .select('detected_at')
+      .eq('user_id', user.id)
+      .gte('detected_at', thirtyDaysAgo)
+      .order('detected_at', { ascending: true }),
   ]);
 
-  // Get per-product infringement counts
-  const { data: productInfringementCounts } = await supabase
-    .from('infringements')
-    .select('product_id, status')
-    .eq('user_id', user.id);
+  // ── Compute derived data ─────────────────────────────────────────────
 
-  // Build product stats map
-  const productStats = new Map<string, { pending: number; active: number; total: number; lastScan: string | null }>();
-  if (productInfringementCounts) {
-    for (const inf of productInfringementCounts) {
-      const existing = productStats.get(inf.product_id) || { pending: 0, active: 0, total: 0, lastScan: null };
-      existing.total++;
-      if (inf.status === 'pending_verification') existing.pending++;
-      if (['active', 'takedown_sent', 'disputed'].includes(inf.status)) existing.active++;
-      productStats.set(inf.product_id, existing);
-    }
-  }
+  const removedCount = removedInfringements?.length ?? 0;
+  const revenueProtected = removedInfringements?.reduce(
+    (sum, inf) => sum + (inf.est_revenue_loss || 0),
+    0
+  ) ?? 0;
 
-  // Get last scan dates per product
-  const { data: productScans } = await supabase
-    .from('scans')
-    .select('product_id, last_run_at')
-    .eq('user_id', user.id)
-    .order('last_run_at', { ascending: false });
-
-  if (productScans) {
-    for (const scan of productScans) {
-      const existing = productStats.get(scan.product_id);
-      if (existing && !existing.lastScan) {
-        existing.lastScan = scan.last_run_at;
-      }
-    }
-  }
-
-  const statCards = [
-    {
-      label: 'Total Products',
-      value: stats?.total_products || 0,
-      icon: '📦',
-      color: 'text-pg-accent',
-      href: '/dashboard/products',
-    },
-    {
-      label: 'Needs Review',
-      value: pendingCount || 0,
-      icon: '⚠️',
-      color: 'text-pg-warning',
-      href: '/dashboard/infringements',
-    },
-    {
-      label: 'Active Threats',
-      value: activeInfringementsCount || 0,
-      icon: '🚨',
-      color: 'text-pg-danger',
-      href: '/dashboard/infringements',
-    },
-    {
-      label: 'Takedowns Sent',
-      value: stats?.total_takedowns || 0,
-      icon: '⚡',
-      color: 'text-green-400',
-      href: '/dashboard/takedowns',
-    },
-  ];
-
-  const getActivityIcon = (toStatus: string) => {
-    switch (toStatus) {
-      case 'active': return '✓';
-      case 'false_positive': return '✗';
-      case 'takedown_sent': return '📧';
-      case 'removed': return '🎉';
-      case 'disputed': return '⚖️';
-      case 'pending_verification': return '🔍';
-      default: return '→';
-    }
-  };
-
-  const getActivityLabel = (fromStatus: string | null, toStatus: string) => {
-    switch (toStatus) {
-      case 'active': return 'Verified as threat';
-      case 'false_positive': return 'Dismissed';
-      case 'takedown_sent': return 'Takedown sent';
-      case 'removed': return 'Successfully removed';
-      case 'disputed': return 'Under dispute';
-      case 'pending_verification': return 'New threat detected';
-      default: return `Status changed to ${toStatus}`;
-    }
-  };
-
-  const getActivityColor = (toStatus: string) => {
-    switch (toStatus) {
-      case 'active': return 'text-pg-accent';
-      case 'false_positive': return 'text-gray-400';
-      case 'takedown_sent': return 'text-blue-400';
-      case 'removed': return 'text-green-400';
-      case 'disputed': return 'text-orange-400';
-      case 'pending_verification': return 'text-pg-warning';
-      default: return 'text-pg-text-muted';
-    }
-  };
-
-  const formatTimeAgo = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  return (
-    <div>
-      {/* Header */}
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-pg-text">Dashboard Overview</h1>
-        <p className="text-sm sm:text-base text-pg-text-muted">
-          Monitor your digital products and protect them from piracy
-        </p>
-      </div>
-
-      {/* Onboarding Banner for new users */}
-      <OnboardingBanner
-        productCount={products?.length || 0}
-        hasScanRun={(productScans?.length || 0) > 0}
-      />
-
-      {/* Onboarding Card */}
-      {userProfile && (
-        <OnboardingCard
-          fullName={userProfile.full_name}
-          phone={userProfile.phone}
-          address={userProfile.address}
-          dmcaReplyEmail={userProfile.dmca_reply_email}
-        />
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-        {statCards.map((stat) => (
-          <Link key={stat.label} href={stat.href}>
-            <div className="group relative p-3 sm:p-6 rounded-xl sm:rounded-2xl bg-pg-surface backdrop-blur-sm border border-pg-border hover:bg-pg-surface-light hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/10 cursor-pointer">
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className={`text-xl sm:text-4xl ${stat.color}`}>{stat.icon}</div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-sm text-pg-text-muted uppercase tracking-wide mb-0.5 sm:mb-1 truncate">
-                    {stat.label}
-                  </p>
-                  <p className={`text-xl sm:text-3xl font-bold ${stat.color}`}>{stat.value}</p>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Needs Review Section */}
-      {(pendingCount || 0) > 0 && pendingInfringements && pendingInfringements.length > 0 && (
-        <DashboardNeedsReview
-          infringements={pendingInfringements}
-          totalPending={pendingCount || 0}
-        />
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Your Products - 2 columns */}
-        <div className="lg:col-span-2">
-          <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-pg-surface backdrop-blur-sm border border-pg-border">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg sm:text-xl font-bold text-pg-text">Your Products</h2>
-              <Link
-                href="/dashboard/products"
-                className="text-sm text-pg-accent hover:underline"
-              >
-                Manage →
-              </Link>
-            </div>
-
-            {!products || products.length === 0 ? (
-              <div className="text-center py-10">
-                <p className="text-pg-text-muted mb-3">No products yet</p>
-                <p className="text-sm text-pg-text-muted mb-4">
-                  Add your first product to start monitoring for piracy
-                </p>
-                <Link href="/dashboard/products">
-                  <Button size="sm">Add Product</Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {products.map((product) => {
-                  const pStats = productStats.get(product.id) || { pending: 0, active: 0, total: 0, lastScan: null };
-                  return (
-                    <Link
-                      key={product.id}
-                      href={`/dashboard/products/${product.id}`}
-                      className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl bg-pg-bg border border-pg-border hover:border-pg-accent/50 transition-all group"
-                    >
-                      {/* Product image or placeholder */}
-                      {product.product_image_url ? (
-                        <img
-                          src={product.product_image_url}
-                          alt={product.name}
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-pg-border shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-pg-surface border border-pg-border flex items-center justify-center shrink-0">
-                          <span className="text-base sm:text-lg">📦</span>
-                        </div>
-                      )}
-
-                      {/* Product info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm sm:text-base text-pg-text group-hover:text-pg-accent transition-colors truncate">
-                          {product.name}
-                        </p>
-                        <div className="flex items-center gap-2 sm:gap-3 mt-1">
-                          <span className="text-xs text-pg-text-muted capitalize">{product.type}</span>
-                          {pStats.lastScan && (
-                            <span className="text-xs text-pg-text-muted hidden sm:inline">
-                              Scanned {formatTimeAgo(pStats.lastScan)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Threat badges */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        {pStats.pending > 0 && (
-                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-yellow-500/20 text-yellow-400 whitespace-nowrap">
-                            {pStats.pending}<span className="hidden sm:inline"> pending</span>
-                          </span>
-                        )}
-                        {pStats.active > 0 && (
-                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-red-500/20 text-red-400 whitespace-nowrap">
-                            {pStats.active}<span className="hidden sm:inline"> active</span>
-                          </span>
-                        )}
-                        {pStats.total === 0 && (
-                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-green-500/20 text-green-400">
-                            Clean
-                          </span>
-                        )}
-                        <svg className="w-4 h-4 text-pg-text-muted group-hover:text-pg-accent transition-colors hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Protection Timeline - 1 column */}
-        <div className="lg:col-span-1">
-          <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-pg-surface backdrop-blur-sm border border-pg-border">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg sm:text-xl font-bold text-pg-text">Activity</h2>
-              <Link
-                href="/dashboard/infringements"
-                className="text-sm text-pg-accent hover:underline"
-              >
-                View all →
-              </Link>
-            </div>
-
-            {!recentActivity || recentActivity.length === 0 ? (
-              <div className="text-center py-10">
-                <p className="text-pg-text-muted mb-2">No activity yet</p>
-                <p className="text-xs text-pg-text-muted">
-                  Activity will appear here as you verify infringements and send takedowns
-                </p>
-              </div>
-            ) : (
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-pg-border" />
-
-                <div className="space-y-4">
-                  {recentActivity.map((event: any) => {
-                    const infringement = event.infringements;
-                    const productName = infringement?.products?.name || 'Unknown';
-                    const sourceUrl = infringement?.source_url || '';
-                    let domain = '';
-                    try { domain = sourceUrl ? new URL(sourceUrl).hostname.replace('www.', '') : ''; } catch {}
-
-                    return (
-                      <div key={event.id} className="relative flex gap-3 pl-0">
-                        {/* Timeline dot */}
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 z-10 ${
-                          event.to_status === 'removed'
-                            ? 'bg-green-500/20 border border-green-500/50'
-                            : event.to_status === 'active'
-                            ? 'bg-pg-accent/20 border border-pg-accent/50'
-                            : event.to_status === 'takedown_sent'
-                            ? 'bg-blue-500/20 border border-blue-500/50'
-                            : event.to_status === 'false_positive'
-                            ? 'bg-gray-500/20 border border-gray-500/50'
-                            : 'bg-yellow-500/20 border border-yellow-500/50'
-                        }`}>
-                          {getActivityIcon(event.to_status)}
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 pb-1">
-                          <p className={`text-sm font-medium ${getActivityColor(event.to_status)}`}>
-                            {getActivityLabel(event.from_status, event.to_status)}
-                          </p>
-                          <p className="text-xs text-pg-text-muted truncate mt-0.5">
-                            {productName}{domain ? ` · ${domain}` : ''}
-                          </p>
-                          <p className="text-xs text-pg-text-muted mt-0.5 opacity-60">
-                            {formatTimeAgo(event.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+  const hasRecentScan = !!(
+    recentScans?.[0]?.completed_at &&
+    new Date(recentScans[0].completed_at) > new Date(sevenDaysAgo)
   );
+
+  const protectionScore = computeProtectionScore({
+    activeCount: activeCount ?? 0,
+    pendingCount: pendingCount ?? 0,
+    removedCount,
+    hasRecentScan,
+  });
+
+  // Platform breakdown aggregation
+  const platformMap = new Map<PlatformType, number>();
+  if (platformData) {
+    for (const row of platformData) {
+      const p = row.platform as PlatformType;
+      platformMap.set(p, (platformMap.get(p) ?? 0) + 1);
+    }
+  }
+  const platformBreakdown = Array.from(platformMap.entries()).map(([platform, count]) => ({
+    platform,
+    count,
+  }));
+
+  // 30-day detection trend (group by date)
+  const detectionMap = new Map<string, number>();
+  if (detectionDays) {
+    for (const row of detectionDays) {
+      const date = new Date(row.detected_at).toISOString().slice(0, 10);
+      detectionMap.set(date, (detectionMap.get(date) ?? 0) + 1);
+    }
+  }
+  const detectionTrend = Array.from(detectionMap.entries()).map(([date, count]) => ({
+    date,
+    count,
+  }));
+
+  // Action items
+  const mappedActionItems: DashboardData['actionItems'] = (actionItems ?? []).map((item: any) => ({
+    id: item.id,
+    sourceUrl: item.source_url,
+    platform: item.platform as PlatformType,
+    riskLevel: item.risk_level as RiskLevel,
+    severityScore: item.severity_score,
+    audienceSize: item.audience_size,
+    estRevenueLoss: item.est_revenue_loss,
+    productName: item.products?.name ?? 'Unknown',
+    detectedAt: item.detected_at,
+  }));
+
+  // Timeline: merge 3 sources, sort by timestamp, take 10
+  const timeline: DashboardData['timeline'] = [];
+
+  if (recentTransitions) {
+    for (const t of recentTransitions) {
+      const inf = (t as any).infringements;
+      const productName = inf?.products?.name ?? 'Unknown';
+      let domain = '';
+      try { domain = inf?.source_url ? new URL(inf.source_url).hostname.replace('www.', '') : ''; } catch {}
+
+      const type = mapTransitionType(t.to_status);
+      timeline.push({
+        id: `st-${t.id}`,
+        type,
+        title: getTransitionTitle(t.to_status),
+        subtitle: `${productName}${domain ? ` · ${domain}` : ''}`,
+        timestamp: t.created_at,
+        status: t.to_status,
+      });
+    }
+  }
+
+  if (recentTakedowns) {
+    for (const td of recentTakedowns) {
+      const inf = (td as any).infringements;
+      const productName = inf?.products?.name ?? 'Unknown';
+      timeline.push({
+        id: `td-${td.id}`,
+        type: 'takedown',
+        title: `Takedown ${td.status}`,
+        subtitle: productName,
+        timestamp: td.sent_at ?? td.created_at,
+      });
+    }
+  }
+
+  if (recentScanActivity) {
+    for (const s of recentScanActivity) {
+      const productName = (s as any).products?.name ?? 'Unknown';
+      timeline.push({
+        id: `sc-${s.id}`,
+        type: 'scan',
+        title: `Scan ${s.status}`,
+        subtitle: productName,
+        timestamp: s.completed_at ?? s.created_at,
+      });
+    }
+  }
+
+  // Sort by most recent, deduplicate by id prefix, take 10
+  timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const uniqueTimeline = timeline.slice(0, 10);
+
+  // Profile completeness
+  const profileComplete = !!(
+    profile?.full_name &&
+    profile?.phone &&
+    profile?.address &&
+    profile?.dmca_reply_email
+  );
+
+  // ── Build DashboardData ──────────────────────────────────────────────
+
+  const dashboardData: DashboardData = {
+    protectionScore,
+    revenueAtRisk: stats?.total_est_loss ?? 0,
+    revenueProtected,
+
+    stats: {
+      totalProducts: stats?.total_products ?? 0,
+      needsReview: pendingCount ?? 0,
+      activeThreats: activeCount ?? 0,
+      takedownsSent: stats?.total_takedowns ?? 0,
+      needsReviewTrend: (pendingCount ?? 0) - (pendingCountPrev ?? 0),
+      activeThreatsTrend: (activeCount ?? 0) - (activeCountPrev ?? 0),
+      takedownsTrend: (stats?.total_takedowns ?? 0) - (takedownsCountPrev ?? 0),
+    },
+
+    actionItems: mappedActionItems,
+    platformBreakdown,
+    detectionTrend,
+    timeline: uniqueTimeline,
+
+    planTier: (profile?.plan_tier as PlanTier) ?? 'scout',
+    productCount: allProducts?.length ?? 0,
+    hasScanRun: (recentScans?.length ?? 0) > 0,
+    hasRecentScan,
+    profileComplete,
+    userProfile: {
+      fullName: profile?.full_name ?? null,
+      phone: profile?.phone ?? null,
+      address: profile?.address ?? null,
+      dmcaReplyEmail: profile?.dmca_reply_email ?? null,
+    },
+  };
+
+  return <DashboardOverview data={dashboardData} />;
+}
+
+// ── Helper functions ──────────────────────────────────────────────────
+
+function mapTransitionType(toStatus: string): DashboardData['timeline'][number]['type'] {
+  switch (toStatus) {
+    case 'removed':
+      return 'removal';
+    case 'takedown_sent':
+      return 'takedown';
+    case 'pending_verification':
+      return 'detection';
+    default:
+      return 'detection';
+  }
+}
+
+function getTransitionTitle(toStatus: string): string {
+  switch (toStatus) {
+    case 'active':
+      return 'Verified as threat';
+    case 'false_positive':
+      return 'Dismissed as false positive';
+    case 'takedown_sent':
+      return 'Takedown notice sent';
+    case 'removed':
+      return 'Successfully removed';
+    case 'disputed':
+      return 'Under dispute';
+    case 'pending_verification':
+      return 'New threat detected';
+    default:
+      return `Status changed to ${toStatus}`;
+  }
 }

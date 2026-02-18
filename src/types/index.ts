@@ -666,3 +666,72 @@ export interface InfringementResult {
   title?: string;
   snippet?: string;
 }
+
+// ============================================================================
+// DASHBOARD OVERVIEW DATA
+// ============================================================================
+
+export interface DashboardData {
+  protectionScore: number;
+  revenueAtRisk: number;
+  revenueProtected: number;
+
+  stats: {
+    totalProducts: number;
+    needsReview: number;
+    activeThreats: number;
+    takedownsSent: number;
+    // 30-day trends (positive = increase, negative = decrease)
+    needsReviewTrend: number;
+    activeThreatsTrend: number;
+    takedownsTrend: number;
+  };
+
+  // Top 5 priority infringements for action center
+  actionItems: Array<{
+    id: string;
+    sourceUrl: string;
+    platform: PlatformType;
+    riskLevel: RiskLevel;
+    severityScore: number;
+    audienceSize: string | null;
+    estRevenueLoss: number;
+    productName: string;
+    detectedAt: string;
+  }>;
+
+  // Platform breakdown for threat landscape
+  platformBreakdown: Array<{
+    platform: PlatformType;
+    count: number;
+  }>;
+
+  // 30-day detection trend (sparkline data)
+  detectionTrend: Array<{
+    date: string;
+    count: number;
+  }>;
+
+  // Recent activity timeline (10 events)
+  timeline: Array<{
+    id: string;
+    type: 'detection' | 'takedown' | 'removal' | 'scan';
+    title: string;
+    subtitle: string;
+    timestamp: string;
+    status?: string;
+  }>;
+
+  // User context
+  planTier: PlanTier;
+  productCount: number;
+  hasScanRun: boolean;
+  hasRecentScan: boolean;
+  profileComplete: boolean;
+  userProfile: {
+    fullName: string | null;
+    phone: string | null;
+    address: string | null;
+    dmcaReplyEmail: string | null;
+  };
+}
