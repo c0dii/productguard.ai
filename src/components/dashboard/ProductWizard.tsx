@@ -132,9 +132,12 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
         price: result.price || prev.price,
         product_image_url: result.image_url || prev.product_image_url,
         url: result.url || prev.url,
-        keywords: result.keywords?.length > 0 ? result.keywords : prev.keywords,
+        keywords: result.keywords?.length > 0 ? filterGenericKeywords(result.keywords) : prev.keywords,
         type: scrapedType || prev.type,
-        ai_extracted_data: result.ai_extracted_data || prev.ai_extracted_data,
+        ai_extracted_data: result.ai_extracted_data ? {
+          ...result.ai_extracted_data,
+          keywords: filterGenericKeywords(result.ai_extracted_data.keywords || []),
+        } : prev.ai_extracted_data,
         full_text_content: result.full_text_content || prev.full_text_content,
       }));
 

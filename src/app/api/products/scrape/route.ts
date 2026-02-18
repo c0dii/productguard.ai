@@ -4,6 +4,7 @@ import { analyzeProductPage } from '@/lib/ai/product-analyzer';
 import { generatePiracyKeywords } from '@/lib/ai/piracy-keyword-generator';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { filterGenericKeywords } from '@/lib/utils/keyword-quality';
 import type { ProductType } from '@/types';
 
 export async function POST(request: Request) {
@@ -102,10 +103,12 @@ export async function POST(request: Request) {
           extractedData.name = analysis.productName;
         }
 
-        // Merge AI-extracted keywords with scraped keywords
+        // Merge AI-extracted keywords with scraped keywords, then filter generics
         if (aiData.keywords && aiData.keywords.length > 0) {
           const allKeywords = [...new Set([...extractedData.keywords, ...aiData.keywords])];
-          extractedData.keywords = allKeywords.slice(0, 15); // Limit to 15 total
+          extractedData.keywords = filterGenericKeywords(allKeywords).slice(0, 15);
+        } else {
+          extractedData.keywords = filterGenericKeywords(extractedData.keywords);
         }
 
         // Prefer AI-generated description (DMCA-ready) over generic meta description
@@ -144,7 +147,7 @@ export async function POST(request: Request) {
       aiData = {
         brand_identifiers: [] as string[],
         unique_phrases: [] as string[],
-        keywords: extractedData.keywords || [],
+        keywords: filterGenericKeywords(extractedData.keywords || []),
         copyrighted_terms: [] as string[],
         product_description: extractedData.description || null,
         content_fingerprint: null,
@@ -338,10 +341,7 @@ function extractKeywords($: cheerio.CheerioAPI): string[] {
     });
   }
 
-  // From og:site_name, og:type, article:tag
-  const ogType = $('meta[property="og:type"]').attr('content');
-  if (ogType) keywordsSet.add(ogType);
-
+  // From og:site_name (skip og:type — it's page metadata like "article", not a product keyword)
   const siteName = $('meta[property="og:site_name"]').attr('content');
   if (siteName) keywordsSet.add(siteName);
 

@@ -132,16 +132,18 @@ Your task is to analyze the provided product page content and extract:
 1. Product name: The ACTUAL name of the product being sold (not the page title). This should be the short, clean product name that a customer would use to refer to it. For example, if the page title is "10x Bars Indicator Evergreen sales page The 10x Bars Indicator – John Carter", the product name should be "10x Bars Indicator". Strip out page suffixes, author names, site names, and marketing fluff.
 2. Brand identifiers: Company names, creator/author names, product line names, trademarked terms (look for ®, ™, © symbols). These MUST be specific to this brand — not generic industry terms.
 3. Unique phrases: Distinctive marketing copy, taglines, unique descriptions (3-10 words each). These should be phrases that ONLY this product would use, not generic marketing.
-4. Keywords: ONLY brand-specific and product-specific terms. These must be compound phrases that combine the product name, brand, or creator with descriptive terms. NEVER include single generic industry words.
+4. Keywords: Terms that would UNIQUELY identify this product if found on a piracy site. Think: "If I searched for this keyword and found a page containing it, would I know it's about THIS specific product?" Each keyword must include at least one word that is unique to this product or brand (a proper noun, product name, creator name, or distinctive coined term). NEVER include generic industry vocabulary.
 5. Copyrighted terms: Any text explicitly marked with copyright symbols or clearly proprietary
 6. Product description: A concise, professional 2-sentence description of the product suitable for use in DMCA takedown notices. The first sentence should identify what the product IS (type, creator, purpose). The second sentence should describe its key features or value proposition. Write in a factual, legal-appropriate tone — not marketing copy.
 
 CRITICAL RULES FOR KEYWORDS:
-- NEVER include generic single words like: "trading", "indicator", "course", "review", "chart", "strategy", "software", "tool", "system", "template", "download", "premium", "free", "analysis", "market", "stock", "forex", "crypto", "signal", "alert", "scanner", "profit", "video", "tutorial", "guide", "ebook", etc.
-- Keywords MUST be specific to THIS product and brand. They should help identify content that is about THIS specific product, not the industry in general.
+- NEVER include generic single words like: "trading", "indicator", "course", "review", "chart", "strategy", "software", "tool", "system", "template", "download", "premium", "free", "analysis", "market", "stock", "forex", "crypto", "signal", "alert", "scanner", "profit", "video", "tutorial", "guide", "ebook", "article", "website", "product", "online", etc.
+- NEVER include HTML metadata values like "article", "website", "product" — these are page types, not product keywords.
+- Keywords MUST be specific to THIS product and brand. Apply this test: would searching for this keyword on Google return results specifically about THIS product? If it could match thousands of unrelated products, it's too generic.
 - Good keywords combine brand + product terms. Examples: "Simpler Trading 10x Bars", "John Carter squeeze indicator", "10x Bars TradingView"
 - If you cannot find product-specific keywords, return an EMPTY array rather than generic terms.
 - Each keyword should be 2+ words unless it is a proper noun / brand name.
+- Aim for 3-8 high-quality keywords. Fewer specific terms are far better than many generic ones.
 
 Rules:
 - Be precise and specific — every extracted term must help identify THIS specific product
