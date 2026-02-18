@@ -29,24 +29,30 @@ export async function filterSearchResult(
   // Build system prompt with learned examples
   let systemPrompt = `You are an expert at identifying copyright infringement, piracy, and unauthorized distribution of digital products.
 
-Your task is to analyze search results and determine if they COULD represent infringements. Results you approve will go to a human review queue — they are NOT automatically actioned. Therefore, when in doubt, lean toward flagging the result as a potential infringement and let the human decide.
+Your task is to analyze search results and determine if they represent actual infringements. Be thorough but precise — only flag results where there is clear evidence of infringement based on the URL, title, and snippet.
 
-LIKELY INFRINGEMENTS (flag these):
+DEFINITE INFRINGEMENTS (flag with high confidence 0.8+):
 - Free downloads of paid content (torrents, direct downloads, file sharing)
 - Cracked, nulled, or pirated versions
-- Unauthorized redistribution on piracy sites
-- Counterfeit copies or clones
-- Unauthorized sales on unofficial platforms
-- Leaked premium content
-- Sites that aggregate or list the product alongside pirated content
-- URLs on known piracy domains even if context is unclear
+- Unauthorized redistribution on known piracy sites
+- Counterfeit copies or clones being sold
+- Leaked premium content on file-sharing platforms
 
-CLEAR FALSE POSITIVES (only filter these out):
+POSSIBLE INFRINGEMENTS (flag with moderate confidence 0.5-0.8):
+- Unauthorized sales on unofficial platforms
+- Sites that list the product alongside other pirated content
+- URLs on suspicious domains with piracy-related terms in title/snippet
+
+FALSE POSITIVES (filter out — confidence below 0.3):
 - The product's own official website or authorized sales pages
 - Major review sites (e.g., Trustpilot, G2, Capterra)
-- News articles from established publications
+- News articles, blog posts, or discussions ABOUT the product
 - The product creator's own social media accounts
-- Official documentation or help pages`;
+- Official documentation, help pages, or changelogs
+- Educational content, tutorials, or "how to use" guides
+- Forums discussing the product legitimately (reviews, support questions)
+- App stores and official marketplaces (Apple App Store, Google Play, MQL5 marketplace)
+- Comparison sites or "alternatives to" pages`;
 
   // Add learned pattern intelligence (from user feedback history)
   if (intelligence?.hasLearningData) {
@@ -107,7 +113,8 @@ SEARCH RESULT TO ANALYZE:
 
 TASK: Determine if this URL represents an actual infringement of the product or a false positive.
 Consider the URL domain, page title, search snippet, the platform type, and the context clues.
-When in doubt, lean toward marking it as a potential infringement — the user will verify it manually.
+Only flag results where there is meaningful evidence of unauthorized distribution or piracy.
+A page merely mentioning the product name is NOT an infringement.
 
 Respond with JSON only.`;
 
@@ -176,16 +183,15 @@ export async function filterSearchResults(
     );
 
     // Filter results based on AI analysis
-    // Results go to pending_verification queue for manual review, so we lean permissive.
-    // Only filter out results the AI is very confident are NOT infringements.
+    // Only pass results the AI has reasonable confidence are infringements.
     analyses.forEach((analysis, index) => {
       const result = batch[index];
       if (!result) return;
 
       // Pass if: AI says it's an infringement with sufficient confidence,
-      // OR if AI is uncertain (confidence between 0.3 and threshold) — let human decide
+      // OR if AI is uncertain but above 0.50 floor — let human decide
       const isLikelyInfringement = analysis.is_infringement && analysis.confidence >= minConfidence;
-      const isUncertain = analysis.confidence >= 0.3 && analysis.confidence < minConfidence;
+      const isUncertain = analysis.confidence >= 0.50 && analysis.confidence < minConfidence;
 
       if (isLikelyInfringement || isUncertain) {
         filteredResults.push(result);
