@@ -142,14 +142,29 @@ export async function POST(request: Request) {
       console.warn('[Scrape] OPENAI_API_KEY not set — skipping AI analysis');
     }
 
-    // Fallback: construct ai_extracted_data from scraped content when AI didn't run
+    // Smart fallback: extract intelligence from page content when AI didn't run
     if (!aiData) {
+      const contentIntel = extractContentIntelligence($, extractedData.name, extractedData.type);
+      const fallbackKeywords = filterGenericKeywords([
+        ...extractedData.keywords,
+        ...contentIntel.keywords,
+      ]);
+
+      // Generate a factual DMCA-ready description from extracted entities
+      const factualDesc = buildFactualDescription(
+        extractedData.name,
+        extractedData.type,
+        contentIntel.creator,
+        contentIntel.brand,
+        contentIntel.platforms
+      );
+
       aiData = {
-        brand_identifiers: [] as string[],
-        unique_phrases: [] as string[],
-        keywords: filterGenericKeywords(extractedData.keywords || []),
+        brand_identifiers: contentIntel.brandIdentifiers,
+        unique_phrases: contentIntel.uniquePhrases,
+        keywords: fallbackKeywords,
         copyrighted_terms: [] as string[],
-        product_description: extractedData.description || null,
+        product_description: factualDesc || null,
         content_fingerprint: null,
         extraction_metadata: {
           model: 'scrape-fallback',
@@ -158,6 +173,11 @@ export async function POST(request: Request) {
           processing_time_ms: 0,
         },
       };
+
+      // Use factual description for the product too (replaces marketing copy)
+      if (factualDesc) {
+        extractedData.description = factualDesc;
+      }
     }
 
     // Always seed keywords from product name — it's the most fundamental search term
@@ -388,6 +408,291 @@ function generateSeedKeywords(productName: string, productType: string): string[
   }
 
   return filterGenericKeywords(seeds);
+}
+
+// ============================================================================
+// SMART CONTENT EXTRACTION (fallback when AI is unavailable)
+// ============================================================================
+
+/** Known platforms organized by product type */
+const PLATFORMS_BY_TYPE: Record<string, string[]> = {
+  indicator: [
+    'ThinkorSwim', 'TOS', 'TradingView', 'MetaTrader', 'MT4', 'MT5',
+    'NinjaTrader', 'TradeStation', 'cTrader', 'Sierra Chart', 'MultiCharts',
+    'MotiveWave', 'Webull', 'Interactive Brokers', 'Tastyworks', 'tastytrade',
+  ],
+  course: [
+    'Udemy', 'Teachable', 'Thinkific', 'Kajabi', 'Gumroad', 'Podia',
+    'Skillshare', 'Coursera', 'Hotmart',
+  ],
+  software: [
+    'Windows', 'macOS', 'Linux', 'Chrome', 'Firefox', 'VSCode',
+    'Adobe Creative Cloud', 'AWS', 'Azure', 'Docker',
+  ],
+  template: [
+    'WordPress', 'Shopify', 'WooCommerce', 'Webflow', 'Squarespace', 'Wix',
+    'Elementor', 'Divi', 'Figma', 'Canva', 'Photoshop', 'Illustrator',
+    'After Effects', 'Premiere Pro', 'Final Cut', 'DaVinci Resolve',
+  ],
+  ebook: [
+    'Kindle', 'Amazon', 'Audible', 'Apple Books', 'Gumroad', 'Lulu',
+  ],
+  other: [],
+};
+
+/** Product-type words that signal a named product (e.g., "Earnings Volatility Indicator") */
+const PRODUCT_TYPE_WORDS = /\b(indicator|system|formula|strategy|method|scanner|course|toolkit|suite|plugin|tool|template|theme|framework|module|package)\b/i;
+
+/**
+ * Extract intelligence from page content using pattern matching.
+ * Runs when AI is unavailable — reads the actual page text to find
+ * creator names, platforms, related products, and distinctive phrases.
+ */
+function extractContentIntelligence(
+  $: cheerio.CheerioAPI,
+  productName: string,
+  productType: string
+): {
+  creator: string | null;
+  brand: string | null;
+  platforms: string[];
+  keywords: string[];
+  brandIdentifiers: string[];
+  uniquePhrases: string[];
+} {
+  // Get page text content (strip scripts/styles)
+  $('script, style, noscript, iframe').remove();
+  const bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+  const headings = $('h1, h2, h3').map((_, el) => $(el).text().trim()).get();
+  const siteName = $('meta[property="og:site_name"]').attr('content')?.trim() || null;
+
+  // ── Extract creator/author names ──────────────────────────────────
+  const creator = extractCreatorName(bodyText, headings, productName);
+
+  // ── Extract platforms ─────────────────────────────────────────────
+  const platforms = extractPlatforms(bodyText, productType);
+
+  // ── Extract related product names ─────────────────────────────────
+  const relatedProducts = extractRelatedProducts(bodyText, productName);
+
+  // ── Extract unique phrases from headings ──────────────────────────
+  const uniquePhrases = extractUniquePhrases(headings, productName);
+
+  // ── Build keywords from extracted entities ────────────────────────
+  const keywords: string[] = [];
+  const brandIdentifiers: string[] = [];
+
+  // Creator is a brand identifier and keyword
+  if (creator) {
+    brandIdentifiers.push(creator);
+    keywords.push(`${creator} ${productName.replace(PRODUCT_TYPE_WORDS, '').trim()}`);
+  }
+
+  // Site name is a brand identifier
+  if (siteName && siteName.length > 2) {
+    brandIdentifiers.push(siteName);
+    if (!keywords.some(k => k.toLowerCase().includes(siteName.toLowerCase()))) {
+      keywords.push(`${siteName} ${productName.replace(PRODUCT_TYPE_WORDS, '').trim()}`);
+    }
+  }
+
+  // Platform + product combos
+  for (const platform of platforms.slice(0, 2)) {
+    keywords.push(`${productName.replace(PRODUCT_TYPE_WORDS, '').trim()} ${platform}`);
+  }
+
+  // Related products are keywords themselves
+  for (const rp of relatedProducts.slice(0, 3)) {
+    keywords.push(rp);
+  }
+
+  return {
+    creator,
+    brand: siteName,
+    platforms,
+    keywords: [...new Set(keywords)],
+    brandIdentifiers: [...new Set(brandIdentifiers)],
+    uniquePhrases,
+  };
+}
+
+/**
+ * Extract creator/author name from page text using common patterns.
+ * Looks for: "X's [product]", "by X", "created by X", "developed by X", etc.
+ */
+function extractCreatorName(
+  bodyText: string,
+  headings: string[],
+  productName: string
+): string | null {
+  const allText = [
+    ...headings,
+    bodyText.substring(0, 5000), // Focus on top of page
+  ].join(' ');
+
+  // Pattern 1: Possessive near product name — "Danielle Shay's ... indicator"
+  // Matches: "FirstName LastName's" where name is 2+ capitalized words
+  const possessivePatterns = [
+    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)'s\b/g,
+    /([A-Z][a-z]+(?:\s+[A-Z]\.?\s*[a-z]+)+)'s\b/g, // With middle initial
+  ];
+
+  for (const pattern of possessivePatterns) {
+    const matches = [...allText.matchAll(pattern)];
+    for (const match of matches) {
+      const name = match[1]?.trim();
+      if (name && name.length >= 5 && !isCommonPhrase(name)) {
+        return name;
+      }
+    }
+  }
+
+  // Pattern 2: "by FirstName LastName" / "created by" / "developed by"
+  const byPatterns = [
+    /(?:created|developed|designed|built|made)\s+by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g,
+    /\bby\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g,
+  ];
+
+  for (const pattern of byPatterns) {
+    const matches = [...allText.matchAll(pattern)];
+    for (const match of matches) {
+      const name = match[1]?.trim();
+      if (name && name.length >= 5 && !isCommonPhrase(name)) {
+        return name;
+      }
+    }
+  }
+
+  // Pattern 3: Check og:description and meta description for name patterns
+  // These often have "AuthorName's product" or "by AuthorName"
+  return null;
+}
+
+/** Filter out common English phrases that look like names but aren't */
+function isCommonPhrase(name: string): boolean {
+  const common = new Set([
+    'The Next', 'This Tool', 'Your Account', 'Our Team', 'The Best',
+    'New York', 'Los Angeles', 'San Francisco', 'United States',
+    'Terms Of', 'Privacy Policy', 'Read More', 'Learn More', 'See More',
+    'Sign Up', 'Log In', 'Get Started', 'Find Out', 'Check Out',
+    'Hot Zone', 'Free Trial', 'Limited Time', 'Right Now',
+  ]);
+  return common.has(name);
+}
+
+/**
+ * Detect known platforms mentioned in the page text.
+ * Only checks platforms relevant to the product type.
+ */
+function extractPlatforms(bodyText: string, productType: string): string[] {
+  const found: string[] = [];
+  const textLower = bodyText.toLowerCase();
+  const platforms = PLATFORMS_BY_TYPE[productType] || PLATFORMS_BY_TYPE['other'] || [];
+
+  for (const platform of platforms) {
+    if (textLower.includes(platform.toLowerCase())) {
+      found.push(platform);
+    }
+  }
+
+  return [...new Set(found)];
+}
+
+/**
+ * Extract related product names mentioned on the page.
+ * Looks for Capitalized Multi-Word phrases adjacent to product-type words.
+ */
+function extractRelatedProducts(bodyText: string, mainProductName: string): string[] {
+  const results: string[] = [];
+  const mainNameLower = mainProductName.toLowerCase();
+
+  // Match patterns like "Earnings Volatility Indicator", "Quarterly Profits Formula"
+  // Capitalized words followed by a product-type word
+  const pattern = /\b((?:[A-Z][a-z]+\s+){1,4}(?:Indicator|System|Formula|Strategy|Method|Scanner|Course|Toolkit|Suite|Plugin|Tool|Template|Theme))\b/g;
+  const matches = [...bodyText.matchAll(pattern)];
+
+  for (const match of matches) {
+    const name = match[1]?.trim();
+    if (
+      name &&
+      name.length >= 8 &&
+      name.toLowerCase() !== mainNameLower &&
+      !results.some(r => r.toLowerCase() === name.toLowerCase())
+    ) {
+      results.push(name);
+    }
+  }
+
+  return results.slice(0, 5);
+}
+
+/**
+ * Extract distinctive phrases from headings — these often contain
+ * unique marketing language or feature descriptions.
+ */
+function extractUniquePhrases(headings: string[], productName: string): string[] {
+  const phrases: string[] = [];
+  const productWords = new Set(productName.toLowerCase().split(/\s+/));
+
+  for (const heading of headings) {
+    const cleaned = heading.trim();
+    // Skip very short or very long headings
+    if (cleaned.length < 10 || cleaned.length > 120) continue;
+    // Skip headings that are just the product name
+    if (cleaned.toLowerCase() === productName.toLowerCase()) continue;
+    // Keep headings that reference the product or are distinctive
+    const words = cleaned.toLowerCase().split(/\s+/);
+    const hasProductWord = words.some(w => productWords.has(w) && w.length > 3);
+    if (hasProductWord && cleaned.length >= 15) {
+      phrases.push(cleaned);
+    }
+  }
+
+  return phrases.slice(0, 5);
+}
+
+/**
+ * Build a factual, DMCA-appropriate description from extracted entities.
+ * Template: "{Name} is a {type} [for {platform}] [created by {creator}] [of {brand}]."
+ */
+function buildFactualDescription(
+  productName: string,
+  productType: string,
+  creator: string | null,
+  brand: string | null,
+  platforms: string[]
+): string | null {
+  if (!productName) return null;
+
+  const typeLabels: Record<string, string> = {
+    indicator: 'trading indicator',
+    course: 'educational course',
+    software: 'software product',
+    template: 'digital template',
+    ebook: 'digital publication',
+    other: 'digital product',
+  };
+
+  const typeLabel = typeLabels[productType] || typeLabels['other'];
+
+  // First sentence: what it is, who made it
+  let sentence1 = `${productName} is a ${typeLabel}`;
+  if (platforms.length > 0) {
+    sentence1 += ` for ${platforms[0]}`;
+  }
+  if (creator && brand) {
+    sentence1 += ` created by ${creator} of ${brand}`;
+  } else if (creator) {
+    sentence1 += ` created by ${creator}`;
+  } else if (brand) {
+    sentence1 += ` by ${brand}`;
+  }
+  sentence1 += '.';
+
+  // Second sentence: note it as commercially sold
+  const sentence2 = `It is a commercially sold, copyrighted product available for purchase from its official source.`;
+
+  return `${sentence1} ${sentence2}`;
 }
 
 // Infer product type from content

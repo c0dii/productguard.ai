@@ -603,7 +603,7 @@ export function EnhancedProductForm({
             <label className="block text-sm font-medium text-pg-text">
               Description
             </label>
-            {aiExtractedData?.product_description && (
+            {aiExtractedData?.product_description && aiExtractedData?.extraction_metadata?.model !== 'scrape-fallback' && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">
                 AI Generated
               </span>
