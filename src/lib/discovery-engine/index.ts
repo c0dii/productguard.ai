@@ -80,7 +80,7 @@ export async function runDiscovery(
   console.log(`[Discovery] Run ${runId} started — categories: ${config.categories.join(', ')}, budget: ${config.serp_budget}`);
 
   // Create a shared SerpClient with the full budget
-  const serpApiKey = process.env.SERPAPI_API_KEY || '';
+  const serpApiKey = process.env.SERPER_API_KEY || '';
   const serpClient = new SerpClient(serpApiKey, config.serp_budget);
 
   try {

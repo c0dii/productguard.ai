@@ -36,10 +36,9 @@ export async function scanCyberlockers(product: Product): Promise<InfringementRe
       'sendspace.com',
     ];
 
-    // If no SerpAPI key, skip search
-    const apiKey = process.env.SERPAPI_KEY;
+    const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey || apiKey === 'xxxxx') {
-      console.log('[Cyberlocker Scanner] No SerpAPI key configured, skipping');
+      console.log('[Cyberlocker Scanner] No Serper API key configured, skipping');
       return [];
     }
 
@@ -82,28 +81,29 @@ async function searchCyberlocker(
     // Build search query - target direct file shares
     const query = `site:${site} "${product.name}"`;
 
-    const url = new URL('https://serpapi.com/search');
-    url.searchParams.set('engine', 'google');
-    url.searchParams.set('q', query);
-    url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('num', '10'); // Top 10 results per cyberlocker
-
-    const response = await fetch(url.toString());
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ q: query, num: 10 }),
+    });
 
     if (!response.ok) {
-      console.error(`[Cyberlocker Scanner] SerpAPI error for ${site}: ${response.status}`);
+      console.error(`[Cyberlocker Scanner] Serper API error for ${site}: ${response.status}`);
       return [];
     }
 
     const data = await response.json();
 
-    if (!data.organic_results || data.organic_results.length === 0) {
+    if (!data.organic || data.organic.length === 0) {
       return [];
     }
 
     const infringements: InfringementResult[] = [];
 
-    for (const result of data.organic_results) {
+    for (const result of data.organic) {
       // Filter out non-file links
       if (!isDirectFileLink(result.link, site)) {
         continue;

@@ -78,10 +78,9 @@ async function searchTelegramViaGoogle(product: Product): Promise<TelegramLink[]
       `site:t.me "${product.name}" course`,
     ];
 
-    // If we don't have a SerpAPI key, return empty
-    const apiKey = process.env.SERPAPI_KEY;
+    const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey || apiKey === 'xxxxx') {
-      console.log('[Telegram Scanner] No SerpAPI key configured, skipping Google search');
+      console.log('[Telegram Scanner] No Serper API key configured, skipping Google search');
       return [];
     }
 
@@ -89,19 +88,20 @@ async function searchTelegramViaGoogle(product: Product): Promise<TelegramLink[]
 
     for (const query of queries) {
       try {
-        const url = new URL('https://serpapi.com/search');
-        url.searchParams.set('engine', 'google');
-        url.searchParams.set('q', query);
-        url.searchParams.set('api_key', apiKey);
-        url.searchParams.set('num', '10');
-
-        const response = await fetch(url.toString());
+        const response = await fetch('https://google.serper.dev/search', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ q: query, num: 10 }),
+        });
         if (!response.ok) continue;
 
         const data = await response.json();
 
-        if (data.organic_results) {
-          for (const result of data.organic_results) {
+        if (data.organic) {
+          for (const result of data.organic) {
             if (result.link && result.link.includes('t.me/')) {
               // Extract channel/group name from URL
               const match = result.link.match(/t\.me\/([^\/\?]+)/);

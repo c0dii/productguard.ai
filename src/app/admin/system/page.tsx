@@ -32,7 +32,7 @@ export default async function AdminSystemPage() {
     { key: 'NEXT_PUBLIC_SUPABASE_URL', value: process.env.NEXT_PUBLIC_SUPABASE_URL },
     { key: 'STRIPE_SECRET_KEY', value: process.env.STRIPE_SECRET_KEY ? 'Set ✓' : 'Missing ✗' },
     { key: 'SUPABASE_SERVICE_ROLE_KEY', value: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set ✓' : 'Missing ✗' },
-    { key: 'SERPAPI_KEY', value: process.env.SERPAPI_KEY ? 'Set ✓' : 'Missing ✗' },
+    { key: 'SERPER_API_KEY', value: process.env.SERPER_API_KEY ? 'Set ✓' : 'Missing ✗' },
     { key: 'RESEND_API_KEY', value: process.env.RESEND_API_KEY ? 'Set ✓' : 'Missing ✗' },
   ];
 
@@ -113,12 +113,12 @@ export default async function AdminSystemPage() {
             <Badge
               variant="default"
               className={
-                process.env.SERPAPI_KEY
+                process.env.SERPER_API_KEY
                   ? 'bg-pg-accent bg-opacity-10 text-pg-accent'
                   : 'bg-pg-warning bg-opacity-10 text-pg-warning'
               }
             >
-              {process.env.SERPAPI_KEY ? '✓ Ready' : '⚠ SerpAPI Key Missing'}
+              {process.env.SERPER_API_KEY ? '✓ Ready' : '⚠ Serper API Key Missing'}
             </Badge>
           </Card>
         </div>

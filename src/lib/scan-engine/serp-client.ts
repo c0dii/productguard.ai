@@ -1,5 +1,5 @@
 /**
- * SerpAPI Client — rate-limited, budget-tracked wrapper.
+ * Serper.dev Client — rate-limited, budget-tracked wrapper.
  *
  * Features:
  * - 150ms minimum delay between API calls
@@ -67,16 +67,16 @@ export class SerpClient {
     }
 
     try {
-      const url = new URL('https://serpapi.com/search');
-      url.searchParams.set('engine', 'google');
-      url.searchParams.set('q', params.query);
-      url.searchParams.set('api_key', this.apiKey);
-      url.searchParams.set('num', String(params.num));
-
       this.lastCallTime = Date.now();
       this.budgetUsed++;
 
-      const response = await fetch(url.toString(), {
+      const response = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: params.query, num: params.num }),
         signal: AbortSignal.timeout(15000), // 15s timeout per API call
       });
 
@@ -88,11 +88,11 @@ export class SerpClient {
       const data = await response.json();
 
       return {
-        organic_results: (data.organic_results || []).map((r: any) => ({
+        organic_results: (data.organic || []).map((r: any, i: number) => ({
           title: r.title || '',
           link: r.link || '',
           snippet: r.snippet || '',
-          position: r.position || 0,
+          position: r.position || i + 1,
         })),
         query: params.query,
       };

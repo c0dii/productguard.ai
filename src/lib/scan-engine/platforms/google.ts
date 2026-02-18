@@ -2,8 +2,8 @@ import type { Product, InfringementResult, RiskLevel } from '@/types';
 import type { IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 import { isGenericKeyword, keywordSpecificityScore } from '@/lib/utils/keyword-quality';
 
-interface SerpApiResult {
-  organic_results?: Array<{
+interface SerperResult {
+  organic?: Array<{
     title: string;
     link: string;
     snippet?: string;
@@ -12,16 +12,16 @@ interface SerpApiResult {
 }
 
 /**
- * Google Search Scanner using SerpAPI
+ * Google Search Scanner using Serper.dev
  * Searches for pirated/leaked/unauthorized copies of digital products
  */
 export async function scanGoogle(product: Product, intelligence?: IntelligenceData): Promise<InfringementResult[]> {
   console.log(`[Google Scanner] Scanning for: ${product.name}`);
 
-  const apiKey = process.env.SERPAPI_KEY;
+  const apiKey = process.env.SERPER_API_KEY;
 
   if (!apiKey || apiKey === 'xxxxx') {
-    console.log('[Google Scanner] No SerpAPI key configured, returning empty results');
+    console.log('[Google Scanner] No Serper API key configured, returning empty results');
     return [];
   }
 
@@ -312,7 +312,7 @@ function getOfficialDomain(product: Product): string {
 }
 
 /**
- * Search Google using SerpAPI for a specific query
+ * Search Google using Serper.dev for a specific query
  */
 async function searchGoogleQuery(
   query: string,
@@ -321,28 +321,29 @@ async function searchGoogleQuery(
   keywordVariations: string[]
 ): Promise<InfringementResult[]> {
   try {
-    const url = new URL('https://serpapi.com/search');
-    url.searchParams.set('engine', 'google');
-    url.searchParams.set('q', query);
-    url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('num', '30'); // Increased from 20 to 30 results per query
-
-    const response = await fetch(url.toString());
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ q: query, num: 30 }),
+    });
 
     if (!response.ok) {
-      console.error(`[Google Scanner] SerpAPI error: ${response.status}`);
+      console.error(`[Google Scanner] Serper API error: ${response.status}`);
       return [];
     }
 
-    const data = (await response.json()) as SerpApiResult;
+    const data = (await response.json()) as SerperResult;
 
-    if (!data.organic_results || data.organic_results.length === 0) {
+    if (!data.organic || data.organic.length === 0) {
       return [];
     }
 
     const infringements: InfringementResult[] = [];
 
-    for (const result of data.organic_results) {
+    for (const result of data.organic) {
       // Skip legitimate sources
       if (isLegitimateSource(result.link, product)) {
         continue;

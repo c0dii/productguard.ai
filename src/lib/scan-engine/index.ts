@@ -820,9 +820,9 @@ async function runTieredSearch(
   maxDurationMs: number = 240_000,
   logger?: ScanLogger,
 ): Promise<InfringementResult[]> {
-  const apiKey = process.env.SERPAPI_KEY;
+  const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey || apiKey === 'xxxxx') {
-    logger?.warn('keyword_search', 'No SerpAPI key configured, skipping tiered search', 'API_LIMIT');
+    logger?.warn('keyword_search', 'No Serper API key configured, skipping tiered search', 'API_LIMIT');
     // Still run Telegram Bot API
     const telegramResults = await scanTelegram(product, intelligence);
     return telegramResults;

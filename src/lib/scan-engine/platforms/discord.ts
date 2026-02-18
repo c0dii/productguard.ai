@@ -21,9 +21,9 @@ export async function scanDiscord(product: Product): Promise<InfringementResult[
   try {
     const infringements: InfringementResult[] = [];
 
-    const apiKey = process.env.SERPAPI_KEY;
+    const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey || apiKey === 'xxxxx') {
-      console.log('[Discord Scanner] No SerpAPI key configured, skipping');
+      console.log('[Discord Scanner] No Serper API key configured, skipping');
       return [];
     }
 
@@ -71,22 +71,23 @@ async function searchDiscordSite(
     const allResults: InfringementResult[] = [];
 
     for (const query of queries) {
-      const url = new URL('https://serpapi.com/search');
-      url.searchParams.set('engine', 'google');
-      url.searchParams.set('q', query);
-      url.searchParams.set('api_key', apiKey);
-      url.searchParams.set('num', '10');
-
-      const response = await fetch(url.toString());
+      const response = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: query, num: 10 }),
+      });
       if (!response.ok) {
-        console.error(`[Discord Scanner] SerpAPI error for ${site}: ${response.status}`);
+        console.error(`[Discord Scanner] Serper API error for ${site}: ${response.status}`);
         continue;
       }
 
       const data = await response.json();
-      if (!data.organic_results || data.organic_results.length === 0) continue;
+      if (!data.organic || data.organic.length === 0) continue;
 
-      for (const result of data.organic_results) {
+      for (const result of data.organic) {
         if (!isDiscordPage(result.link, site)) continue;
 
         const memberCount = extractMemberCount(result.snippet || '', result.title || '');

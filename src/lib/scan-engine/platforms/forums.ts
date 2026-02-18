@@ -26,9 +26,9 @@ export async function scanForums(product: Product): Promise<InfringementResult[]
   try {
     const infringements: InfringementResult[] = [];
 
-    const apiKey = process.env.SERPAPI_KEY;
+    const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey || apiKey === 'xxxxx') {
-      console.log('[Forum Scanner] No SerpAPI key configured, skipping');
+      console.log('[Forum Scanner] No Serper API key configured, skipping');
       return [];
     }
 
@@ -64,24 +64,25 @@ async function searchForumSite(
   try {
     const query = `site:${site} "${product.name}"`;
 
-    const url = new URL('https://serpapi.com/search');
-    url.searchParams.set('engine', 'google');
-    url.searchParams.set('q', query);
-    url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('num', '10');
-
-    const response = await fetch(url.toString());
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ q: query, num: 10 }),
+    });
     if (!response.ok) {
-      console.error(`[Forum Scanner] SerpAPI error for ${site}: ${response.status}`);
+      console.error(`[Forum Scanner] Serper API error for ${site}: ${response.status}`);
       return [];
     }
 
     const data = await response.json();
-    if (!data.organic_results || data.organic_results.length === 0) return [];
+    if (!data.organic || data.organic.length === 0) return [];
 
     const infringements: InfringementResult[] = [];
 
-    for (const result of data.organic_results) {
+    for (const result of data.organic) {
       if (!isForumThread(result.link, site)) continue;
 
       const { views, replies } = extractForumStats(result.snippet || '', result.title || '');

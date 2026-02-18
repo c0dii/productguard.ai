@@ -565,19 +565,19 @@ function getSuggestedSteps(errorCode: string, message: string): string[] {
 
   switch (errorCode) {
     case 'TIMEOUT':
-      steps.push('Check SerpAPI status page for service disruptions');
+      steps.push('Check Serper.dev status for service disruptions');
       steps.push('Review scan duration settings (MAX_SCAN_DURATION_MS)');
       steps.push('Check if product has excessive keywords generating too many queries');
       break;
     case 'API_LIMIT':
     case 'SERP_429':
-      steps.push('Check SerpAPI account quota and billing');
-      steps.push('Review SERPAPI_KEY environment variable');
+      steps.push('Check Serper.dev account quota and billing');
+      steps.push('Review SERPER_API_KEY environment variable');
       steps.push('Consider reducing scan budget or query count');
       break;
     case 'SERP_ERROR':
-      steps.push('Check SerpAPI status page');
-      steps.push('Verify SERPAPI_KEY is valid');
+      steps.push('Check Serper.dev status page');
+      steps.push('Verify SERPER_API_KEY is valid');
       steps.push('Review query format for malformed requests');
       break;
     case 'AI_FILTER_FAIL':
