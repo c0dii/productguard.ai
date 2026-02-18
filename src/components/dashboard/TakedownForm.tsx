@@ -13,6 +13,8 @@ interface TakedownFormProps {
   prefilledProduct: any;
   availableProducts: any[];
   userId: string;
+  inDrawer?: boolean;
+  onSuccess?: (takedownId: string) => void;
 }
 
 const TONE_OPTIONS = [
@@ -43,6 +45,8 @@ export function TakedownForm({
   prefilledProduct,
   availableProducts,
   userId,
+  inDrawer = false,
+  onSuccess,
 }: TakedownFormProps) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -275,8 +279,12 @@ export function TakedownForm({
 
       if (response.ok) {
         const data = await response.json();
-        alert('DMCA takedown notice created successfully!');
-        router.push(`/dashboard/takedowns/${data.takedown_id}`);
+        if (onSuccess) {
+          onSuccess(data.takedown_id);
+        } else {
+          alert('DMCA takedown notice created successfully!');
+          router.push(`/dashboard/takedowns/${data.takedown_id}`);
+        }
       } else {
         const error = await response.json();
         alert(`Failed to create takedown: ${error.error}`);

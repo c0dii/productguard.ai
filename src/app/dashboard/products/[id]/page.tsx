@@ -217,6 +217,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           initialInfringements={pendingInfringements || []}
           initialTotal={pendingTotal ?? 0}
           productId={id}
+          product={product}
+          userId={user.id}
         />
       )}
     </div>

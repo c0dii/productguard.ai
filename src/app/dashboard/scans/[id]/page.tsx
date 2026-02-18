@@ -220,6 +220,8 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
             initialInfringements={(pendingInfringements || []) as Infringement[]}
             initialTotal={pendingTotal ?? 0}
             productId={productId}
+            product={scan.products}
+            userId={user.id}
           />
         </div>
       )}
