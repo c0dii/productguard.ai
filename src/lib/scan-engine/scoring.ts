@@ -169,14 +169,16 @@ function estimateRevenueLoss(
   if (suffix === 'm') views *= 1000000;
 
   // Platform-specific conversion rates
+  // Two-step model: (% who actually download) × (% who would have bought)
+  // Based on industry research showing ~10-20% of pirates would have purchased
   const conversionRates: Record<string, number> = {
-    telegram: 0.02,   // 2% — large audience but low intent
-    torrent: 0.40,    // 40% — active downloaders
-    cyberlocker: 0.30, // 30% — direct download intent
-    discord: 0.02,    // 2% — community sharing
-    forum: 0.05,      // 5% — moderate intent
-    google: 0.10,     // 10% — mixed intent
-    social: 0.01,     // 1% — passive exposure
+    telegram: 0.01,    // 1% — mostly lurkers, few download, fewer would buy
+    torrent: 0.10,     // 10% — active downloaders but price-sensitive
+    cyberlocker: 0.08, // 8% — direct downloads, similar to torrents
+    discord: 0.01,     // 1% — community lurkers
+    forum: 0.01,       // 1% — passive browsing, low conversion
+    google: 0.02,      // 2% — mixed intent, most just browsing
+    social: 0.001,     // 0.1% — passive exposure, near-zero conversion
   };
 
   const rate = conversionRates[platform] || 0.10;

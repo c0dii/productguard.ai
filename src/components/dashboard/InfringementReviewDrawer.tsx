@@ -29,13 +29,17 @@ export function InfringementReviewDrawer({
   const [fullData, setFullData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // Track the verified infringement so we stay on it for the DMCA form
+  const [verifiedInfringement, setVerifiedInfringement] = useState<Infringement | null>(null);
 
-  // Reset view when infringement changes
+  // Reset view when infringement changes (but not when we're showing the DMCA form)
   useEffect(() => {
-    setView('review');
-    setFullData(null);
-    if (infringement) {
-      fetchFullData(infringement.id);
+    if (!verifiedInfringement) {
+      setView('review');
+      setFullData(null);
+      if (infringement) {
+        fetchFullData(infringement.id);
+      }
     }
   }, [infringement?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -66,8 +70,10 @@ export function InfringementReviewDrawer({
 
       if (res.ok) {
         if (action === 'verify') {
-          // Transition to DMCA form
+          // Hold onto this infringement for the DMCA form, then transition
+          setVerifiedInfringement(infringement);
           setView('takedown');
+          // Remove from parent list but DON'T advance (we're staying on this one)
           onAction(infringement.id, action);
         } else {
           // Dismiss/whitelist → advance to next
@@ -86,18 +92,29 @@ export function InfringementReviewDrawer({
   }, [infringement, onAction]);
 
   const handleTakedownSuccess = useCallback(() => {
-    if (infringement) {
-      onAction(infringement.id, 'verify');
-    }
-  }, [infringement, onAction]);
+    // DMCA submitted — clear the verified hold and close/advance
+    setVerifiedInfringement(null);
+    setView('review');
+    // The parent already removed this item, so the drawer will show whatever
+    // infringement the parent advanced to, or close if none left
+  }, []);
 
-  const data = fullData || infringement;
-  const drawerWidth = view === 'takedown' ? 'xl' : 'lg';
+  const handleClose = useCallback(() => {
+    // If we were in the DMCA form, clear the hold
+    setVerifiedInfringement(null);
+    setView('review');
+    onClose();
+  }, [onClose]);
+
+  // When showing the DMCA form, use the verified infringement (not whatever the parent advanced to)
+  const activeInfringement = verifiedInfringement || infringement;
+  const data = fullData || activeInfringement;
+  const drawerWidth = verifiedInfringement || view === 'takedown' ? 'xl' : 'lg';
 
   return (
     <SlideOver
-      isOpen={!!infringement}
-      onClose={onClose}
+      isOpen={!!activeInfringement}
+      onClose={handleClose}
       title={view === 'takedown' ? 'Send DMCA Takedown' : 'Review Infringement'}
       width={drawerWidth}
     >
