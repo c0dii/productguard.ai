@@ -160,6 +160,15 @@ export async function POST(request: Request) {
       };
     }
 
+    // Always seed keywords from product name — it's the most fundamental search term
+    const seedKeywords = generateSeedKeywords(extractedData.name, extractedData.type);
+    const existingKeywords = new Set((aiData.keywords || []).map((k: string) => k.toLowerCase()));
+    const newSeeds = seedKeywords.filter(sk => !existingKeywords.has(sk.toLowerCase()));
+    if (newSeeds.length > 0) {
+      aiData.keywords = [...newSeeds, ...(aiData.keywords || [])];
+      extractedData.keywords = [...new Set([...newSeeds, ...extractedData.keywords])].slice(0, 15);
+    }
+
     return NextResponse.json({
       ...extractedData,
       ai_extracted_data: aiData,
@@ -358,6 +367,27 @@ function extractKeywords($: cheerio.CheerioAPI): string[] {
   });
 
   return Array.from(keywordsSet).slice(0, 10); // Limit to 10 keywords
+}
+
+// Generate baseline keywords from product name — ensures the product name
+// itself is always present as a keyword regardless of AI availability
+function generateSeedKeywords(productName: string, productType: string): string[] {
+  if (!productName || productName.trim().length === 0) return [];
+
+  const seeds: string[] = [];
+  const name = productName.trim();
+
+  // Full product name is always a keyword
+  seeds.push(name);
+
+  // Strip type suffix to get the core name (e.g., "Earnings Hot Zone Indicator" → "Earnings Hot Zone")
+  const typeSuffixes = /\b(indicator|course|training|tutorial|software|tool|plugin|template|theme|ebook|book|guide|system|program|app|strategy)\b\s*$/i;
+  const coreName = name.replace(typeSuffixes, '').trim();
+  if (coreName && coreName !== name && coreName.length >= 3) {
+    seeds.push(coreName);
+  }
+
+  return filterGenericKeywords(seeds);
 }
 
 // Infer product type from content
