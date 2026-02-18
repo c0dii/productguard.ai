@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import type { Scan, ScanProgress, ScanStage } from '@/types';
 
 interface ScanProgressTrackerProps {
@@ -62,7 +61,6 @@ const DEFAULT_STAGES: ScanStage[] = [
 ];
 
 export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
-  const router = useRouter();
   const [progress, setProgress] = useState<ScanProgress>(
     scan.scan_progress || { current_stage: null, stages: DEFAULT_STAGES }
   );
@@ -117,14 +115,16 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
         // Stop polling if scan is complete
         if (data.status === 'completed' || data.status === 'failed') {
           setIsPolling(false);
-          // Use Next.js router to refresh server data without full page reload
-          router.refresh();
+          // Brief delay so user sees "Scan Complete" before page reloads with results
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
         }
       }
     } catch (error) {
       console.error('Error polling scan progress:', error);
     }
-  }, [scan.id, router]);
+  }, [scan.id]);
 
   useEffect(() => {
     if (!isPolling) return;
