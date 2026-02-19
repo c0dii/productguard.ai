@@ -112,28 +112,32 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
           setInfringementCount(data.infringement_count);
         }
 
-        // Stop polling if scan is complete
+        // Detect completion from any of these signals:
+        // 1. Status field updated to completed/failed
         const isFinished = data.status === 'completed' || data.status === 'failed';
 
-        // Also detect completion from stages: if all stages are done but status
-        // hasn't been updated yet (Vercel function killed before final write)
+        // 2. All stages marked done in scan_progress (function killed before status write)
         const polledStages = (data.scan_progress?.stages || []) as Array<{ status: string }>;
         const allStagesDone = polledStages.length > 0 && polledStages.every(
           (s: { status: string }) => s.status === 'completed' || s.status === 'skipped'
         );
 
-        if (isFinished || allStagesDone) {
+        // 3. Hard timeout: no scan takes more than 5 minutes — force reload
+        const scanStarted = scan.started_at || scan.created_at;
+        const scanElapsedMs = Date.now() - new Date(scanStarted).getTime();
+        const isTimedOut = scanElapsedMs > 300_000;
+
+        if (isFinished || allStagesDone || isTimedOut) {
           setIsPolling(false);
-          // Brief delay so user sees "Scan Complete" before page reloads with results
           setTimeout(() => {
             window.location.reload();
-          }, 1500);
+          }, isTimedOut ? 500 : 1500);
         }
       }
     } catch (error) {
       console.error('Error polling scan progress:', error);
     }
-  }, [scan.id]);
+  }, [scan.id, scan.started_at, scan.created_at]);
 
   useEffect(() => {
     if (!isPolling) return;

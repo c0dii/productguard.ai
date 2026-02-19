@@ -59,7 +59,8 @@ export async function GET(
         });
       }
 
-      // Recovery 2: Scan running for >10 minutes (function crashed/timed out)
+      // Recovery 2: Scan running past maxDuration (function killed by Vercel)
+      // Vercel maxDuration=300s, so anything running >6 min is guaranteed dead
       const { data: fullScan } = await supabase
         .from('scans')
         .select('started_at')
@@ -68,7 +69,7 @@ export async function GET(
 
       if (fullScan?.started_at) {
         const elapsedMs = Date.now() - new Date(fullScan.started_at).getTime();
-        const STALE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+        const STALE_THRESHOLD_MS = 6 * 60 * 1000; // 6 minutes (maxDuration=300s + buffer)
 
         if (elapsedMs > STALE_THRESHOLD_MS) {
           console.warn(`[Progress] Scan ${id} stale (${Math.round(elapsedMs / 1000)}s), marking as failed`);

@@ -49,10 +49,10 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
     if (allStagesDone) {
       scanStatus = 'completed';
     }
-    // Recovery 2: Running for >10 minutes (function crashed/timed out)
+    // Recovery 2: Running past maxDuration (function killed by Vercel, maxDuration=300s)
     else if (scan.started_at) {
       const elapsedMs = Date.now() - new Date(scan.started_at).getTime();
-      if (elapsedMs > 10 * 60 * 1000) {
+      if (elapsedMs > 6 * 60 * 1000) {
         scanStatus = 'failed';
       }
     }
