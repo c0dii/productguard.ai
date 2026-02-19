@@ -132,49 +132,32 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* Summary Stats - Product-wide totals */}
-      {isScanning ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <Card>
-            <p className="text-sm text-pg-text-muted mb-1">Total Infringements</p>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full border-2 border-pg-accent border-t-transparent animate-spin" />
-              <p className="text-lg font-medium text-pg-text-muted">Scanning...</p>
+      {/* Summary Stats - Product-wide totals (always show real numbers) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <Card>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-pg-text-muted">Total Infringements</p>
+            {isScanning && <span className="flex items-center gap-1.5 text-xs text-cyan-400"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />Scanning</span>}
+          </div>
+          <p className="text-3xl font-bold text-pg-accent">{totalInfringementCount ?? 0}</p>
+        </Card>
+        <Card>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-pg-text-muted">Pending Review</p>
+            {isScanning && <span className="flex items-center gap-1.5 text-xs text-cyan-400"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />Scanning</span>}
+          </div>
+          <p className="text-3xl font-bold text-pg-warning">{pendingTotal ?? 0}</p>
+        </Card>
+        <Link href="/dashboard/infringements">
+          <Card className="cursor-pointer hover:border-pg-accent hover:shadow-lg hover:shadow-pg-accent/20 transition-all">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-pg-text-muted">Active Threats</p>
+              {isScanning && <span className="flex items-center gap-1.5 text-xs text-cyan-400"><span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />Scanning</span>}
             </div>
+            <p className="text-3xl font-bold text-pg-danger">{activeInfringements?.length || 0}</p>
           </Card>
-          <Card>
-            <p className="text-sm text-pg-text-muted mb-1">Pending Review</p>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full border-2 border-pg-warning border-t-transparent animate-spin" />
-              <p className="text-lg font-medium text-pg-text-muted">Scanning...</p>
-            </div>
-          </Card>
-          <Card>
-            <p className="text-sm text-pg-text-muted mb-1">Active Threats</p>
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full border-2 border-pg-danger border-t-transparent animate-spin" />
-              <p className="text-lg font-medium text-pg-text-muted">Scanning...</p>
-            </div>
-          </Card>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <Card>
-            <p className="text-sm text-pg-text-muted mb-1">Total Infringements</p>
-            <p className="text-3xl font-bold text-pg-accent">{totalInfringementCount ?? 0}</p>
-          </Card>
-          <Card>
-            <p className="text-sm text-pg-text-muted mb-1">Pending Review</p>
-            <p className="text-3xl font-bold text-pg-warning">{pendingTotal ?? 0}</p>
-          </Card>
-          <Link href="/dashboard/infringements">
-            <Card className="cursor-pointer hover:border-pg-accent hover:shadow-lg hover:shadow-pg-accent/20 transition-all">
-              <p className="text-sm text-pg-text-muted mb-1">Active Threats</p>
-              <p className="text-3xl font-bold text-pg-danger">{activeInfringements?.length || 0}</p>
-            </Card>
-          </Link>
-        </div>
-      )}
+        </Link>
+      </div>
 
       {/* Scan Status - only show when not scanning (progress tracker replaces this) */}
       {!isScanning && (
@@ -213,8 +196,8 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
         </Card>
       )}
 
-      {/* Pending Verification Section - product-wide */}
-      {!isScanning && (pendingTotal ?? 0) > 0 && (
+      {/* Pending Verification Section - product-wide (show even during scanning if there are items) */}
+      {(pendingTotal ?? 0) > 0 && (
         <div className="mb-8">
           <PendingVerificationList
             initialInfringements={(pendingInfringements || []) as Infringement[]}
@@ -226,8 +209,8 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* Active Infringements or Scanning Placeholder */}
-      {isScanning ? (
+      {/* Active Infringements - show placeholder during scanning if no data, otherwise show the list */}
+      {isScanning && (!activeInfringements || activeInfringements.length === 0) ? (
         <ScanningPlaceholder productName={scan.products?.name || 'your product'} />
       ) : (
         <InfringementList
@@ -246,7 +229,7 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
       )}
 
       {/* Resolved Infringements Section */}
-      {!isScanning && resolvedInfringements && resolvedInfringements.length > 0 && (
+      {resolvedInfringements && resolvedInfringements.length > 0 && (
         <div className="mt-8">
           <InfringementList
             infringements={resolvedInfringements}
