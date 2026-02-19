@@ -923,10 +923,15 @@ async function runTieredSearch(
 ): Promise<InfringementResult[]> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey || apiKey === 'xxxxx') {
-    logger?.warn('keyword_search', 'No Serper API key configured, skipping tiered search', 'API_LIMIT');
+    logger?.error('keyword_search', 'SERPER_API_KEY is missing or placeholder — cannot run search. Set it in Vercel env vars.', 'SERP_ERROR');
     // Still run Telegram Bot API
     const telegramResults = await scanTelegram(product, intelligence);
     return telegramResults;
+  }
+
+  // Validate key format — Serper.dev keys are short alphanumeric, NOT long hex hashes (that's SerpAPI)
+  if (/^[0-9a-f]{40,}$/i.test(apiKey)) {
+    logger?.warn('keyword_search', `SERPER_API_KEY looks like a SerpAPI key (long hex hash). Serper.dev uses shorter keys. Verify you have the right key from serper.dev (not serpapi.com).`, 'SERP_ERROR');
   }
 
   const isTimedOut = () => Date.now() - scanStartTime > maxDurationMs;
@@ -956,16 +961,22 @@ async function runTieredSearch(
     tier: 1,
     query_count: tier1.length,
     budget_remaining: client.remaining,
+    queries: tier1.map((q) => ({ query: q.query, category: q.category })),
   });
 
   const tier1Responses = await client.searchBatch(
     tier1.map((q) => ({ query: q.query, num: q.num }))
   );
 
+  let tier1RawOrganicCount = 0;
+  let tier1FalsePositiveCount = 0;
+
   for (let i = 0; i < tier1Responses.length; i++) {
     const response = tier1Responses[i];
     const queryInfo = tier1[i];
     if (!response || !queryInfo) continue;
+
+    tier1RawOrganicCount += response.organic_results.length;
 
     for (const result of response.organic_results) {
       const scored = scoreResult(
@@ -993,13 +1004,17 @@ async function runTieredSearch(
           title: result.title,
           snippet: result.snippet,
         });
+      } else {
+        tier1FalsePositiveCount++;
       }
     }
   }
 
-  logger?.info('keyword_search', `Tier 1 complete: ${allResults.length} results (${client.used} API calls used)`, {
+  logger?.info('keyword_search', `Tier 1 complete: ${allResults.length} passed, ${tier1FalsePositiveCount} false positives, ${tier1RawOrganicCount} raw from Serper (${client.used} API calls)`, {
     tier: 1,
-    results_count: allResults.length,
+    results_passed: allResults.length,
+    false_positives: tier1FalsePositiveCount,
+    raw_organic_from_serper: tier1RawOrganicCount,
     api_calls_used: client.used,
     elapsed_ms: Date.now() - scanStartTime,
   });
@@ -1021,11 +1036,15 @@ async function runTieredSearch(
   );
 
   const tier2StartCount = allResults.length;
+  let tier2RawOrganicCount = 0;
+  let tier2FalsePositiveCount = 0;
 
   for (let i = 0; i < tier2Responses.length; i++) {
     const response = tier2Responses[i];
     const queryInfo = tier2[i];
     if (!response || !queryInfo) continue;
+
+    tier2RawOrganicCount += response.organic_results.length;
 
     for (const result of response.organic_results) {
       const scored = scoreResult(
@@ -1053,11 +1072,13 @@ async function runTieredSearch(
           title: result.title,
           snippet: result.snippet,
         });
+      } else {
+        tier2FalsePositiveCount++;
       }
     }
   }
 
-  logger?.info('trademark_search', `Tier 2 complete: +${allResults.length - tier2StartCount} results (${client.used} API calls used)`, {
+  logger?.info('trademark_search', `Tier 2 complete: +${allResults.length - tier2StartCount} passed, ${tier2FalsePositiveCount} false positives, ${tier2RawOrganicCount} raw from Serper (${client.used} API calls)`, {
     tier: 2,
     new_results: allResults.length - tier2StartCount,
     total_results: allResults.length,
@@ -1145,6 +1166,38 @@ async function runTieredSearch(
     api_calls_used: client.used,
     api_calls_remaining: client.remaining,
   });
+
+  // Diagnostic: Log Serper API health so errors are visible in scan logs
+  const diag = client.diagnostics;
+  if (diag.errorCalls > 0) {
+    const firstError = diag.errors[0];
+    logger?.error(
+      'marketplace_scan',
+      `Serper API ERRORS: ${diag.errorCalls}/${diag.totalCalls} calls failed (first error: ${firstError?.message || 'unknown'})`,
+      firstError?.status === 429 ? 'SERP_429' : 'SERP_ERROR',
+      {
+        serper_diagnostics: {
+          total_calls: diag.totalCalls,
+          success_calls: diag.successCalls,
+          error_calls: diag.errorCalls,
+          empty_result_calls: diag.emptyResultCalls,
+          total_organic_results: diag.totalResults,
+          first_error_status: firstError?.status,
+          first_error_message: firstError?.message?.slice(0, 300),
+        },
+      }
+    );
+  } else {
+    logger?.info('marketplace_scan', `Serper API health: ${diag.successCalls} OK, ${diag.emptyResultCalls} empty, ${diag.totalResults} total organic results`, {
+      serper_diagnostics: {
+        total_calls: diag.totalCalls,
+        success_calls: diag.successCalls,
+        error_calls: diag.errorCalls,
+        empty_result_calls: diag.emptyResultCalls,
+        total_organic_results: diag.totalResults,
+      },
+    });
+  }
 
   // Progress: Search tiers complete
   setStageStatus(stages, 'marketplace_scan', 'completed', allResults.length);

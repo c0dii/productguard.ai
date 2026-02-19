@@ -140,5 +140,9 @@ export async function runPlatformScanners(
     budget_used: budgetUsed,
   });
 
+  if (allResults.length === 0 && platformsRun.length > 0) {
+    logger?.warn('platform_scan', `All ${platformsRun.length} platform scanners returned 0 results. If Serper API errors were logged above, the API key may be invalid.`, 'SERP_ERROR');
+  }
+
   return { results: allResults, budgetUsed, platformsRun };
 }

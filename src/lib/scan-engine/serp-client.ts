@@ -6,6 +6,7 @@
  * - Batch execution with concurrency of 3
  * - Hard budget cap (default 50 calls per scan)
  * - Automatic budget enforcement — queries exceeding the budget are skipped
+ * - Diagnostic stats tracked per-scan: errors, empty results, total results
  */
 
 export interface SerpSearchParams {
@@ -25,6 +26,16 @@ export interface SerpResponse {
   query: string;
 }
 
+/** Diagnostic stats for debugging Serper issues */
+export interface SerpDiagnostics {
+  totalCalls: number;
+  successCalls: number;
+  errorCalls: number;
+  emptyResultCalls: number;
+  totalResults: number;
+  errors: Array<{ query: string; status: number; message: string }>;
+}
+
 export class SerpClient {
   private apiKey: string;
   private budgetUsed: number = 0;
@@ -32,6 +43,16 @@ export class SerpClient {
   private lastCallTime: number = 0;
   private readonly MIN_DELAY_MS = 150;
   private readonly BATCH_CONCURRENCY = 3;
+
+  /** Diagnostic counters — read after batch completes */
+  readonly diagnostics: SerpDiagnostics = {
+    totalCalls: 0,
+    successCalls: 0,
+    errorCalls: 0,
+    emptyResultCalls: 0,
+    totalResults: 0,
+    errors: [],
+  };
 
   constructor(apiKey: string, budgetLimit: number = 50) {
     this.apiKey = apiKey;
@@ -69,6 +90,7 @@ export class SerpClient {
     try {
       this.lastCallTime = Date.now();
       this.budgetUsed++;
+      this.diagnostics.totalCalls++;
 
       const response = await fetch('https://google.serper.dev/search', {
         method: 'POST',
@@ -81,23 +103,43 @@ export class SerpClient {
       });
 
       if (!response.ok) {
-        console.error(`[SerpClient] API error ${response.status} for: ${params.query}`);
+        const errorBody = await response.text().catch(() => '');
+        const errorMsg = `HTTP ${response.status}: ${errorBody.slice(0, 200)}`;
+        console.error(`[SerpClient] API error ${response.status} for: ${params.query} — ${errorBody.slice(0, 100)}`);
+        this.diagnostics.errorCalls++;
+        this.diagnostics.errors.push({
+          query: params.query,
+          status: response.status,
+          message: errorMsg,
+        });
         return { organic_results: [], query: params.query };
       }
 
       const data = await response.json();
+      const organicResults = (data.organic || []).map((r: any, i: number) => ({
+        title: r.title || '',
+        link: r.link || '',
+        snippet: r.snippet || '',
+        position: r.position || i + 1,
+      }));
 
-      return {
-        organic_results: (data.organic || []).map((r: any, i: number) => ({
-          title: r.title || '',
-          link: r.link || '',
-          snippet: r.snippet || '',
-          position: r.position || i + 1,
-        })),
-        query: params.query,
-      };
+      this.diagnostics.successCalls++;
+      this.diagnostics.totalResults += organicResults.length;
+      if (organicResults.length === 0) {
+        this.diagnostics.emptyResultCalls++;
+      }
+
+      return { organic_results: organicResults, query: params.query };
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
       console.error(`[SerpClient] Error for "${params.query}":`, error);
+      this.diagnostics.errorCalls++;
+      this.diagnostics.totalCalls++; // count timeout/network errors too
+      this.diagnostics.errors.push({
+        query: params.query,
+        status: 0,
+        message: errMsg,
+      });
       return { organic_results: [], query: params.query };
     }
   }
