@@ -1188,6 +1188,8 @@ async function runTieredSearch(
   const diag = client.diagnostics;
   if (diag.errorCalls > 0) {
     const firstError = diag.errors[0];
+    // Log ALL failing queries so we can identify the pattern
+    const failingQueries = diag.errors.map((e) => `[${e.status}] ${e.query}`).join(' | ');
     logger?.error(
       'marketplace_scan',
       `Serper API ERRORS: ${diag.errorCalls}/${diag.totalCalls} calls failed (first error: ${firstError?.message || 'unknown'})`,
@@ -1201,6 +1203,7 @@ async function runTieredSearch(
           total_organic_results: diag.totalResults,
           first_error_status: firstError?.status,
           first_error_message: firstError?.message?.slice(0, 300),
+          failing_queries: failingQueries.slice(0, 2000),
         },
       }
     );
