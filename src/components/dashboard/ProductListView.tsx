@@ -9,10 +9,11 @@ interface ProductListViewProps {
   products: ProductWithStats[];
   onEdit: (product: ProductWithStats) => void;
   onDelete: (id: string) => void;
+  onArchive?: (id: string) => void;
   onScan: (id: string) => void;
 }
 
-export function ProductListView({ products, onEdit, onDelete, onScan }: ProductListViewProps) {
+export function ProductListView({ products, onEdit, onDelete, onArchive, onScan }: ProductListViewProps) {
   const getRiskBadge = (activeCount: number = 0, totalCount: number = 0) => {
     if (activeCount === 0 && totalCount === 0) {
       return <Badge variant="default" className="bg-green-600 text-white">Safe</Badge>;
@@ -116,6 +117,20 @@ export function ProductListView({ products, onEdit, onDelete, onScan }: ProductL
                   >
                     ✏️
                   </Button>
+                  {onArchive && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onArchive(product.id);
+                      }}
+                      className="text-xs px-2 py-1"
+                      title="Archive"
+                    >
+                      📦
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="danger"

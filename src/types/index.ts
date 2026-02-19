@@ -258,6 +258,9 @@ export interface Product {
   product_images: ProductImage[]; // Array of uploaded images
   ai_analysis_version: number; // Version tracker for re-analysis
   last_analyzed_at: string | null; // Cache invalidation timestamp
+
+  // Archive
+  archived_at?: string | null;
 }
 
 export interface ProductWithStats extends Product {
@@ -300,6 +303,9 @@ export interface Scan {
   run_count: number; // Number of times this scan has been run
   last_run_at: string; // Most recent run timestamp
   initial_run_at: string; // When scan was first created
+
+  // Archive
+  archived_at?: string | null;
 }
 
 export interface ScanHistory {

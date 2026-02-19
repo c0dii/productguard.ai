@@ -706,7 +706,7 @@ export async function notifyScanError(payload: ScanErrorPayload): Promise<boolea
           </div>
 
           <div style="text-align: center; margin: 24px 0;">
-            <a href="${APP_URL}/admin/scan-logs"
+            <a href="${APP_URL}/admin/scans/scan-logs"
                style="display: inline-block; background: #ef4444; color: #fff; font-weight: 600; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-size: 14px;">
               View Scan Logs Dashboard
             </a>

@@ -7,6 +7,7 @@ import { InfringementTrendChart } from '@/components/dashboard/InfringementTrend
 import { PendingVerificationList } from '@/components/dashboard/PendingVerificationList';
 import { RunScanButton } from '@/components/dashboard/RunScanButton';
 import { ProductWorkflowBar } from '@/components/dashboard/ProductWorkflowBar';
+import { ArchiveProductButton } from '@/components/dashboard/ArchiveProductButton';
 import type { Product, ProductTimelineData } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -118,12 +119,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
 
-            <Link
-              href={`/dashboard/products?edit=${product.id}`}
-              className="inline-flex items-center gap-1.5 px-4 py-2 mt-3 text-sm font-medium text-pg-text bg-pg-surface hover:bg-pg-surface-light border border-pg-border rounded-lg transition-all"
-            >
-              ✏️ Edit Product
-            </Link>
+            <div className="flex items-center gap-2 mt-3">
+              <Link
+                href={`/dashboard/products?edit=${product.id}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-pg-text bg-pg-surface hover:bg-pg-surface-light border border-pg-border rounded-lg transition-all"
+              >
+                ✏️ Edit Product
+              </Link>
+              <ArchiveProductButton productId={product.id} />
+            </div>
 
             <div className="space-y-3 mt-4 sm:mt-6">
               <div>

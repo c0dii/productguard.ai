@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { UserManagementActions } from '@/components/admin/UserManagementActions';
+import { AdminUserProducts } from '@/components/admin/AdminUserProducts';
+import { AdminUserScans } from '@/components/admin/AdminUserScans';
 import Link from 'next/link';
 
 export default async function AdminUserDetailPage({
@@ -251,54 +253,14 @@ export default async function AdminUserDetailPage({
 
           {/* Products */}
           <Card>
-            <h2 className="text-xl font-bold mb-4">Products ({products?.length || 0})</h2>
-            {!products || products.length === 0 ? (
-              <p className="text-sm text-pg-text-muted">No products created</p>
-            ) : (
-              <div className="space-y-2">
-                {products.map((product: any) => (
-                  <div
-                    key={product.id}
-                    className="p-3 bg-pg-surface-light rounded-lg"
-                  >
-                    <p className="font-semibold">{product.name}</p>
-                    <p className="text-xs text-pg-text-muted">
-                      {product.type} • Created{' '}
-                      {new Date(product.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <AdminUserProducts products={products || []} />
           </Card>
 
           {/* Recent Activity */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Recent Scans */}
             <Card>
-              <h2 className="text-lg font-bold mb-4">Recent Scans</h2>
-              {!scans || scans.length === 0 ? (
-                <p className="text-sm text-pg-text-muted">No scans yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {scans.map((scan: any) => (
-                    <div
-                      key={scan.id}
-                      className="text-sm p-2 bg-pg-surface-light rounded"
-                    >
-                      <div className="flex justify-between">
-                        <span className="capitalize text-pg-accent">{scan.status}</span>
-                        <span className="text-pg-text-muted">
-                          {scan.results_count || 0} results
-                        </span>
-                      </div>
-                      <p className="text-xs text-pg-text-muted">
-                        {new Date(scan.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <AdminUserScans scans={scans || []} />
             </Card>
 
             {/* Recent Takedowns */}

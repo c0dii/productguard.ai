@@ -14,10 +14,14 @@ interface AdminSidebarProps {
   alertCounts?: AdminAlertCounts | null;
 }
 
+const scansSubItems = [
+  { href: '/admin/scans', label: 'Scan Activity', exact: true },
+  { href: '/admin/scans/scan-learning', label: 'Scan Learning' },
+  { href: '/admin/scans/scan-logs', label: 'Scan Logs' },
+];
+
 const dataSubItems = [
   { href: '/admin/data', label: 'Health Overview', exact: true },
-  { href: '/admin/data/scan-learning', label: 'Scan Learning' },
-  { href: '/admin/data/scan-logs', label: 'Scan Logs' },
   { href: '/admin/data/api-logs', label: 'API Logs' },
   { href: '/admin/data/system-events', label: 'System Events' },
   { href: '/admin/data/errors', label: 'Error Tracking' },
@@ -27,6 +31,8 @@ const dataSubItems = [
 
 export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
   const pathname = usePathname();
+  const isScansActive = pathname.startsWith('/admin/scans');
+  const [scansOpen, setScansOpen] = useState(isScansActive);
   const isDataActive = pathname.startsWith('/admin/data');
   const [dataOpen, setDataOpen] = useState(isDataActive);
 
@@ -34,7 +40,6 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
     { href: '/admin', label: 'Overview', icon: '\ud83d\udcca', exact: true },
     { href: '/admin/users', label: 'Users', icon: '\ud83d\udc65' },
     { href: '/admin/subscriptions', label: 'Subscriptions', icon: '\ud83d\udcb3' },
-    { href: '/admin/scans', label: 'Scans', icon: '\ud83d\udd0d' },
     { href: '/admin/infringements', label: 'Infringements', icon: '\u26a0\ufe0f' },
     { href: '/admin/takedowns', label: 'Takedowns', icon: '\ud83d\udce7' },
     { href: '/admin/marketing', label: 'Marketing', icon: '\ud83d\udce3' },
@@ -84,6 +89,52 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
             {item.icon} {item.label}
           </Link>
         ))}
+
+        {/* Scans Collapsible Group */}
+        <div className="pt-2">
+          <button
+            onClick={() => setScansOpen(!scansOpen)}
+            className={`
+              w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-medium transition-colors
+              ${
+                isScansActive
+                  ? 'bg-pg-accent bg-opacity-10 text-pg-accent border border-pg-accent'
+                  : 'text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text'
+              }
+            `}
+          >
+            <span>{'\ud83d\udd0d'} Scans</span>
+            <svg
+              className={`w-4 h-4 transition-transform ${scansOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {scansOpen && (
+            <div className="ml-4 mt-1 space-y-0.5 border-l border-pg-border pl-3">
+              {scansSubItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`
+                    block px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                    ${
+                      isActive(item.href, item.exact)
+                        ? 'text-pg-accent bg-pg-accent bg-opacity-5'
+                        : 'text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text'
+                    }
+                  `}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Data Collapsible Group */}
         <div className="pt-2">

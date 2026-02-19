@@ -107,7 +107,7 @@ export default async function DataOverviewPage() {
           title="Scan Engine"
           icon="&#128269;"
           stats={getStats('scan')}
-          href="/admin/data/scan-logs"
+          href="/admin/scans/scan-logs"
         />
         <ServiceHealthCard
           title="OpenAI API"
@@ -146,7 +146,7 @@ export default async function DataOverviewPage() {
       <h2 className="text-xl font-bold mb-4">Quick Links</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { href: '/admin/data/scan-logs', label: 'Scan Logs', desc: 'Detailed scan execution logs' },
+          { href: '/admin/scans/scan-logs', label: 'Scan Logs', desc: 'Detailed scan execution logs' },
           { href: '/admin/data/api-logs', label: 'API Logs', desc: 'OpenAI, Serper, WHOIS calls' },
           { href: '/admin/data/system-events', label: 'System Events', desc: 'Cron, webhooks, emails' },
           { href: '/admin/data/errors', label: 'Error Tracking', desc: 'Unresolved errors & resolution' },

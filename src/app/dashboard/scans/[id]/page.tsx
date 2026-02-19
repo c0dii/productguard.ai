@@ -8,6 +8,7 @@ import { ExportReportButton } from '@/components/dashboard/ExportReportButton';
 import { PendingVerificationList } from '@/components/dashboard/PendingVerificationList';
 import { ScanProgressTracker } from '@/components/dashboard/ScanProgressTracker';
 import { ScanningPlaceholder } from '@/components/dashboard/ScanningPlaceholder';
+import { ArchiveScanButton } from '@/components/dashboard/ArchiveScanButton';
 import type { Infringement, Scan } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -210,9 +211,12 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
                 </div>
               </div>
             </div>
-            {scanStatus === 'completed' && activeInfringements && activeInfringements.length > 0 && (
-              <ExportReportButton scanId={id} productName={scan.products?.name || 'Product'} />
-            )}
+            <div className="flex items-center gap-2">
+              {scanStatus === 'completed' && activeInfringements && activeInfringements.length > 0 && (
+                <ExportReportButton scanId={id} productName={scan.products?.name || 'Product'} />
+              )}
+              <ArchiveScanButton scanId={id} />
+            </div>
           </div>
         </Card>
       )}

@@ -25,6 +25,8 @@ export default function ProductsPage() {
   const [showWizard, setShowWizard] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [pendingEditId, setPendingEditId] = useState<string | null>(null);
+  const [archivedProducts, setArchivedProducts] = useState<ProductWithStats[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const supabase = createClient();
@@ -126,7 +128,10 @@ export default function ProductsPage() {
     );
 
     console.log('Products fetched with stats:', productsWithStats);
-    setProducts(productsWithStats);
+    const active = productsWithStats.filter(p => !p.archived_at);
+    const archived = productsWithStats.filter(p => !!p.archived_at);
+    setProducts(active);
+    setArchivedProducts(archived);
     setLoading(false);
   };
 
@@ -235,6 +240,26 @@ export default function ProductsPage() {
         alert('Product deleted successfully!');
         fetchProducts();
       }
+    }
+  };
+
+  const handleArchive = async (id: string) => {
+    if (confirm('Archive this product? It will be hidden from your dashboard and scans.')) {
+      const response = await fetch(`/api/products/${id}/archive`, { method: 'POST' });
+      if (response.ok) {
+        fetchProducts();
+      } else {
+        alert('Failed to archive product');
+      }
+    }
+  };
+
+  const handleUnarchive = async (id: string) => {
+    const response = await fetch(`/api/products/${id}/unarchive`, { method: 'POST' });
+    if (response.ok) {
+      fetchProducts();
+    } else {
+      alert('Failed to unarchive product');
     }
   };
 
@@ -401,6 +426,7 @@ export default function ProductsPage() {
           products={sortedProducts}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onArchive={handleArchive}
           onScan={handleScan}
         />
       ) : (
@@ -447,6 +473,20 @@ export default function ProductsPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              handleArchive(product.id);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-pg-text hover:bg-pg-bg transition-colors flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                            </svg>
+                            Archive
                           </button>
                           <button
                             onClick={(e) => {
@@ -549,6 +589,48 @@ export default function ProductsPage() {
 
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Archived Products */}
+      {archivedProducts.length > 0 && (
+        <div className="mt-8">
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className="text-sm text-pg-text-muted hover:text-pg-text transition-colors flex items-center gap-2"
+          >
+            <svg
+              className={`w-4 h-4 transition-transform ${showArchived ? 'rotate-180' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            {showArchived ? 'Hide' : 'Show'} Archived ({archivedProducts.length})
+          </button>
+
+          {showArchived && (
+            <div className="mt-4 space-y-2">
+              {archivedProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-center justify-between p-4 rounded-lg bg-pg-surface/50 border border-pg-border opacity-70"
+                >
+                  <div>
+                    <p className="font-semibold text-pg-text">{product.name}</p>
+                    <p className="text-xs text-pg-text-muted">
+                      {product.type} - ${product.price} - Archived {product.archived_at ? new Date(product.archived_at).toLocaleDateString() : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleUnarchive(product.id)}
+                    className="px-3 py-1.5 text-sm font-medium text-pg-accent hover:bg-pg-accent/10 border border-pg-accent/30 rounded-lg transition-colors"
+                  >
+                    Unarchive
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
