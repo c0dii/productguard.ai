@@ -20,6 +20,7 @@ export function DashboardSidebar({ profile, onNavigate }: DashboardSidebarProps)
     { name: 'Products', href: '/dashboard/products', icon: '📦' },
     { name: 'Scans', href: '/dashboard/scans', icon: '🔍' },
     { name: 'Infringements', href: '/dashboard/infringements', icon: '🚨' },
+    { name: 'Ready for Takedown', href: '/dashboard/ready-for-takedown', icon: '📋' },
     { name: 'Takedowns', href: '/dashboard/takedowns', icon: '⚡' },
     { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
   ];
@@ -48,7 +49,7 @@ export function DashboardSidebar({ profile, onNavigate }: DashboardSidebarProps)
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
         {navigation.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'));
           return (
             <Link
               key={item.name}

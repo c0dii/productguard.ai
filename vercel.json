@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/check-deadlines",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/dmca/process-queue",
+      "schedule": "*/3 * * * *"
     }
   ]
 }

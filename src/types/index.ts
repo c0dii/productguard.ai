@@ -470,6 +470,54 @@ export interface Takedown {
   updated_at: string;
 }
 
+// ── DMCA Send Queue ──────────────────────────────────────────────────────
+
+export type QueueItemStatus = 'pending' | 'processing' | 'sent' | 'web_form' | 'failed' | 'skipped';
+export type DeliveryMethod = 'email' | 'web_form' | 'manual';
+
+export interface DMCASendQueueItem {
+  id: string;
+  user_id: string;
+  batch_id: string;
+  infringement_id: string;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  provider_name: string;
+  target_type: string;
+  delivery_method: DeliveryMethod;
+  form_url: string | null;
+  notice_subject: string;
+  notice_body: string;
+  cc_emails: string[] | null;
+  status: QueueItemStatus;
+  priority: number;
+  attempt_count: number;
+  max_attempts: number;
+  takedown_id: string | null;
+  resend_message_id: string | null;
+  error_message: string | null;
+  scheduled_for: string;
+  processing_started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DMCABatchSummary {
+  batch_id: string;
+  user_id: string;
+  total_items: number;
+  pending_count: number;
+  processing_count: number;
+  sent_count: number;
+  web_form_count: number;
+  failed_count: number;
+  skipped_count: number;
+  batch_created_at: string;
+  last_completed_at: string | null;
+  next_scheduled: string | null;
+}
+
 export interface ProductTimelineData {
   product_id: string;
   date: string;

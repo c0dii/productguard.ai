@@ -38,10 +38,10 @@ const PROVIDERS: Record<string, ProviderInfo> = {
   },
   google: {
     name: 'Google',
-    dmcaEmail: 'dmca-agent@google.com',
-    dmcaFormUrl: 'https://support.google.com/legal/troubleshooter/1114905',
+    dmcaEmail: null, // Google does NOT accept DMCA via email — web form only
+    dmcaFormUrl: 'https://reportcontent.google.com/forms/dmca_search',
     agentName: 'Google DMCA Agent',
-    requirements: 'Include specific URLs to be removed from search results. Use the web form for fastest processing.',
+    requirements: 'Google only accepts DMCA submissions via their web form. Include specific URLs to be removed from search results.',
     prefersWebForm: true,
   },
   telegram: {
@@ -88,10 +88,10 @@ const PROVIDERS: Record<string, ProviderInfo> = {
   },
   'drive.google': {
     name: 'Google Drive',
-    dmcaEmail: 'dmca-agent@google.com',
-    dmcaFormUrl: 'https://support.google.com/legal/troubleshooter/1114905',
+    dmcaEmail: null, // Google does NOT accept DMCA via email — web form only
+    dmcaFormUrl: 'https://reportcontent.google.com/forms/dmca_search',
     agentName: 'Google DMCA Agent',
-    requirements: 'Include shared drive file/folder links. Use the web form for fastest processing.',
+    requirements: 'Google only accepts DMCA submissions via their web form. Include shared drive file/folder links.',
     prefersWebForm: true,
   },
 
