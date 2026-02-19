@@ -145,7 +145,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
 
     // Initialize structured logger
     logger = new ScanLogger(scanId, product.id, product.user_id, product, {
-      serpBudget: 50,
+      serpBudget: 75,
       maxDurationMs: MAX_SCAN_DURATION_MS,
       aiFilterEnabled: process.env.DISABLE_AI_FILTER !== 'true',
       aiConfidenceThreshold: parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.75'),
@@ -953,7 +953,7 @@ async function runTieredSearch(
 
   const isTimedOut = () => Date.now() - scanStartTime > maxDurationMs;
 
-  const client = new SerpClient(apiKey, 50);
+  const client = new SerpClient(apiKey, 75);
   const allResults: InfringementResult[] = [];
   const allFoundUrls: string[] = [];
 
@@ -1179,7 +1179,7 @@ async function runTieredSearch(
     }
   }
 
-  logger?.info('marketplace_scan', `SerpAPI budget: ${client.used}/50 calls used`, {
+  logger?.info('marketplace_scan', `Serper budget: ${client.used}/75 calls used`, {
     api_calls_used: client.used,
     api_calls_remaining: client.remaining,
   });

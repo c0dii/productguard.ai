@@ -4,7 +4,7 @@
  * Features:
  * - 150ms minimum delay between API calls
  * - Batch execution with concurrency of 3
- * - Hard budget cap (default 50 calls per scan)
+ * - Hard budget cap (default 75 calls per scan)
  * - Automatic budget enforcement — queries exceeding the budget are skipped
  * - Diagnostic stats tracked per-scan: errors, empty results, total results
  */
@@ -54,7 +54,7 @@ export class SerpClient {
     errors: [],
   };
 
-  constructor(apiKey: string, budgetLimit: number = 50) {
+  constructor(apiKey: string, budgetLimit: number = 75) {
     this.apiKey = apiKey;
     this.budgetLimit = budgetLimit;
   }
