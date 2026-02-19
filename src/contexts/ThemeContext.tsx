@@ -87,14 +87,9 @@ export function ThemeProvider({
     }
   };
 
-  // Prevent flash of incorrect theme
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>;
-  }
-
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
-      {children}
+      {!mounted ? <div style={{ visibility: 'hidden' }}>{children}</div> : children}
     </ThemeContext.Provider>
   );
 }
