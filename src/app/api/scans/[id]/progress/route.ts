@@ -30,9 +30,36 @@ export async function GET(
       return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
     }
 
-    // Auto-recover stale scans: if running for >10 minutes, mark as failed
-    // Uses admin client to bypass RLS (users may not have UPDATE on scans)
+    // Auto-recover scans stuck in 'running' state
     if (scan.status === 'running') {
+      const adminClient = createAdminClient();
+      const scanProgress = scan.scan_progress as { stages?: Array<{ status: string }> } | null;
+      const stages = scanProgress?.stages || [];
+
+      // Recovery 1: All stages completed but status never updated
+      // This happens when Vercel kills the function after stages finish
+      // but before the final status='completed' write
+      const allStagesDone = stages.length > 0 && stages.every(
+        (s) => s.status === 'completed' || s.status === 'skipped'
+      );
+
+      if (allStagesDone) {
+        console.warn(`[Progress] Scan ${id} has all stages done but status='running', marking as completed`);
+        await adminClient
+          .from('scans')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+
+        return NextResponse.json({
+          ...scan,
+          status: 'completed',
+        });
+      }
+
+      // Recovery 2: Scan running for >10 minutes (function crashed/timed out)
       const { data: fullScan } = await supabase
         .from('scans')
         .select('started_at')
@@ -45,7 +72,6 @@ export async function GET(
 
         if (elapsedMs > STALE_THRESHOLD_MS) {
           console.warn(`[Progress] Scan ${id} stale (${Math.round(elapsedMs / 1000)}s), marking as failed`);
-          const adminClient = createAdminClient();
           await adminClient
             .from('scans')
             .update({

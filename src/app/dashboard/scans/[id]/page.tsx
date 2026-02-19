@@ -38,13 +38,23 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
 
   const productId = scan.products?.id || scan.product_id;
 
-  // Server-side stale scan recovery: if scan has been "running" for >10 minutes,
-  // treat it as failed so the user sees results instead of a stuck progress bar
+  // Server-side scan recovery: detect scans stuck in 'running' state
   let scanStatus = scan.status;
-  if ((scanStatus === 'running' || scanStatus === 'pending') && scan.started_at) {
-    const elapsedMs = Date.now() - new Date(scan.started_at).getTime();
-    if (elapsedMs > 10 * 60 * 1000) {
-      scanStatus = 'failed';
+  if (scanStatus === 'running' || scanStatus === 'pending') {
+    // Recovery 1: All stages completed but status never updated (function killed mid-write)
+    const stages = (scan.scan_progress as any)?.stages || [];
+    const allStagesDone = stages.length > 0 && stages.every(
+      (s: any) => s.status === 'completed' || s.status === 'skipped'
+    );
+    if (allStagesDone) {
+      scanStatus = 'completed';
+    }
+    // Recovery 2: Running for >10 minutes (function crashed/timed out)
+    else if (scan.started_at) {
+      const elapsedMs = Date.now() - new Date(scan.started_at).getTime();
+      if (elapsedMs > 10 * 60 * 1000) {
+        scanStatus = 'failed';
+      }
     }
   }
 

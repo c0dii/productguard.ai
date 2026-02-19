@@ -113,7 +113,16 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
         }
 
         // Stop polling if scan is complete
-        if (data.status === 'completed' || data.status === 'failed') {
+        const isFinished = data.status === 'completed' || data.status === 'failed';
+
+        // Also detect completion from stages: if all stages are done but status
+        // hasn't been updated yet (Vercel function killed before final write)
+        const polledStages = (data.scan_progress?.stages || []) as Array<{ status: string }>;
+        const allStagesDone = polledStages.length > 0 && polledStages.every(
+          (s: { status: string }) => s.status === 'completed' || s.status === 'skipped'
+        );
+
+        if (isFinished || allStagesDone) {
           setIsPolling(false);
           // Brief delay so user sees "Scan Complete" before page reloads with results
           setTimeout(() => {
