@@ -175,7 +175,7 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
   // independent of the polling fetch. Even if every API call fails, this fires.
   useEffect(() => {
     if (!isPolling || hasNavigated.current) return;
-    if (elapsedSeconds >= 300) {
+    if (elapsedSeconds >= 255) {
       hasNavigated.current = true;
       setIsPolling(false);
       navigateToResults(scan.id);
@@ -382,7 +382,7 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
         )}
 
         {/* Fallback link — visible after 4.5 minutes in case auto-navigation fails */}
-        {isPolling && elapsedSeconds >= 270 && (
+        {isPolling && elapsedSeconds >= 225 && (
           <div className="text-center pt-1">
             <a
               href={`/dashboard/scans/${scan.id}?t=${Date.now()}`}
