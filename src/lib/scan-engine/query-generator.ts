@@ -171,6 +171,12 @@ function generateTier1(
   const q = (query: string, category: string) =>
     queries.push({ query, tier: 1, num: 30, category });
 
+  // ── BROAD NAME SEARCH (highest priority) ─────────────────────────
+  // Search just the product name with exclusions — no piracy terms.
+  // This catches piracy pages that Google ranks naturally for the product name,
+  // which is exactly how a human would search.
+  q(`"${names.canonical}" ${exclusions}`.trim(), 'name-only');
+
   // AI-generated piracy search terms (product-specific, highest priority)
   const aiPiracyTerms = product.ai_extracted_data?.piracy_search_terms || [];
   for (const term of aiPiracyTerms.slice(0, 4)) {
@@ -188,6 +194,16 @@ function generateTier1(
   if (names.short && names.short !== names.canonical && names.short.length > 3) {
     q(`"${names.short}" free download ${exclusions}`.trim(), 'piracy-short');
     q(`"${names.short}" nulled ${exclusions}`.trim(), 'piracy-short');
+  }
+
+  // ── ALTERNATIVE NAME SEARCHES ────────────────────────────────────
+  // Search alternative names early (Tier 1) instead of only in Tier 3,
+  // which depends on Tier 1/2 finding results first.
+  const userAltNames = product.alternative_names || [];
+  const autoAltNames = product.ai_extracted_data?.auto_alternative_names || [];
+  const allAltNames = [...new Set([...userAltNames, ...autoAltNames])];
+  for (const altName of allAltNames.slice(0, 2)) {
+    q(`"${altName}" ${exclusions}`.trim(), 'alt-name');
   }
 
   // User-specified keywords as additional search terms
