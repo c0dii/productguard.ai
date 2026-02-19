@@ -1,7 +1,7 @@
 /**
  * Tiered Query Generator — builds search queries organized by priority.
  *
- * Tier 1: Broad Discovery (8-12 queries @ num=30)
+ * Tier 1: Broad Discovery (8-12 queries @ num=10)
  *   Cast a wide net: core piracy terms + product name variations.
  *
  * Tier 2: Targeted Platform (10-20 queries @ num=10)
@@ -157,7 +157,7 @@ function mapProductTypeToDiscoveryCategory(type: ProductType): DiscoveryCategory
 }
 
 // ============================================================================
-// TIER 1: BROAD DISCOVERY (8-12 queries @ num=30)
+// TIER 1: BROAD DISCOVERY (8-12 queries @ num=10)
 // ============================================================================
 
 function generateTier1(
@@ -169,7 +169,7 @@ function generateTier1(
 ): GeneratedQuery[] {
   const queries: GeneratedQuery[] = [];
   const q = (query: string, category: string) =>
-    queries.push({ query, tier: 1, num: 30, category });
+    queries.push({ query, tier: 1, num: 10, category });
 
   // ── BROAD NAME SEARCH (highest priority) ─────────────────────────
   // Search just the product name with exclusions — no piracy terms.
