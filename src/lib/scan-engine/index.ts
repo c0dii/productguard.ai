@@ -276,16 +276,33 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     let filteredResults = resultsToProcess;
 
     if (useAIFilter && resultsToProcess.length > 0) {
-      filteredResults = await filterSearchResults(resultsToProcess, product, aiConfidenceThreshold, intelligence);
+      const aiResult = await filterSearchResults(resultsToProcess, product, aiConfidenceThreshold, intelligence);
+      filteredResults = aiResult.filtered;
 
       const passRate = resultsToProcess.length > 0 ? ((filteredResults.length / resultsToProcess.length) * 100).toFixed(1) : '0';
       logger.info('phrase_matching', `AI Filter: ${filteredResults.length}/${resultsToProcess.length} NEW results passed (${passRate}% pass rate)`, {
         ai_passed: filteredResults.length,
         ai_total: resultsToProcess.length,
         pass_rate: parseFloat(passRate),
+        ai_status: aiResult.aiStatus,
+        ai_fallback_count: aiResult.fallbackCount,
         ai_cost_usd: parseFloat(estimateFilteringCost(resultsToProcess.length).toFixed(4)),
         ai_savings_usd: parseFloat(estimateFilteringCost(aiFilteringSaved).toFixed(4)),
       });
+
+      // CRITICAL: Warn if OpenAI is failing and fallback is being used
+      if (aiResult.aiStatus === 'all_fallback') {
+        logger.error('phrase_matching',
+          `OpenAI API FAILED for ALL ${resultsToProcess.length} results — fallback used (results NOT AI-verified). Error: ${aiResult.errorMessage || 'unknown'}`,
+          'AI_FILTER_FAIL',
+          { fallback_count: aiResult.fallbackCount, error_message: aiResult.errorMessage }
+        );
+      } else if (aiResult.aiStatus === 'partial_fallback') {
+        logger.warn('phrase_matching',
+          `OpenAI API failed for ${aiResult.fallbackCount}/${resultsToProcess.length} results — partial fallback used`,
+          'AI_FILTER_FAIL'
+        );
+      }
     } else if (resultsToProcess.length === 0) {
       logger.info('phrase_matching', 'No new URLs to filter (all URLs already tracked)');
     } else {

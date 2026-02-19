@@ -215,18 +215,21 @@ Respond with JSON only.`;
         is_infringement: true, // Be conservative, let user verify
         confidence: 0.5,
         reasoning: 'AI filter returned invalid response',
-      };
+        _fallback: true,
+      } as FilterResult & { _fallback?: boolean };
     }
 
     return response.data;
   } catch (error) {
-    console.error('AI filtering error:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('AI filtering error:', errMsg);
     // On error, be conservative and allow the result through with low confidence
     return {
       is_infringement: true,
       confidence: 0.5,
-      reasoning: 'AI filter error, requires manual verification',
-    };
+      reasoning: `AI filter error: ${errMsg.slice(0, 100)}`,
+      _fallback: true,
+    } as FilterResult & { _fallback?: boolean };
   }
 }
 
@@ -238,12 +241,14 @@ export async function filterSearchResults(
   product: Product,
   minConfidence: number = 0.75,
   intelligence?: IntelligenceData
-): Promise<InfringementResult[]> {
+): Promise<{ filtered: InfringementResult[]; aiStatus: 'ok' | 'all_fallback' | 'partial_fallback'; fallbackCount: number; errorMessage?: string }> {
   console.log(`[AI Filter] Analyzing ${results.length} results for product: ${product.name}`);
 
   const filteredResults: InfringementResult[] = [];
-  let filtered = 0;
+  let filteredCount = 0;
   let passed = 0;
+  let fallbackCount = 0;
+  let lastErrorMessage: string | undefined;
 
   // Process in batches to avoid rate limits
   const batchSize = 5;
@@ -260,6 +265,16 @@ export async function filterSearchResults(
       const result = batch[index];
       if (!result) return;
 
+      // Track fallback usage
+      const isFallback = (analysis as FilterResult & { _fallback?: boolean })._fallback === true;
+      if (isFallback) {
+        fallbackCount++;
+        // Extract error from reasoning
+        if (analysis.reasoning.startsWith('AI filter error:')) {
+          lastErrorMessage = analysis.reasoning;
+        }
+      }
+
       // Pass if: AI says it's an infringement with sufficient confidence,
       // OR if AI is uncertain but above 0.50 floor — let human decide
       const isLikelyInfringement = analysis.is_infringement && analysis.confidence >= minConfidence;
@@ -269,11 +284,11 @@ export async function filterSearchResults(
         filteredResults.push(result);
         passed++;
         console.log(
-          `[AI Filter] ✓ PASS (${(analysis.confidence * 100).toFixed(0)}%${isUncertain ? ' uncertain' : ''}): ${result.source_url} - ${analysis.reasoning}`
+          `[AI Filter] ✓ PASS (${(analysis.confidence * 100).toFixed(0)}%${isUncertain ? ' uncertain' : ''}${isFallback ? ' FALLBACK' : ''}): ${result.source_url} - ${analysis.reasoning}`
         );
       } else {
         // Only filter out results the AI is confident are NOT infringements
-        filtered++;
+        filteredCount++;
         console.log(
           `[AI Filter] ✗ FILTERED (${(analysis.confidence * 100).toFixed(0)}%): ${result.source_url} - ${analysis.reasoning}`
         );
@@ -286,11 +301,18 @@ export async function filterSearchResults(
     }
   }
 
+  // Determine AI status
+  const aiStatus = fallbackCount === 0 ? 'ok' : fallbackCount === results.length ? 'all_fallback' : 'partial_fallback';
+
+  if (fallbackCount > 0) {
+    console.error(`[AI Filter] WARNING: ${fallbackCount}/${results.length} results used FALLBACK (OpenAI call failed). Error: ${lastErrorMessage || 'unknown'}`);
+  }
+
   console.log(
-    `[AI Filter] Results: ${passed} passed, ${filtered} filtered (${((passed / results.length) * 100).toFixed(1)}% accuracy)`
+    `[AI Filter] Results: ${passed} passed, ${filteredCount} filtered, ${fallbackCount} fallbacks (${((passed / results.length) * 100).toFixed(1)}% pass rate)`
   );
 
-  return filteredResults;
+  return { filtered: filteredResults, aiStatus, fallbackCount, errorMessage: lastErrorMessage };
 }
 
 /**

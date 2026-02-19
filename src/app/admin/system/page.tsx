@@ -1,9 +1,40 @@
 import { createClient } from '@/lib/supabase/server';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import OpenAI from 'openai';
+
+async function testOpenAIConnection(): Promise<{ ok: boolean; error?: string; model?: string; latencyMs?: number }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { ok: false, error: 'OPENAI_API_KEY not set' };
+
+  try {
+    const client = new OpenAI({ apiKey });
+    const start = Date.now();
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'Reply with just the word "ok"' }],
+      max_tokens: 5,
+      temperature: 0,
+    });
+    const latencyMs = Date.now() - start;
+    return {
+      ok: true,
+      model: response.model,
+      latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err.message || String(err),
+    };
+  }
+}
 
 export default async function AdminSystemPage() {
   const supabase = await createClient();
+
+  // Live test OpenAI connection
+  const openaiTest = await testOpenAIConnection();
 
   // Get system stats
   const [
@@ -131,12 +162,15 @@ export default async function AdminSystemPage() {
             <Badge
               variant="default"
               className={
-                process.env.OPENAI_API_KEY
+                openaiTest.ok
                   ? 'bg-pg-accent bg-opacity-10 text-pg-accent'
                   : 'bg-red-500 bg-opacity-10 text-red-400'
               }
             >
-              {process.env.OPENAI_API_KEY ? '✓ Ready' : '✗ OPENAI_API_KEY Missing'}
+              {openaiTest.ok
+                ? `✓ Connected (${openaiTest.latencyMs}ms, ${openaiTest.model})`
+                : `✗ FAILED: ${openaiTest.error?.slice(0, 80)}`
+              }
             </Badge>
           </Card>
         </div>
