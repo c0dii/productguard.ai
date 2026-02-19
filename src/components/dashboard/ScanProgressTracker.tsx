@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { Scan, ScanProgress, ScanStage } from '@/types';
 
 interface ScanProgressTrackerProps {
@@ -61,8 +60,14 @@ const DEFAULT_STAGES: ScanStage[] = [
   },
 ];
 
+// Hard navigate to the scan page with a cache-busting param.
+// This is NOT a reload — it's a full navigation to a "new" URL,
+// which browsers are guaranteed to fetch fresh from the server.
+function navigateToResults(scanId: string) {
+  window.location.href = `/dashboard/scans/${scanId}?t=${Date.now()}`;
+}
+
 export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
-  const router = useRouter();
   const [progress, setProgress] = useState<ScanProgress>(
     scan.scan_progress || { current_stage: null, stages: DEFAULT_STAGES }
   );
@@ -72,6 +77,7 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [infringementCount, setInfringementCount] = useState(0);
   const [statusMessageIndex, setStatusMessageIndex] = useState(0);
+  const hasNavigated = useRef(false);
 
   // Rotating status messages shown while scan is running (mix of real + fun)
   const STATUS_MESSAGES = [
@@ -104,8 +110,14 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
 
   // Poll for updates when scan is running
   const pollProgress = useCallback(async () => {
+    if (hasNavigated.current) return;
+
     try {
-      const response = await fetch(`/api/scans/${scan.id}/progress`, { cache: 'no-store' });
+      // Cache-busting param on the fetch URL to prevent any edge-case caching
+      const response = await fetch(
+        `/api/scans/${scan.id}/progress?_=${Date.now()}`,
+        { cache: 'no-store' }
+      );
       if (response.ok) {
         const data = await response.json();
         setProgress(data.scan_progress || { current_stage: null, stages: DEFAULT_STAGES });
@@ -114,7 +126,7 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
           setInfringementCount(data.infringement_count);
         }
 
-        // Detect completion from any of these signals:
+        // Detect completion from API signals:
         // 1. Status field updated to completed/failed
         const isFinished = data.status === 'completed' || data.status === 'failed';
 
@@ -124,25 +136,18 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
           (s: { status: string }) => s.status === 'completed' || s.status === 'skipped'
         );
 
-        // 3. Hard timeout: no scan takes more than 5 minutes — force reload
-        const scanStarted = scan.started_at || scan.created_at;
-        const scanElapsedMs = Date.now() - new Date(scanStarted).getTime();
-        const isTimedOut = scanElapsedMs > 300_000;
-
-        if (isFinished || allStagesDone || isTimedOut) {
+        if (isFinished || allStagesDone) {
           setIsPolling(false);
-          // Use Next.js router.refresh() instead of window.location.reload()
-          // This re-executes the server component via RSC protocol,
-          // which triggers server-side recovery logic and swaps in the results view
-          setTimeout(() => {
-            router.refresh();
-          }, isTimedOut ? 500 : 1500);
+          if (!hasNavigated.current) {
+            hasNavigated.current = true;
+            setTimeout(() => navigateToResults(scan.id), 1500);
+          }
         }
       }
     } catch (error) {
       console.error('Error polling scan progress:', error);
     }
-  }, [scan.id, scan.started_at, scan.created_at, router]);
+  }, [scan.id]);
 
   useEffect(() => {
     if (!isPolling) return;
@@ -164,6 +169,18 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
     const interval = setInterval(updateElapsed, 1000);
     return () => clearInterval(interval);
   }, [isPolling, scan.created_at]);
+
+  // INDEPENDENT hard timeout: navigate after 5 minutes regardless of poll results.
+  // This runs off the elapsedSeconds timer which ticks every second, completely
+  // independent of the polling fetch. Even if every API call fails, this fires.
+  useEffect(() => {
+    if (!isPolling || hasNavigated.current) return;
+    if (elapsedSeconds >= 300) {
+      hasNavigated.current = true;
+      setIsPolling(false);
+      navigateToResults(scan.id);
+    }
+  }, [isPolling, elapsedSeconds, scan.id]);
 
   const stages = progress.stages.length > 0 ? progress.stages : DEFAULT_STAGES;
 
@@ -361,6 +378,18 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
               )}
               Scans typically take 2-5 minutes. This page will <span className="text-pg-accent font-medium">update automatically</span> when complete.
             </p>
+          </div>
+        )}
+
+        {/* Fallback link — visible after 4.5 minutes in case auto-navigation fails */}
+        {isPolling && elapsedSeconds >= 270 && (
+          <div className="text-center pt-1">
+            <a
+              href={`/dashboard/scans/${scan.id}?t=${Date.now()}`}
+              className="text-sm text-pg-accent hover:underline"
+            >
+              Taking longer than expected? Click here to view results
+            </a>
           </div>
         )}
       </div>
