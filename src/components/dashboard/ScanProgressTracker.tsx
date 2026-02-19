@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Scan, ScanProgress, ScanStage } from '@/types';
 
 interface ScanProgressTrackerProps {
@@ -61,6 +62,7 @@ const DEFAULT_STAGES: ScanStage[] = [
 ];
 
 export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
+  const router = useRouter();
   const [progress, setProgress] = useState<ScanProgress>(
     scan.scan_progress || { current_stage: null, stages: DEFAULT_STAGES }
   );
@@ -129,15 +131,18 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
 
         if (isFinished || allStagesDone || isTimedOut) {
           setIsPolling(false);
+          // Use Next.js router.refresh() instead of window.location.reload()
+          // This re-executes the server component via RSC protocol,
+          // which triggers server-side recovery logic and swaps in the results view
           setTimeout(() => {
-            window.location.reload();
+            router.refresh();
           }, isTimedOut ? 500 : 1500);
         }
       }
     } catch (error) {
       console.error('Error polling scan progress:', error);
     }
-  }, [scan.id, scan.started_at, scan.created_at]);
+  }, [scan.id, scan.started_at, scan.created_at, router]);
 
   useEffect(() => {
     if (!isPolling) return;

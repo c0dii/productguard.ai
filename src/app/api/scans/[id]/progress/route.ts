@@ -69,7 +69,7 @@ export async function GET(
 
       if (fullScan?.started_at) {
         const elapsedMs = Date.now() - new Date(fullScan.started_at).getTime();
-        const STALE_THRESHOLD_MS = 6 * 60 * 1000; // 6 minutes (maxDuration=300s + buffer)
+        const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes (matches Vercel maxDuration=300s)
 
         if (elapsedMs > STALE_THRESHOLD_MS) {
           console.warn(`[Progress] Scan ${id} stale (${Math.round(elapsedMs / 1000)}s), marking as failed`);
