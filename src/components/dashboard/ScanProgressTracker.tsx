@@ -103,7 +103,7 @@ export function ScanProgressTracker({ scan }: ScanProgressTrackerProps) {
   // Poll for updates when scan is running
   const pollProgress = useCallback(async () => {
     try {
-      const response = await fetch(`/api/scans/${scan.id}/progress`);
+      const response = await fetch(`/api/scans/${scan.id}/progress`, { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
         setProgress(data.scan_progress || { current_stage: null, stages: DEFAULT_STAGES });

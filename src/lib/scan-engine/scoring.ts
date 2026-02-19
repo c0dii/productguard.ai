@@ -280,7 +280,7 @@ export function scoreResult(
     urlLower.includes(site)
   );
   if (isLegitSite) {
-    score -= 30;
+    score -= 15;
     reasons.push('legitimate site');
   }
 
@@ -328,14 +328,14 @@ export function scoreResult(
   const est_revenue_loss = estimateRevenueLoss(audience_size, product.price, platform);
 
   // False positive determination:
-  // - confidence < 30: too low to be credible
+  // - confidence < 20: too low to be credible
   // - whitelist domains: user explicitly approved these domains
   // NOTE: isLegitSite is NOT a hard false positive trigger. The -30 score penalty
   // already suppresses most legitimate results. But a YouTube video titled
   // "FREE Earnings Hot Zone Indicator CRACKED download" should still pass
   // if enough piracy signals push confidence above 30.
   const isFalsePositive =
-    confidence < 30 ||
+    confidence < 20 ||
     (product.whitelist_domains?.some((d) => urlLower.includes(d)) ?? false);
 
   return {

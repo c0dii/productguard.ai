@@ -148,7 +148,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       serpBudget: 75,
       maxDurationMs: MAX_SCAN_DURATION_MS,
       aiFilterEnabled: process.env.DISABLE_AI_FILTER !== 'true',
-      aiConfidenceThreshold: parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.75'),
+      aiConfidenceThreshold: parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.55'),
       runNumber,
     });
 
@@ -271,7 +271,7 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
     // AI-POWERED FILTERING: Remove false positives before processing
     // Only process NEW URLs (delta detection saves AI costs)
     const useAIFilter = process.env.DISABLE_AI_FILTER !== 'true';
-    const aiConfidenceThreshold = parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.75');
+    const aiConfidenceThreshold = parseFloat(process.env.AI_CONFIDENCE_THRESHOLD || '0.55');
 
     let filteredResults = resultsToProcess;
 

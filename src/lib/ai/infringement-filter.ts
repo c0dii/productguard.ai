@@ -246,7 +246,7 @@ Respond with JSON only.`;
 export async function filterSearchResults(
   results: InfringementResult[],
   product: Product,
-  minConfidence: number = 0.75,
+  minConfidence: number = 0.55,
   intelligence?: IntelligenceData
 ): Promise<{ filtered: InfringementResult[]; aiStatus: 'ok' | 'all_fallback' | 'partial_fallback'; fallbackCount: number; errorMessage?: string }> {
   console.log(`[AI Filter] Analyzing ${results.length} results for product: ${product.name}`);
@@ -295,7 +295,7 @@ export async function filterSearchResults(
       // Pass if: AI says it's an infringement with sufficient confidence,
       // OR if AI is uncertain but above 0.50 floor — let human decide
       const isLikelyInfringement = analysis.is_infringement && analysis.confidence >= minConfidence;
-      const isUncertain = analysis.confidence >= 0.50 && analysis.confidence < minConfidence;
+      const isUncertain = analysis.confidence >= 0.30 && analysis.confidence < minConfidence;
 
       if (isLikelyInfringement || isUncertain) {
         filteredResults.push(result);

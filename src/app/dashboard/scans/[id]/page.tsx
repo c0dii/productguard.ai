@@ -37,7 +37,18 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
   }
 
   const productId = scan.products?.id || scan.product_id;
-  const isScanning = scan.status === 'running' || scan.status === 'pending';
+
+  // Server-side stale scan recovery: if scan has been "running" for >10 minutes,
+  // treat it as failed so the user sees results instead of a stuck progress bar
+  let scanStatus = scan.status;
+  if ((scanStatus === 'running' || scanStatus === 'pending') && scan.started_at) {
+    const elapsedMs = Date.now() - new Date(scan.started_at).getTime();
+    if (elapsedMs > 10 * 60 * 1000) {
+      scanStatus = 'failed';
+    }
+  }
+
+  const isScanning = scanStatus === 'running' || scanStatus === 'pending';
 
   // Fetch ALL product infringements (not just this scan's) so we always show historical data
   const [
@@ -106,7 +117,7 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
       )}
 
       {/* This Scan summary - show what this specific scan found */}
-      {!isScanning && scan.status === 'completed' && (
+      {!isScanning && scanStatus === 'completed' && (
         <div className={`mb-6 p-4 rounded-xl border ${
           newThisScan > 0
             ? 'bg-yellow-500/5 border-yellow-500/30'
@@ -170,15 +181,15 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
                   <span className="text-sm text-pg-text-muted">Status:</span>
                   <Badge
                     variant={
-                      scan.status === 'completed'
+                      scanStatus === 'completed'
                         ? ('scout' as any)
-                        : scan.status === 'failed'
+                        : scanStatus === 'failed'
                         ? ('business' as any)
                         : ('starter' as any)
                     }
                     className="capitalize"
                   >
-                    {scan.status}
+                    {scanStatus}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -189,7 +200,7 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
                 </div>
               </div>
             </div>
-            {scan.status === 'completed' && activeInfringements && activeInfringements.length > 0 && (
+            {scanStatus === 'completed' && activeInfringements && activeInfringements.length > 0 && (
               <ExportReportButton scanId={id} productName={scan.products?.name || 'Product'} />
             )}
           </div>

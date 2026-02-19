@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 export async function GET(
@@ -31,6 +31,7 @@ export async function GET(
     }
 
     // Auto-recover stale scans: if running for >10 minutes, mark as failed
+    // Uses admin client to bypass RLS (users may not have UPDATE on scans)
     if (scan.status === 'running') {
       const { data: fullScan } = await supabase
         .from('scans')
@@ -44,7 +45,8 @@ export async function GET(
 
         if (elapsedMs > STALE_THRESHOLD_MS) {
           console.warn(`[Progress] Scan ${id} stale (${Math.round(elapsedMs / 1000)}s), marking as failed`);
-          await supabase
+          const adminClient = createAdminClient();
+          await adminClient
             .from('scans')
             .update({
               status: 'failed',
