@@ -447,6 +447,10 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
             // Status tracking
             status: 'pending_verification' as const, // Changed from 'active' - user must verify first
             next_check_at: nextCheckAt.toISOString(),
+
+            // Scan learning system: track which query strategy found this result
+            query_category: result.query_category || null,
+            query_tier: result.query_tier || null,
           };
         })
       );
@@ -1020,6 +1024,8 @@ async function runTieredSearch(
           est_revenue_loss: scored.est_revenue_loss,
           title: result.title,
           snippet: result.snippet,
+          query_category: queryInfo.category,
+          query_tier: queryInfo.tier,
         });
       } else {
         tier1FalsePositiveCount++;
@@ -1088,6 +1094,8 @@ async function runTieredSearch(
           est_revenue_loss: scored.est_revenue_loss,
           title: result.title,
           snippet: result.snippet,
+          query_category: queryInfo.category,
+          query_tier: queryInfo.tier,
         });
       } else {
         tier2FalsePositiveCount++;
@@ -1164,6 +1172,8 @@ async function runTieredSearch(
               est_revenue_loss: scored.est_revenue_loss,
               title: result.title,
               snippet: result.snippet,
+              query_category: queryInfo.category,
+              query_tier: queryInfo.tier,
             });
           }
         }
@@ -1240,6 +1250,11 @@ async function runTieredSearch(
       logger?.info('platform_scan', `Telegram Bot API: +${telegramResults.length} results`, {
         telegram_results: telegramResults.length,
       });
+      // Tag with platform category for scan learning system
+      for (const r of telegramResults) {
+        r.query_category = r.query_category || 'platform-telegram';
+        r.query_tier = r.query_tier || 2;
+      }
       allResults.push(...telegramResults);
     }
   } catch (error) {
@@ -1262,6 +1277,11 @@ async function runTieredSearch(
           platform_results: platformResults.length,
           platforms_run: platformsRun,
         });
+        // Tag with platform category for scan learning system
+        for (const r of platformResults) {
+          r.query_category = r.query_category || `platform-${r.platform}`;
+          r.query_tier = r.query_tier || 2;
+        }
         allResults.push(...platformResults);
       }
     } catch (error) {

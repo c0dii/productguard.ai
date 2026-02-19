@@ -448,6 +448,10 @@ export interface Infringement {
   previous_status: InfringementStatus | null;
   next_check_at: string | null;
 
+  // Scan learning system
+  query_category: string | null;
+  query_tier: number | null;
+
   created_at: string;
   updated_at: string;
 }
@@ -722,6 +726,45 @@ export interface SystemHealthStats {
 }
 
 // ============================================================================
+// SCAN LEARNING SYSTEM TYPES
+// ============================================================================
+
+export interface CategoryPrecisionStats {
+  query_category: string;
+  query_tier: number;
+  product_type: string;
+  total_results: number;
+  verified_count: number;
+  rejected_count: number;
+  pending_count: number;
+  precision_pct: number | null;
+}
+
+export interface TierPrecisionStats {
+  query_tier: number;
+  total_results: number;
+  verified_count: number;
+  rejected_count: number;
+  pending_count: number;
+  precision_pct: number | null;
+}
+
+export interface ScanLearningWeight {
+  id: string;
+  product_type: string;
+  query_category: string;
+  query_tier: number;
+  total_results: number;
+  verified_count: number;
+  rejected_count: number;
+  bayesian_weight: number;
+  raw_precision: number | null;
+  is_active: boolean;
+  last_computed_at: string;
+  created_at: string;
+}
+
+// ============================================================================
 // HELPER TYPES FOR API REQUESTS/RESPONSES
 // ============================================================================
 
@@ -743,6 +786,9 @@ export interface InfringementResult {
   // SERP context for AI filtering
   title?: string;
   snippet?: string;
+  // Query category tracking for scan learning system
+  query_category?: string;
+  query_tier?: number;
 }
 
 // ============================================================================

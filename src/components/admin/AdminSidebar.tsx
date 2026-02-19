@@ -16,6 +16,7 @@ interface AdminSidebarProps {
 
 const dataSubItems = [
   { href: '/admin/data', label: 'Health Overview', exact: true },
+  { href: '/admin/data/scan-learning', label: 'Scan Learning' },
   { href: '/admin/data/scan-logs', label: 'Scan Logs' },
   { href: '/admin/data/api-logs', label: 'API Logs' },
   { href: '/admin/data/system-events', label: 'System Events' },

@@ -7,6 +7,7 @@
 import { generateCompletion, AI_MODELS } from './client';
 import type { Product, InfringementResult, ProductType } from '@/types';
 import { getAIPromptExamples, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
+import { fetchCategoryPrecisionStats, buildPrecisionContext } from '@/lib/scan-engine/category-precision';
 
 export interface FilterResult {
   is_infringement: boolean;
@@ -90,7 +91,8 @@ TYPE-SPECIFIC RULES FOR OTHER DIGITAL PRODUCTS:
 export async function filterSearchResult(
   result: InfringementResult,
   product: Product,
-  intelligence?: IntelligenceData
+  intelligence?: IntelligenceData,
+  precisionContext?: string,
 ): Promise<FilterResult> {
   // Get learned examples from intelligence engine
   const examples = await getAIPromptExamples(product.id);
@@ -164,6 +166,11 @@ FALSE POSITIVES (filter out — confidence below 0.3):
     });
   }
 
+  // Inject category precision context from scan learning system
+  if (precisionContext) {
+    systemPrompt += precisionContext;
+  }
+
   systemPrompt += `\n\nRespond ONLY with valid JSON in this exact format:
 {
   "is_infringement": true or false,
@@ -181,7 +188,7 @@ SEARCH RESULT TO ANALYZE:
 - Platform: ${result.platform}
 - URL: ${result.source_url}
 - Risk Level: ${result.risk_level}
-- Audience Size: ${result.audience_size || 'unknown'}${result.title ? `\n- Page Title: ${result.title}` : ''}${result.snippet ? `\n- Search Snippet: ${result.snippet}` : ''}
+- Audience Size: ${result.audience_size || 'unknown'}${result.query_category ? `\n- Search Strategy: ${result.query_category} (Tier ${result.query_tier || '?'})` : ''}${result.title ? `\n- Page Title: ${result.title}` : ''}${result.snippet ? `\n- Search Snippet: ${result.snippet}` : ''}
 
 TASK: Determine if this URL represents an actual infringement of the product or a false positive.
 Consider the URL domain, page title, search snippet, the platform type, and the context clues.
@@ -244,6 +251,12 @@ export async function filterSearchResults(
 ): Promise<{ filtered: InfringementResult[]; aiStatus: 'ok' | 'all_fallback' | 'partial_fallback'; fallbackCount: number; errorMessage?: string }> {
   console.log(`[AI Filter] Analyzing ${results.length} results for product: ${product.name}`);
 
+  // Fetch category precision stats once for the entire batch (scan learning system)
+  const precisionMap = await fetchCategoryPrecisionStats();
+  if (precisionMap.size > 0) {
+    console.log(`[AI Filter] Loaded precision context for ${precisionMap.size} query categories`);
+  }
+
   const filteredResults: InfringementResult[] = [];
   let filteredCount = 0;
   let passed = 0;
@@ -256,7 +269,11 @@ export async function filterSearchResults(
     const batch = results.slice(i, i + batchSize);
 
     const analyses = await Promise.all(
-      batch.map((result) => filterSearchResult(result, product, intelligence))
+      batch.map((result) => {
+        // Build per-result precision context from cached stats
+        const ctx = buildPrecisionContext(precisionMap, result.query_category);
+        return filterSearchResult(result, product, intelligence, ctx || undefined);
+      })
     );
 
     // Filter results based on AI analysis
