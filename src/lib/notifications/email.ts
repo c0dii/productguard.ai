@@ -10,6 +10,7 @@
 
 import { Resend } from 'resend';
 import { createAdminClient } from '@/lib/supabase/server';
+import { systemLogger } from '@/lib/logging/system-logger';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -166,13 +167,16 @@ export async function notifyHighSeverityInfringement(
 
     if (error) {
       console.error('[Notifications] Failed to send high-severity email:', error);
+      await systemLogger.logEmail('high_severity_alert', payload.to, 'failure', { provider: 'resend', template: 'high_severity_alert', to: payload.to });
       return false;
     }
 
     console.log(`[Notifications] High-severity alert sent to ${payload.to} (ID: ${data?.id})`);
+    await systemLogger.logEmail('high_severity_alert', payload.to, 'success', { provider: 'resend', template: 'high_severity_alert', to: payload.to, message_id: data?.id });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending email:', error);
+    await systemLogger.logEmail('high_severity_alert', payload.to, 'failure', { provider: 'resend', template: 'high_severity_alert', to: payload.to });
     return false;
   }
 }
@@ -250,13 +254,16 @@ export async function notifyScanComplete(
 
     if (error) {
       console.error('[Notifications] Failed to send scan complete email:', error);
+      await systemLogger.logEmail('scan_complete', payload.to, 'failure', { provider: 'resend', template: 'scan_complete', to: payload.to });
       return false;
     }
 
     console.log(`[Notifications] Scan complete email sent to ${payload.to}`);
+    await systemLogger.logEmail('scan_complete', payload.to, 'success', { provider: 'resend', template: 'scan_complete', to: payload.to });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending email:', error);
+    await systemLogger.logEmail('scan_complete', payload.to, 'failure', { provider: 'resend', template: 'scan_complete', to: payload.to });
     return false;
   }
 }
@@ -317,13 +324,16 @@ export async function notifyTakedownSuccess(
 
     if (error) {
       console.error('[Notifications] Failed to send takedown success email:', error);
+      await systemLogger.logEmail('takedown_success', payload.to, 'failure', { provider: 'resend', template: 'takedown_success', to: payload.to });
       return false;
     }
 
     console.log(`[Notifications] Takedown success email sent to ${payload.to}`);
+    await systemLogger.logEmail('takedown_success', payload.to, 'success', { provider: 'resend', template: 'takedown_success', to: payload.to });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending email:', error);
+    await systemLogger.logEmail('takedown_success', payload.to, 'failure', { provider: 'resend', template: 'takedown_success', to: payload.to });
     return false;
   }
 }
@@ -383,13 +393,16 @@ export async function notifyPaymentFailed(
 
     if (error) {
       console.error('[Notifications] Failed to send payment failed email:', error);
+      await systemLogger.logEmail('payment_failed', payload.to, 'failure', { provider: 'resend', template: 'payment_failed', to: payload.to });
       return false;
     }
 
     console.log(`[Notifications] Payment failed email sent to ${payload.to}`);
+    await systemLogger.logEmail('payment_failed', payload.to, 'success', { provider: 'resend', template: 'payment_failed', to: payload.to });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending payment failed email:', error);
+    await systemLogger.logEmail('payment_failed', payload.to, 'failure', { provider: 'resend', template: 'payment_failed', to: payload.to });
     return false;
   }
 }
@@ -453,13 +466,16 @@ export async function notifyDeadlineOverdue(
 
     if (error) {
       console.error('[Notifications] Failed to send deadline overdue email:', error);
+      await systemLogger.logEmail('deadline_overdue', payload.to, 'failure', { provider: 'resend', template: 'deadline_overdue', to: payload.to });
       return false;
     }
 
     console.log(`[Notifications] Deadline overdue email sent to ${payload.to}`);
+    await systemLogger.logEmail('deadline_overdue', payload.to, 'success', { provider: 'resend', template: 'deadline_overdue', to: payload.to });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending deadline overdue email:', error);
+    await systemLogger.logEmail('deadline_overdue', payload.to, 'failure', { provider: 'resend', template: 'deadline_overdue', to: payload.to });
     return false;
   }
 }
@@ -534,13 +550,16 @@ export async function notifyRelisting(
 
     if (error) {
       console.error('[Notifications] Failed to send relisting email:', error);
+      await systemLogger.logEmail('relisting_alert', payload.to, 'failure', { provider: 'resend', template: 'relisting_alert', to: payload.to });
       return false;
     }
 
     console.log(`[Notifications] Relisting alert sent to ${payload.to}`);
+    await systemLogger.logEmail('relisting_alert', payload.to, 'success', { provider: 'resend', template: 'relisting_alert', to: payload.to });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending relisting email:', error);
+    await systemLogger.logEmail('relisting_alert', payload.to, 'failure', { provider: 'resend', template: 'relisting_alert', to: payload.to });
     return false;
   }
 }
@@ -717,13 +736,16 @@ export async function notifyScanError(payload: ScanErrorPayload): Promise<boolea
 
     if (error) {
       console.error('[Notifications] Failed to send scan error alert:', error);
+      await systemLogger.logEmail('scan_error_admin', adminEmail, 'failure', { provider: 'resend', template: 'scan_error_admin', to: adminEmail });
       return false;
     }
 
     console.log(`[Notifications] Scan error alert sent to ${adminEmail}`);
+    await systemLogger.logEmail('scan_error_admin', adminEmail, 'success', { provider: 'resend', template: 'scan_error_admin', to: adminEmail });
     return true;
   } catch (error) {
     console.error('[Notifications] Error sending scan error alert:', error);
+    await systemLogger.logEmail('scan_error_admin', adminEmail || 'unknown', 'failure', { provider: 'resend', template: 'scan_error_admin', to: adminEmail || 'unknown' });
     return false;
   }
 }

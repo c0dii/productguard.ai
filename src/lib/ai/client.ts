@@ -5,6 +5,7 @@
  */
 
 import OpenAI from 'openai';
+import { systemLogger } from '@/lib/logging/system-logger';
 
 // Singleton instance
 let openaiClient: OpenAI | null = null;
@@ -101,6 +102,28 @@ export async function generateCompletion<T = any>(
 
     const processingTimeMs = Date.now() - startTime;
     const content = response.choices[0]?.message?.content || '';
+    const promptTokens = response.usage?.prompt_tokens || 0;
+    const completionTokens = response.usage?.completion_tokens || 0;
+    const totalTokens = response.usage?.total_tokens || 0;
+    const costUsd = estimateCost(promptTokens, completionTokens, model);
+
+    // Log to system_logs
+    await systemLogger.log({
+      log_source: 'api_call',
+      log_level: 'info',
+      operation: `openai.chat.${model}`,
+      status: 'success',
+      message: `OpenAI ${model} completed in ${processingTimeMs}ms (${totalTokens} tokens, $${costUsd.toFixed(4)})`,
+      duration_ms: processingTimeMs,
+      context: {
+        provider: 'openai' as const,
+        model,
+        tokens_used: totalTokens,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        cost_usd: costUsd,
+      },
+    });
 
     // Parse JSON if response format is JSON
     const data = responseFormat === 'json' ? JSON.parse(content) : content;
@@ -109,13 +132,30 @@ export async function generateCompletion<T = any>(
       data: data as T,
       metadata: {
         model,
-        tokensUsed: response.usage?.total_tokens || 0,
+        tokensUsed: totalTokens,
         processingTimeMs,
         finishReason: response.choices[0]?.finish_reason || 'unknown',
       },
     };
   } catch (error) {
+    const processingTimeMs = Date.now() - startTime;
     console.error('AI generation error:', error);
+
+    await systemLogger.log({
+      log_source: 'api_call',
+      log_level: 'error',
+      operation: `openai.chat.${model}`,
+      status: 'failure',
+      message: `OpenAI ${model} failed after ${processingTimeMs}ms: ${error instanceof Error ? error.message : 'Unknown'}`,
+      duration_ms: processingTimeMs,
+      error_message: error instanceof Error ? error.message : String(error),
+      error_stack: error instanceof Error ? error.stack : undefined,
+      context: {
+        provider: 'openai' as const,
+        model,
+      },
+    });
+
     throw new Error(`AI completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

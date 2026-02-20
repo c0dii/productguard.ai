@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { notifyTakedownSuccess } from '@/lib/notifications/email';
+import { systemLogger } from '@/lib/logging/system-logger';
 
 /**
  * Priority-Based URL Monitoring Endpoint
@@ -145,6 +146,19 @@ export async function POST(request: Request) {
       return acc;
     }, {} as Record<string, number>);
 
+    // Log URL check batch to system_logs
+    const removedCount = summary['removed'] || 0;
+    const errorCount = summary['error'] || 0;
+    await systemLogger.log({
+      log_source: 'cron',
+      log_level: errorCount > takedowns.length / 2 ? 'warn' : 'info',
+      operation: 'takedown.url-check',
+      status: errorCount > 0 ? 'partial' : 'success',
+      message: `Checked ${takedowns.length} takedown URLs: ${removedCount} removed, ${summary['active'] || 0} active, ${errorCount} errors`,
+      context: { ...summary, priority_summary: prioritySummary },
+    });
+    await systemLogger.flush();
+
     return NextResponse.json({
       success: true,
       checked: takedowns.length,
@@ -154,6 +168,16 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('URL check error:', error);
+    await systemLogger.log({
+      log_source: 'cron',
+      log_level: 'error',
+      operation: 'takedown.url-check',
+      status: 'failure',
+      message: `Takedown URL check failed: ${error instanceof Error ? error.message : String(error)}`,
+      error_message: error instanceof Error ? error.message : String(error),
+      error_stack: error instanceof Error ? error.stack : undefined,
+    });
+    await systemLogger.flush();
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
