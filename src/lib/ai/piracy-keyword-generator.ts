@@ -28,12 +28,23 @@ function getTypeInstructions(productType: ProductType): string {
   const instructions: Record<ProductType, string> = {
     indicator: `
 PRODUCT TYPE: Trading Indicator
-- Pirates share indicator files as .ex4, .ex5, .mq4, .mq5, .pine, .zip archives
-- Common piracy terms: "decompiled", "cracked", "unlocked", "source code", "free indicator"
-- Platforms: forex-station.com, mql5.com forums, Telegram indicator channels, TradingView public scripts
-- Alternative names often include: version numbers, platform suffixes (MT4/MT5/TV), abbreviated forms
-- File identifiers: look for .ex4/.mq4/.pine file references, version strings like "v2.1"
-- Telegram searches use short terms: product abbreviation + "free" or "indicator"`,
+- People searching for stolen indicators search: product name + trading platform name + "free" or "download"
+- They are NOT searching for "crack sites" — they search for the indicator on the platform they trade on
+- Trading platforms and their file extensions:
+  * MetaTrader 4 (MT4): .ex4, .mq4
+  * MetaTrader 5 (MT5): .ex5, .mq5
+  * TradingView: .pine (PineScript)
+  * ThinkOrSwim (TOS/ToS): .ts, .thinkscript
+  * NinjaTrader: .cs (NinjaScript)
+  * TradeStation: .eld, .els (EasyLanguage)
+  * MultiCharts: .pln (PowerLanguage)
+  * Sierra Chart: .dll
+  * cTrader: .algo, .cs (cAlgo)
+- Common search patterns: "[indicator name] TradingView", "[indicator name] ThinkOrSwim free", "[indicator name] MT4 download", "[indicator name] NinjaTrader"
+- Alternative names include: platform suffixes (MT4/MT5/TV/TOS), version numbers, abbreviated forms
+- File identifiers: generate filenames for EACH platform the indicator could run on (e.g., "ProductName.ex4", "ProductName.pine", "ProductName.ts", "ProductName.mq5")
+- Sharing platforms: forex-station.com, mql5.com forums, Telegram indicator channels, TradingView public scripts, ThinkOrSwim sharing groups, futures.io forums
+- Telegram searches use short terms: product abbreviation + platform name or "free"`,
 
     course: `
 PRODUCT TYPE: Online Course
@@ -103,9 +114,11 @@ export async function generatePiracyKeywords(
 
 You will analyze a digital product and generate:
 
-1. **piracy_search_terms** (6-10 items): Complete search queries a pirate would type into Google, Telegram, or torrent sites to find a free/pirated copy. Each term MUST include the product name (or a recognizable part of it). Combine the product identity with piracy-intent language naturally.
-   - GOOD: "10x bars indicator crack download", "simpler trading 10x bars free .ex4"
+1. **piracy_search_terms** (8-14 items): Realistic search queries someone would type to find a free/stolen copy of this product. Each term MUST include the product name (or a recognizable part of it). For trading indicators, people search the product name + the trading platform they use + "free" or "download". Do NOT use generic piracy jargon like "crack site" or "keygen" for indicators.
+   - GOOD for indicators: "10x bars TradingView", "10x bars ThinkOrSwim free", "10x bars MT4 download", "10x bars indicator free", "10x bars NinjaTrader"
+   - GOOD for other products: "ProductName free download", "ProductName leaked pdf"
    - BAD: "free download crack" (too generic, no product identity)
+   - BAD for indicators: "10x bars crack site", "10x bars keygen" (not how people search for indicators)
 
 2. **alternative_names** (3-8 items): Common variations of the product name that pirates might use:
    - Abbreviations: "10x Bars Indicator" → "10xbars", "10x-bars"
@@ -115,17 +128,22 @@ You will analyze a digital product and generate:
    - With platform suffixes: "ProductName MT4", "ProductName TradingView"
    - DO NOT include the exact original name as an alternative
 
-3. **unique_identifiers** (2-6 items): File names, version numbers, serial patterns, or other technical identifiers extracted from the page content:
-   - File names: "product-v2.1.ex4", "course-module-1.zip"
-   - Version strings: "v3.2.1", "Version 2024.1"
-   - Technical identifiers visible on the product page
-   - Only include identifiers actually found in or inferable from the page content
+3. **unique_identifiers** (6-15 items): File names, version numbers, and platform-specific file identifiers. For trading indicators, generate expected file names for EVERY major trading platform the indicator could exist on:
+   - MetaTrader: "ProductName.ex4", "ProductName.mq4", "ProductName.ex5", "ProductName.mq5"
+   - TradingView: "ProductName.pine"
+   - ThinkOrSwim: "ProductName.ts", "ProductName.thinkscript"
+   - NinjaTrader: "ProductName.cs"
+   - TradeStation: "ProductName.eld", "ProductName.els"
+   - MultiCharts: "ProductName.pln"
+   - General: "ProductName.zip", version strings like "v2.1"
+   - Use the actual product name (or slug form) in the file names
+   - Include version strings if visible on the product page
 
-4. **platform_terms**: Search terms optimized for specific platforms:
-   - **google** (3-4 items): Full search queries for Google (can be longer, use quotes)
-   - **telegram** (2-3 items): Short terms for Telegram search (typically 2-4 words, no quotes)
-   - **torrent** (2-3 items): Torrent site search patterns (often include file extensions, version numbers)
-   - **forum** (2-3 items): Forum search patterns (include piracy slang: "nulled", "cracked", "leaked")
+4. **platform_terms**: Search terms optimized for specific platforms. For trading indicators, focus on how people actually search — by product name + trading platform, NOT piracy jargon:
+   - **google** (4-6 items): Full search queries for Google. For indicators: "[name] TradingView free", "[name] ThinkOrSwim download", "[name] MT4 free download", "[name] NinjaTrader indicator". For other products: use natural search queries with "free download", "free pdf", etc.
+   - **telegram** (3-4 items): Short terms for Telegram search (2-4 words). For indicators: "[name] free", "[name] MT4", "[name] indicator". For others: product abbreviation + "free" or "leaked"
+   - **torrent** (2-3 items): Torrent site search patterns (include file extensions, version numbers)
+   - **forum** (3-4 items): Forum search patterns. For indicators: "[name] forex-station", "[name] futures.io", "[name] mql5 forum free". For others: relevant forum terms
    - **cyberlocker** (2-3 items): File-sharing search patterns (include "mega", "mediafire", "drive")
 
 ${getTypeInstructions(productType)}
@@ -177,7 +195,7 @@ Generate piracy search intelligence as JSON:
     }>(systemPrompt, userPrompt, {
       model: AI_MODELS.MINI,
       temperature: 0.4,
-      maxTokens: 1500,
+      maxTokens: 2000,
       responseFormat: 'json',
     });
 
