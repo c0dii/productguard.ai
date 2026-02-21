@@ -8,11 +8,12 @@ import type { Product, InfringementResult, RiskLevel } from '@/types';
  * - MediaFire
  * - Google Drive
  * - Dropbox
- * - Zippyshare
  * - 4shared
  * - Uploaded.net
  * - RapidGator
- * - AnonFiles
+ * - SendSpace
+ * - 1fichier.com
+ * - Gofile.io
  *
  * Uses Google search with site: operator to find public file links
  */
@@ -23,17 +24,19 @@ export async function scanCyberlockers(product: Product): Promise<InfringementRe
     const infringements: InfringementResult[] = [];
 
     // Major cyberlockers to search
+    // Dead sites removed: zippyshare.com (shut down 2023), anonfiles.com (shut down 2023)
+    // Added: 1fichier.com, gofile.io (active cyberlockers frequently used for piracy)
     const cyberlockers = [
       'mega.nz',
       'mediafire.com',
       'drive.google.com',
       'dropbox.com',
-      'zippyshare.com',
       '4shared.com',
       'uploaded.net',
       'rapidgator.net',
-      'anonfiles.com',
       'sendspace.com',
+      '1fichier.com',
+      'gofile.io',
     ];
 
     const apiKey = process.env.SERPER_API_KEY;
@@ -157,10 +160,6 @@ function isDirectFileLink(url: string, site: string): boolean {
     return urlLower.includes('/s/') || urlLower.includes('/sh/');
   }
 
-  if (site === 'zippyshare.com') {
-    return urlLower.includes('/v/') || !!urlLower.match(/zippyshare\.com\/v\//);
-  }
-
   if (site === '4shared.com') {
     return urlLower.includes('/file/') || urlLower.includes('/get/');
   }
@@ -171,10 +170,6 @@ function isDirectFileLink(url: string, site: string): boolean {
 
   if (site === 'rapidgator.net') {
     return urlLower.includes('/file/');
-  }
-
-  if (site === 'anonfiles.com') {
-    return !!urlLower.match(/anonfiles\.com\/[a-zA-Z0-9]+\//);
   }
 
   if (site === 'sendspace.com') {
@@ -247,12 +242,12 @@ function estimateDownloads(snippet: string, site: string): number {
     'mediafire.com': 300,
     'drive.google.com': 400,
     'dropbox.com': 200,
-    'zippyshare.com': 150,
     '4shared.com': 250,
     'uploaded.net': 200,
     'rapidgator.net': 150,
-    'anonfiles.com': 100,
     'sendspace.com': 100,
+    '1fichier.com': 200,
+    'gofile.io': 300,
   };
 
   return defaultDownloads[site] || 100;

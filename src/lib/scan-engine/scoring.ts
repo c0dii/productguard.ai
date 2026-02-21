@@ -201,7 +201,7 @@ export function scoreResult(
   const urlLower = input.url.toLowerCase();
   const reasons: string[] = [];
 
-  let score = 40; // Base score
+  let score = 50; // Base score (raised from 40 — results need -16 to die at threshold instead of -6)
 
   // ── Position-based scoring ──
   if (input.position <= 3) {
@@ -244,15 +244,15 @@ export function scoreResult(
   if (boostCount > 0) reasons.push(`${boostCount} piracy indicators`);
 
   // ── Profile penalty terms ──
-  // Reduced from -10 to -5 per term. Penalty terms like "review" and "tutorial"
+  // Reduced from -5 to -3 per term. Penalty terms like "review" and "tutorial"
   // appear in nearly every search result for niche products, causing mass false positives.
-  // The -5 still suppresses pure review/tutorial pages but allows mixed-signal results
+  // The -3 still suppresses pure review/tutorial pages but allows mixed-signal results
   // (e.g., "Earnings Hot Zone Indicator review + free download") to survive.
   let penaltyCount = 0;
   for (const term of profile.penaltyTerms) {
     if (combined.includes(term.toLowerCase())) {
       penaltyCount++;
-      score -= 5;
+      score -= 3;
     }
   }
   if (penaltyCount > 0) reasons.push(`${penaltyCount} non-piracy indicators`);
@@ -261,7 +261,7 @@ export function scoreResult(
   // the penalty was already too harsh — partially restore confidence.
   // A page with "free download" AND "review" is still suspicious.
   if (boostCount > 0 && penaltyCount > 0) {
-    const recovery = Math.min(penaltyCount, boostCount) * 3;
+    const recovery = Math.min(penaltyCount, boostCount) * 5;
     score += recovery;
     reasons.push(`mixed-signal recovery (+${recovery})`);
   }
@@ -366,7 +366,7 @@ function confidenceToRiskLevel(confidence: number): RiskLevel {
  */
 export function filterByConfidence(
   results: Array<{ url: string; score: ScoringResult }>,
-  threshold: number = 35
+  threshold: number = 30
 ): Array<{ url: string; score: ScoringResult }> {
   return results.filter(
     (r) => !r.score.isFalsePositive && r.score.confidence >= threshold

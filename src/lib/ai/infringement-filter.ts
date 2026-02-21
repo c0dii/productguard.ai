@@ -205,8 +205,8 @@ Respond with JSON only.`;
       userPrompt,
       {
         model: AI_MODELS.MINI, // Use cheapest model
-        temperature: 0.2, // Low temperature for consistent decisions
-        maxTokens: 200, // Short response
+        temperature: 0.3, // Slightly higher temp for better edge-case reasoning
+        maxTokens: 500, // Enough tokens for nuanced reasoning on borderline cases
         responseFormat: 'json',
       }
     );
@@ -246,7 +246,7 @@ Respond with JSON only.`;
 export async function filterSearchResults(
   results: InfringementResult[],
   product: Product,
-  minConfidence: number = 0.55,
+  minConfidence: number = 0.40,
   intelligence?: IntelligenceData
 ): Promise<{ filtered: InfringementResult[]; aiStatus: 'ok' | 'all_fallback' | 'partial_fallback'; fallbackCount: number; errorMessage?: string }> {
   console.log(`[AI Filter] Analyzing ${results.length} results for product: ${product.name}`);

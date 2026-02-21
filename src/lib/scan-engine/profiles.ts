@@ -115,6 +115,8 @@ const courseProfile: ScanProfile = {
     'free training',
     'pirated',
     'shared free',
+    'zero-cost',
+    'share link',
   ],
   fileExtensions: ['.mp4', '.mkv', '.avi', '.zip', '.rar', '.pdf'],
   dedicatedSites: [
@@ -204,6 +206,9 @@ const indicatorProfile: ScanProfile = {
     'torrent',
     'mega link',
     'shared',
+    'EA copy',
+    'MT4 clone',
+    'MT5 clone',
   ],
   fileExtensions: ['.ex4', '.ex5', '.mq4', '.mq5', '.pine', '.zip', '.rar'],
   dedicatedSites: [
@@ -288,6 +293,8 @@ const softwareProfile: ScanProfile = {
     'torrent',
     'mega link',
     'leaked',
+    'license bypass',
+    'no-install',
   ],
   fileExtensions: ['.exe', '.dmg', '.zip', '.rar', '.iso', '.msi', '.deb', '.apk'],
   dedicatedSites: [

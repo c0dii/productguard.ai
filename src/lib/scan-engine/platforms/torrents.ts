@@ -20,18 +20,20 @@ export async function scanTorrents(product: Product): Promise<InfringementResult
   try {
     const infringements: InfringementResult[] = [];
 
-    // Major torrent sites (current working domains as of 2025)
+    // Major torrent sites (updated 2026)
+    // Dead sites removed: rarbg.to (shut down 2023), torrentz2.eu (often offline), zooqle.com (unstable/offline)
+    // Added: nyaa.si (anime/software), btdig.com (DHT search), rutracker.org (large general tracker)
     const torrentSites = [
       '1337x.to',
       'thepiratebay.org',
       'torrentgalaxy.to',
       'yts.mx',
       'eztv.re',
-      'rarbg.to',
       'torlock.com',
-      'torrentz2.eu',
       'limetorrents.pro',
-      'zooqle.com',
+      'nyaa.si',
+      'btdig.com',
+      'rutracker.org',
     ];
 
     const apiKey = process.env.SERPER_API_KEY;
