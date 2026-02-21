@@ -10,7 +10,6 @@
 
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Product } from '@/types';
 
 export interface LearningPattern {
   pattern_value: string;
@@ -127,65 +126,6 @@ export function optimizeSearchQueryFromIntelligence(
       .map(d => `-site:${d}`)
       .join(' ');
     optimizedQuery = `${optimizedQuery} ${excludeDomains}`;
-  }
-
-  return optimizedQuery;
-}
-
-/**
- * Generate optimized search query based on learned patterns.
- * @deprecated Use optimizeSearchQueryFromIntelligence() with pre-fetched data instead.
- */
-export async function optimizeSearchQuery(
-  product: Product,
-  platform: string,
-  baseQuery: string
-): Promise<string> {
-  const supabase = await createClient();
-
-  // Get top verified keywords for this product
-  const verifiedKeywords = await getTopVerifiedKeywords(product.id, 5);
-
-  // Get false positive domains to exclude
-  const falsePositiveDomains = await getFalsePositiveDomains(product.id, 5);
-
-  let optimizedQuery = baseQuery;
-
-  // Add high-confidence keywords to query
-  if (verifiedKeywords.length > 0) {
-    const topKeywords = verifiedKeywords
-      .filter(k => k.confidence_score > 0.7) // Only high-confidence patterns
-      .slice(0, 3)
-      .map(k => k.pattern_value);
-
-    if (topKeywords.length > 0) {
-      optimizedQuery = `${baseQuery} ${topKeywords.join(' ')}`;
-    }
-  }
-
-  // Exclude known false positive domains
-  if (falsePositiveDomains.length > 0 && platform === 'google') {
-    const excludeDomains = falsePositiveDomains
-      .filter(d => d.confidence_score > 0.6)
-      .map(d => `-site:${d.pattern_value}`)
-      .join(' ');
-
-    if (excludeDomains) {
-      optimizedQuery = `${optimizedQuery} ${excludeDomains}`;
-    }
-  }
-
-  // Store optimized query for tracking
-  if (optimizedQuery !== baseQuery) {
-    await supabase.from('optimized_queries').insert({
-      product_id: product.id,
-      platform,
-      base_query: baseQuery,
-      optimized_query: optimizedQuery,
-      optimization_reason: `Added ${verifiedKeywords.length} verified keywords, excluded ${falsePositiveDomains.length} false positive domains`,
-    });
-
-    console.log(`[Intelligence Engine] Optimized query for ${platform}: "${baseQuery}" → "${optimizedQuery}"`);
   }
 
   return optimizedQuery;
@@ -311,37 +251,6 @@ export async function recordDailyMetrics(
     });
 
   console.log(`[Intelligence Engine] Recorded metrics for product ${productId}: Precision ${(metrics.precision_rate * 100).toFixed(1)}%`);
-}
-
-/**
- * Get suggested improvements for a product
- */
-export async function getSuggestedImprovements(productId: string): Promise<string[]> {
-  const metrics = await calculatePerformanceMetrics(productId);
-  const suggestions: string[] = [];
-
-  // Low precision = too many false positives
-  if (metrics.precision_rate < 0.5 && metrics.false_positives > 5) {
-    suggestions.push(
-      `🔧 Precision is low (${(metrics.precision_rate * 100).toFixed(0)}%). Consider increasing AI confidence threshold or adding more specific keywords.`
-    );
-  }
-
-  // High precision = good filtering
-  if (metrics.precision_rate > 0.8) {
-    suggestions.push(
-      `✅ Excellent precision (${(metrics.precision_rate * 100).toFixed(0)}%)! Your filters are working well.`
-    );
-  }
-
-  // Low detections = need broader search
-  if (metrics.total_detections < 10 && metrics.verified_infringements < 3) {
-    suggestions.push(
-      `📊 Low detection count. Consider adding more keywords or enabling more platforms.`
-    );
-  }
-
-  return suggestions;
 }
 
 // ── Admin-Client Functions (for background scan context) ──────────────

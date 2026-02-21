@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse, after } from 'next/server';
 import crypto from 'crypto';
-import { learnFromFeedback, recordDailyMetrics, calculatePerformanceMetrics } from '@/lib/intelligence/intelligence-engine';
+import { learnFromFeedback, recordDailyMetrics, calculatePerformanceMetrics, refreshPiracyKeywords } from '@/lib/intelligence/intelligence-engine';
+import { createAdminClient } from '@/lib/supabase/server';
 import { createBlockchainTimestamp, formatTimestampProof } from '@/lib/evidence/blockchain-timestamp';
 import { capturePageEvidence } from '@/lib/evidence/capture-page';
 import { trackInfringementVerified } from '@/lib/ghl/events';
@@ -137,6 +138,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await recordDailyMetrics(infringement.product_id, user.id, metrics);
         console.log(
           `[Intelligence] Learned from ${action} action. Precision: ${(metrics.precision_rate * 100).toFixed(1)}%`
+        );
+
+        // Refresh piracy keywords when enough feedback has accumulated.
+        // Non-blocking: has internal guards (5+ feedback items, 24h cooldown).
+        const adminClient = createAdminClient();
+        refreshPiracyKeywords(adminClient, infringement.product_id).catch((err) =>
+          console.error('[Intelligence] Piracy keyword refresh error:', err)
         );
       } catch (intelligenceError) {
         console.error('[Intelligence] Error in learning system:', intelligenceError);
