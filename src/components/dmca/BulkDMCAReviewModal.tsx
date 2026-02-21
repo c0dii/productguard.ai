@@ -157,7 +157,7 @@ export function BulkDMCAReviewModal({
             <div className="flex items-center gap-2 mt-2">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center gap-1">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  <div className={`w-7 h-7 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                     s < step ? 'bg-green-500 text-white'
                       : s === step ? 'bg-pg-accent text-white'
                       : 'bg-pg-surface-light text-pg-text-muted border border-pg-border'
@@ -176,7 +176,7 @@ export function BulkDMCAReviewModal({
               ))}
             </div>
           </div>
-          <button onClick={onClose} className="text-pg-text-muted hover:text-pg-text transition-colors p-1">
+          <button onClick={onClose} className="text-pg-text-muted hover:text-pg-text transition-colors p-2 -mr-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -212,18 +212,18 @@ export function BulkDMCAReviewModal({
         {step === 1 && !isLoading && !error && summary && (
           <div>
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
               <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
-                <p className="text-2xl font-bold text-green-400">{summary.total_email}</p>
-                <p className="text-[10px] text-pg-text-muted mt-0.5">Auto-Send Email</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-400">{summary.total_email}</p>
+                <p className="text-[11px] sm:text-xs text-pg-text-muted mt-0.5">Auto-Send Email</p>
               </div>
               <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-center">
-                <p className="text-2xl font-bold text-blue-400">{summary.total_web_form}</p>
-                <p className="text-[10px] text-pg-text-muted mt-0.5">Web Form (Manual)</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-400">{summary.total_web_form}</p>
+                <p className="text-[11px] sm:text-xs text-pg-text-muted mt-0.5">Web Form (Manual)</p>
               </div>
-              <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-center">
-                <p className="text-2xl font-bold text-yellow-400">{summary.total_manual}</p>
-                <p className="text-[10px] text-pg-text-muted mt-0.5">Manual</p>
+              <div className="col-span-2 sm:col-span-1 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-center">
+                <p className="text-xl sm:text-2xl font-bold text-yellow-400">{summary.total_manual}</p>
+                <p className="text-[11px] sm:text-xs text-pg-text-muted mt-0.5">Manual</p>
               </div>
             </div>
 
@@ -299,7 +299,7 @@ export function BulkDMCAReviewModal({
                           Open Form
                         </a>
                       </div>
-                      <p className="text-[10px] text-pg-text-muted mt-1">
+                      <p className="text-[11px] sm:text-xs text-pg-text-muted mt-1">
                         Notices will be generated for you to copy and submit via the provider&apos;s web form.
                       </p>
                     </div>
@@ -320,7 +320,7 @@ export function BulkDMCAReviewModal({
                     <div key={group.provider_name} className="p-3 rounded-lg border border-pg-border bg-pg-surface-light">
                       <span className="text-sm font-medium text-pg-text">{group.provider_name}</span>
                       <span className="text-xs text-pg-text-muted ml-2">({group.count})</span>
-                      <p className="text-[10px] text-pg-text-muted mt-1">
+                      <p className="text-[11px] sm:text-xs text-pg-text-muted mt-1">
                         No automated delivery available. Notices will be generated for manual sending.
                       </p>
                     </div>

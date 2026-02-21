@@ -35,14 +35,14 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-pg-border bg-pg-surface">
-            <th className="text-left p-4 text-sm font-semibold text-pg-text">Product Name</th>
-            <th className="text-left p-4 text-sm font-semibold text-pg-text">Type</th>
-            <th className="text-right p-4 text-sm font-semibold text-pg-text">Price</th>
-            <th className="text-center p-4 text-sm font-semibold text-pg-text">Risk Level</th>
-            <th className="text-center p-4 text-sm font-semibold text-pg-text">Infringements</th>
-            <th className="text-center p-4 text-sm font-semibold text-pg-text">Pending</th>
-            <th className="text-center p-4 text-sm font-semibold text-pg-text">Last Scan</th>
-            <th className="text-right p-4 text-sm font-semibold text-pg-text">Actions</th>
+            <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text">Product Name</th>
+            <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text hidden sm:table-cell">Type</th>
+            <th className="text-right p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text hidden md:table-cell">Price</th>
+            <th className="text-center p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text">Risk</th>
+            <th className="text-center p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text hidden sm:table-cell">Threats</th>
+            <th className="text-center p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text hidden md:table-cell">Pending</th>
+            <th className="text-center p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text hidden lg:table-cell">Last Scan</th>
+            <th className="text-right p-3 sm:p-4 text-xs sm:text-sm font-semibold text-pg-text">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -51,10 +51,10 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
               key={product.id}
               className="border-b border-pg-border hover:bg-pg-surface transition-colors group"
             >
-              <td className="p-4">
+              <td className="p-3 sm:p-4">
                 <Link
                   href={`/dashboard/products/${product.id}`}
-                  className="font-semibold text-pg-text hover:text-pg-accent transition-colors"
+                  className="font-semibold text-pg-text hover:text-pg-accent transition-colors text-sm"
                 >
                   {product.name}
                 </Link>
@@ -62,21 +62,21 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                   <p className="text-xs text-pg-text-muted mt-1 line-clamp-1">{product.description}</p>
                 )}
               </td>
-              <td className="p-4">
+              <td className="p-3 sm:p-4 hidden sm:table-cell">
                 <Badge variant="default" className="capitalize text-xs">
                   {product.type}
                 </Badge>
               </td>
-              <td className="p-4 text-right font-bold text-pg-accent">${product.price}</td>
-              <td className="p-4 text-center">
+              <td className="p-3 sm:p-4 text-right font-bold text-pg-accent hidden md:table-cell">${product.price}</td>
+              <td className="p-3 sm:p-4 text-center">
                 {getRiskBadge(product.active_count, product.infringement_count)}
               </td>
-              <td className="p-4 text-center">
+              <td className="p-3 sm:p-4 text-center hidden sm:table-cell">
                 <span className={`font-bold ${(product.infringement_count || 0) > 0 ? 'text-pg-danger' : 'text-pg-text-muted'}`}>
                   {product.infringement_count || 0}
                 </span>
               </td>
-              <td className="p-4 text-center">
+              <td className="p-3 sm:p-4 text-center hidden md:table-cell">
                 {(product.pending_count || 0) > 0 ? (
                   <Badge variant="warning" className="text-xs">
                     {product.pending_count}
@@ -85,7 +85,7 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                   <span className="text-pg-text-muted text-sm">-</span>
                 )}
               </td>
-              <td className="p-4 text-center text-xs text-pg-text-muted">
+              <td className="p-3 sm:p-4 text-center text-xs text-pg-text-muted hidden lg:table-cell">
                 {product.last_scan_at
                   ? new Date(product.last_scan_at).toLocaleDateString('en-US', {
                       month: 'short',
@@ -93,8 +93,8 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                     })
                   : 'Never'}
               </td>
-              <td className="p-4">
-                <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+              <td className="p-3 sm:p-4">
+                <div className="flex gap-1.5 sm:gap-2 justify-end sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <Button
                     size="sm"
                     variant="secondary"
@@ -102,7 +102,7 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                       e.stopPropagation();
                       onScan(product.id);
                     }}
-                    className="text-xs px-2 py-1"
+                    className="text-xs min-w-[36px] min-h-[36px] px-2 py-1.5 sm:px-2 sm:py-1"
                   >
                     🔍
                   </Button>
@@ -113,7 +113,7 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                       e.stopPropagation();
                       onEdit(product);
                     }}
-                    className="text-xs px-2 py-1"
+                    className="text-xs min-w-[36px] min-h-[36px] px-2 py-1.5 sm:px-2 sm:py-1"
                   >
                     ✏️
                   </Button>
@@ -125,7 +125,7 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                         e.stopPropagation();
                         onArchive(product.id);
                       }}
-                      className="text-xs px-2 py-1"
+                      className="text-xs min-w-[36px] min-h-[36px] px-2 py-1.5 sm:px-2 sm:py-1 hidden sm:inline-flex"
                       title="Archive"
                     >
                       📦
@@ -138,7 +138,7 @@ export function ProductListView({ products, onEdit, onDelete, onArchive, onScan 
                       e.stopPropagation();
                       onDelete(product.id);
                     }}
-                    className="text-xs px-2 py-1"
+                    className="text-xs min-w-[36px] min-h-[36px] px-2 py-1.5 sm:px-2 sm:py-1"
                   >
                     🗑️
                   </Button>

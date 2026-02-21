@@ -240,7 +240,7 @@ export function InlineDMCASendFlow({
               <div className="flex items-center gap-2 mt-2">
                 {[1, 2, 3].map((s) => (
                   <div key={s} className="flex items-center gap-1">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    <div className={`w-7 h-7 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                       s < step ? 'bg-green-500 text-white'
                         : s === step ? 'bg-pg-accent text-white'
                         : 'bg-pg-surface-light text-pg-text-muted border border-pg-border'
@@ -260,7 +260,7 @@ export function InlineDMCASendFlow({
               </div>
             )}
           </div>
-          <button onClick={onClose} className="text-pg-text-muted hover:text-pg-text transition-colors p-1">
+          <button onClick={onClose} className="text-pg-text-muted hover:text-pg-text transition-colors p-2 -mr-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
