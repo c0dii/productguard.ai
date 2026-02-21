@@ -5,24 +5,26 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/Badge';
 import type { Profile } from '@/types';
+import type { BadgeCounts } from './MobileDashboardLayout';
 
 interface DashboardSidebarProps {
   profile: Profile;
   onNavigate?: () => void;
+  badgeCounts?: BadgeCounts;
 }
 
-export function DashboardSidebar({ profile, onNavigate }: DashboardSidebarProps) {
+export function DashboardSidebar({ profile, onNavigate, badgeCounts }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
   const navigation = [
-    { name: 'Overview', href: '/dashboard', icon: '📊' },
-    { name: 'Products', href: '/dashboard/products', icon: '📦' },
-    { name: 'Scans', href: '/dashboard/scans', icon: '🔍' },
-    { name: 'Infringements', href: '/dashboard/infringements', icon: '🚨' },
-    { name: 'Ready for Takedown', href: '/dashboard/ready-for-takedown', icon: '📋' },
-    { name: 'Takedowns', href: '/dashboard/takedowns', icon: '⚡' },
-    { name: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
+    { name: 'Overview', href: '/dashboard', icon: '📊', badge: 0 },
+    { name: 'Products', href: '/dashboard/products', icon: '📦', badge: 0 },
+    { name: 'Scans', href: '/dashboard/scans', icon: '🔍', badge: 0 },
+    { name: 'Infringements', href: '/dashboard/infringements', icon: '🚨', badge: badgeCounts?.infringements ?? 0 },
+    { name: 'Ready for Takedown', href: '/dashboard/ready-for-takedown', icon: '📋', badge: badgeCounts?.readyForTakedown ?? 0 },
+    { name: 'Takedowns', href: '/dashboard/takedowns', icon: '⚡', badge: 0 },
+    { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', badge: 0 },
   ];
 
   const handleLogout = async () => {
@@ -62,7 +64,12 @@ export function DashboardSidebar({ profile, onNavigate }: DashboardSidebarProps)
               }`}
             >
               <span className="text-xl">{item.icon}</span>
-              <span className="font-medium">{item.name}</span>
+              <span className="font-medium flex-1">{item.name}</span>
+              {item.badge > 0 && (
+                <span className="ml-auto min-w-[20px] h-5 flex items-center justify-center px-1.5 text-[11px] font-bold rounded-full bg-pg-accent/20 text-pg-accent border border-pg-accent/30">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
             </Link>
           );
         })}

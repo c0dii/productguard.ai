@@ -30,18 +30,6 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
         </p>
       </div>
 
-      {/* Onboarding card for incomplete profile */}
-      {!data.profileComplete && (
-        <div className="mb-6">
-          <OnboardingCard
-            fullName={data.userProfile.fullName}
-            phone={data.userProfile.phone}
-            address={data.userProfile.address}
-            dmcaReplyEmail={data.userProfile.dmcaReplyEmail}
-          />
-        </div>
-      )}
-
       {/* Protection Score Hero */}
       <ProtectionScoreHero
         score={data.protectionScore}
@@ -88,6 +76,18 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
           trendLabel="vs last 30d"
         />
       </div>
+
+      {/* Onboarding card for incomplete profile — shown below stats so dashboard feels alive first */}
+      {!data.profileComplete && (
+        <div className="mb-6">
+          <OnboardingCard
+            fullName={data.userProfile.fullName}
+            phone={data.userProfile.phone}
+            address={data.userProfile.address}
+            dmcaReplyEmail={data.userProfile.dmcaReplyEmail}
+          />
+        </div>
+      )}
 
       {/* Two-column split: Action Center + Threat Landscape */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

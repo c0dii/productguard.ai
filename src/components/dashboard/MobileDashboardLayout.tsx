@@ -4,12 +4,18 @@ import { useState } from 'react';
 import { DashboardSidebar } from './DashboardSidebar';
 import type { Profile } from '@/types';
 
+export interface BadgeCounts {
+  infringements: number;
+  readyForTakedown: number;
+}
+
 interface MobileDashboardLayoutProps {
   profile: Profile;
   children: React.ReactNode;
+  badgeCounts?: BadgeCounts;
 }
 
-export function MobileDashboardLayout({ profile, children }: MobileDashboardLayoutProps) {
+export function MobileDashboardLayout({ profile, children, badgeCounts }: MobileDashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -73,7 +79,7 @@ export function MobileDashboardLayout({ profile, children }: MobileDashboardLayo
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        <DashboardSidebar profile={profile} onNavigate={() => setSidebarOpen(false)} />
+        <DashboardSidebar profile={profile} onNavigate={() => setSidebarOpen(false)} badgeCounts={badgeCounts} />
       </div>
 
       {/* Main Content - offset by sidebar width on desktop */}

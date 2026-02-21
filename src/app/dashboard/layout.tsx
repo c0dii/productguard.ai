@@ -17,15 +17,34 @@ export default async function DashboardLayout({
     redirect('/auth/login');
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  // Fetch profile and sidebar badge counts in parallel
+  const [{ data: profile }, { count: needsReviewCount }, { count: readyForTakedownCount }] =
+    await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase
+        .from('infringements')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['pending_verification', 'active']),
+      supabase
+        .from('infringements')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'active'),
+    ]);
 
   if (!profile) {
     redirect('/auth/login');
   }
 
-  return <MobileDashboardLayout profile={profile}>{children}</MobileDashboardLayout>;
+  const badgeCounts = {
+    infringements: needsReviewCount ?? 0,
+    readyForTakedown: readyForTakedownCount ?? 0,
+  };
+
+  return (
+    <MobileDashboardLayout profile={profile} badgeCounts={badgeCounts}>
+      {children}
+    </MobileDashboardLayout>
+  );
 }

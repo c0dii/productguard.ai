@@ -221,6 +221,26 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
         </Card>
       )}
 
+      {/* Next Step CTA — when all pending verified and active threats exist */}
+      {!isScanning && scanStatus === 'completed' && (pendingTotal ?? 0) === 0 && activeInfringements && activeInfringements.length > 0 && (
+        <div className="mb-6 p-4 rounded-xl border bg-cyan-500/5 border-cyan-500/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-pg-text">All infringements reviewed</p>
+              <p className="text-sm text-pg-text-muted">
+                {activeInfringements.length} active threat{activeInfringements.length !== 1 ? 's' : ''} ready for takedown action.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/ready-for-takedown"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-medium rounded-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all whitespace-nowrap"
+            >
+              Send Takedowns →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Pending Verification Section - product-wide (show even during scanning if there are items) */}
       {(pendingTotal ?? 0) > 0 && (
         <div className="mb-8">

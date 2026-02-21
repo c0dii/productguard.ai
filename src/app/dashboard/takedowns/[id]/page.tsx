@@ -44,9 +44,14 @@ export default async function TakedownDetailsPage({ params }: { params: Promise<
     <div>
       {/* Header */}
       <div className="mb-6 sm:mb-8">
-        <Link href="/dashboard/takedowns" className="text-sm text-pg-accent hover:underline mb-4 inline-block">
-          ← Back to Takedowns
-        </Link>
+        <div className="flex items-center gap-4 mb-4">
+          <Link href="/dashboard/takedowns" className="text-sm text-pg-accent hover:underline">
+            ← Back to Takedowns
+          </Link>
+          <Link href="/dashboard/ready-for-takedown" className="text-sm text-pg-text-muted hover:text-pg-accent hover:underline">
+            View Ready Queue
+          </Link>
+        </div>
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">DMCA Takedown Notice</h1>
         <p className="text-sm sm:text-base text-pg-text-muted">
           {takedown.infringements?.products?.name || 'Product'}
