@@ -14,6 +14,19 @@ import { systemLogger } from '@/lib/logging/system-logger';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+// ── Webhook event deduplication ─────────────────────────────────────
+// Stripe retries webhooks on 500 responses. Track processed event IDs
+// in-memory to skip duplicate processing within a single instance.
+const processedEvents = new Map<string, number>(); // eventId → timestamp
+const DEDUP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function cleanupProcessedEvents() {
+  const cutoff = Date.now() - DEDUP_TTL_MS;
+  for (const [id, ts] of processedEvents) {
+    if (ts < cutoff) processedEvents.delete(id);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const headersList = await headers();
@@ -37,6 +50,14 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Deduplicate: skip if we've already processed this event recently
+  cleanupProcessedEvents();
+  if (processedEvents.has(event.id)) {
+    console.log(`[Stripe Webhook] Skipping duplicate event: ${event.id} (${event.type})`);
+    return NextResponse.json({ received: true, deduplicated: true });
+  }
+  processedEvents.set(event.id, Date.now());
 
   const supabase = createAdminClient();
 

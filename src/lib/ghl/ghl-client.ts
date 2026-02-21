@@ -35,6 +35,7 @@ export class GHLClient {
         'Version': '2021-07-28',
         ...options.headers,
       },
+      signal: options.signal || AbortSignal.timeout(10000), // 10s timeout
     });
 
     if (!response.ok) {
@@ -187,6 +188,7 @@ export class GHLClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        signal: AbortSignal.timeout(10000), // 10s timeout
       });
     } catch (error) {
       console.error('[GHL Client] Error triggering workflow:', error);

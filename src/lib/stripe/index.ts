@@ -8,6 +8,8 @@ if (!process.env.STRIPE_SECRET_KEY) {
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-02-24.acacia',
   typescript: true,
+  timeout: 15000, // 15s timeout for Stripe API calls
+  maxNetworkRetries: 2, // Retry transient network failures (idempotent)
 });
 
 /**

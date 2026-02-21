@@ -167,6 +167,7 @@ export async function lookupWhois(url: string): Promise<WhoisRecord | null> {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(10000), // 10s timeout
     });
 
     if (!response.ok) {
@@ -273,6 +274,7 @@ export async function submitBulkWhoisRequest(urls: string[]): Promise<string | n
           domains,
           outputFormat: 'JSON',
         }),
+        signal: AbortSignal.timeout(15000), // 15s timeout
       }
     );
 
@@ -323,6 +325,7 @@ export async function downloadBulkWhoisResults(requestId: string): Promise<strin
           requestId,
           searchType: 'all', // or 'noError' to skip domains with errors
         }),
+        signal: AbortSignal.timeout(30000), // 30s timeout (bulk download can be larger)
       }
     );
 

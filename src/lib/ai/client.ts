@@ -23,6 +23,7 @@ export function getOpenAIClient(): OpenAI {
 
     openaiClient = new OpenAI({
       apiKey,
+      timeout: 30000, // 30s timeout for AI calls
     });
   }
 
