@@ -99,6 +99,28 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
 
+  // ── Helpers ──────────────────────────────────────────────────────
+
+  /** Extract bare domain from a URL (e.g., "https://www.tradingview.com/foo" → "tradingview.com") */
+  const extractDomain = (url: string): string | null => {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      return host || null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** Auto-populate whitelist_domains from the product URL if not already present */
+  const syncWhitelistFromUrl = useCallback((url: string) => {
+    const domain = extractDomain(url);
+    if (!domain) return;
+    setData((prev) => {
+      if (prev.whitelist_domains.includes(domain)) return prev;
+      return { ...prev, whitelist_domains: [domain, ...prev.whitelist_domains] };
+    });
+  }, []);
+
   // ── AI Scrape ────────────────────────────────────────────────────
 
   const handleScrape = useCallback(async () => {
@@ -142,13 +164,16 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
       }));
 
       setScrapeComplete(true);
+
+      // Auto-add the product URL domain to whitelist
+      syncWhitelistFromUrl(result.url || data.url);
     } catch (error: any) {
       console.error('Scrape error:', error);
       setScrapeError(error.message || 'Failed to analyze page. You can enter details manually.');
     } finally {
       setIsScraping(false);
     }
-  }, [data.url, isScraping]);
+  }, [data.url, isScraping, syncWhitelistFromUrl]);
 
   // Auto-scrape when entering Step 2 with initialUrl
   useEffect(() => {
@@ -209,12 +234,34 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
 
   // ── Navigation ───────────────────────────────────────────────────
 
+  const goToStep = (step: number) => {
+    // When leaving step 2, auto-add the URL domain to whitelist
+    if (currentStep === 2 && step > 2 && data.url.trim()) {
+      syncWhitelistFromUrl(data.url.trim());
+    }
+    setCurrentStep(step);
+  };
+
   const canGoNext = () => {
     if (currentStep === 1) return data.name.trim() !== '' && data.type !== '';
     return true;
   };
 
   const canFinish = currentStep >= 3;
+
+  /** Enter key on text inputs advances focus to the next input in the wizard */
+  const handleEnterAdvance = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const form = (e.target as HTMLElement).closest('[data-wizard]');
+    if (!form) return;
+    const inputs = Array.from(form.querySelectorAll<HTMLInputElement>(
+      'input:not([disabled]):not([type="hidden"])'
+    ));
+    const idx = inputs.indexOf(e.target as HTMLInputElement);
+    const next = idx >= 0 ? inputs[idx + 1] : undefined;
+    if (next) next.focus();
+  }, []);
 
   if (!isOpen) return null;
 
@@ -223,7 +270,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-[60] sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <Card className="max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-2xl">
+      <Card data-wizard className="max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg sm:text-xl font-bold text-pg-text">Add New Product</h2>
@@ -239,7 +286,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
 
         {/* Step Content */}
         {currentStep === 1 && (
-          <Step1Name data={data} setData={setData} />
+          <Step1Name data={data} setData={setData} onEnter={handleEnterAdvance} />
         )}
         {currentStep === 2 && (
           <Step2Url
@@ -249,6 +296,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
             scrapeComplete={scrapeComplete}
             scrapeError={scrapeError}
             onScrape={handleScrape}
+            onEnter={handleEnterAdvance}
           />
         )}
         {currentStep === 3 && (
@@ -258,7 +306,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
           <Step4Detection data={data} setData={setData} />
         )}
         {currentStep === 5 && (
-          <Step5Legal data={data} setData={setData} />
+          <Step5Legal data={data} setData={setData} onEnter={handleEnterAdvance} />
         )}
 
         {/* Save Error */}
@@ -273,7 +321,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
           <div>
             {currentStep > 1 && (
               <button
-                onClick={() => setCurrentStep((s) => s - 1)}
+                onClick={() => goToStep(currentStep - 1)}
                 className="text-sm text-pg-text-muted hover:text-pg-text transition-colors"
               >
                 Back
@@ -283,7 +331,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
           <div className="flex items-center gap-3">
             {currentStep >= 4 && currentStep < 5 && (
               <button
-                onClick={() => setCurrentStep((s) => s + 1)}
+                onClick={() => goToStep(currentStep + 1)}
                 className="text-sm text-pg-text-muted hover:text-pg-text transition-colors"
               >
                 Skip
@@ -296,7 +344,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
             )}
             {currentStep < 5 && (
               <Button
-                onClick={() => setCurrentStep((s) => s + 1)}
+                onClick={() => goToStep(currentStep + 1)}
                 disabled={!canGoNext()}
                 variant={canFinish ? 'secondary' : 'primary'}
                 size="sm"
@@ -360,9 +408,11 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 function Step1Name({
   data,
   setData,
+  onEnter,
 }: {
   data: WizardData;
   setData: React.Dispatch<React.SetStateAction<WizardData>>;
+  onEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div>
@@ -378,7 +428,8 @@ function Step1Name({
           type="text"
           value={data.name}
           onChange={(e) => setData((prev) => ({ ...prev, name: e.target.value }))}
-          placeholder="e.g., Squeeze Pro Indicator, My Video Course"
+          onKeyDown={onEnter}
+          placeholder="e.g., My Video Course"
           className="input-field w-full"
           autoFocus
         />
@@ -412,6 +463,15 @@ function Step1Name({
 
 // ── Step 2: Where is it sold? ──────────────────────────────────────
 
+const URL_PLACEHOLDERS: Record<string, string> = {
+  course: 'https://www.udemy.com/course/your-course-name/',
+  indicator: 'https://www.tradingview.com/script/your-indicator/',
+  software: 'https://www.your-app.com/pricing',
+  template: 'https://www.canva.com/templates/your-template/',
+  ebook: 'https://www.amazon.com/dp/your-ebook/',
+  other: 'https://www.your-product-page.com/',
+};
+
 function Step2Url({
   data,
   setData,
@@ -419,6 +479,7 @@ function Step2Url({
   scrapeComplete,
   scrapeError,
   onScrape,
+  onEnter,
 }: {
   data: WizardData;
   setData: React.Dispatch<React.SetStateAction<WizardData>>;
@@ -426,7 +487,10 @@ function Step2Url({
   scrapeComplete: boolean;
   scrapeError: string;
   onScrape: () => void;
+  onEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
+  const urlPlaceholder = URL_PLACEHOLDERS[data.type || ''] || URL_PLACEHOLDERS.other;
+
   return (
     <div>
       <h3 className="text-lg font-semibold text-pg-text mb-1">Where is it sold?</h3>
@@ -444,7 +508,7 @@ function Step2Url({
             value={data.url}
             onChange={(e) => setData((prev) => ({ ...prev, url: e.target.value }))}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onScrape(); } }}
-            placeholder="https://www.tradingview.com/script/your-indicator/"
+            placeholder={urlPlaceholder}
             className="input-field flex-1"
             disabled={isScraping}
           />
@@ -584,6 +648,7 @@ function Step2Url({
           step="0.01"
           value={data.price || ''}
           onChange={(e) => setData((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+          onKeyDown={onEnter}
           placeholder="29.99"
           className="input-field w-full max-w-xs"
         />
@@ -942,9 +1007,11 @@ function Step4Detection({
 function Step5Legal({
   data,
   setData,
+  onEnter,
 }: {
   data: WizardData;
   setData: React.Dispatch<React.SetStateAction<WizardData>>;
+  onEnter: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div>
@@ -961,6 +1028,7 @@ function Step5Legal({
             type="text"
             value={data.brand_name}
             onChange={(e) => setData((prev) => ({ ...prev, brand_name: e.target.value }))}
+            onKeyDown={onEnter}
             placeholder="e.g., Simpler Trading, John Smith"
             className="input-field w-full"
           />
@@ -972,6 +1040,7 @@ function Step5Legal({
             type="text"
             value={data.copyright_number}
             onChange={(e) => setData((prev) => ({ ...prev, copyright_number: e.target.value }))}
+            onKeyDown={onEnter}
             placeholder="e.g., TX 1-234-567 (optional)"
             className="input-field w-full"
           />
@@ -987,6 +1056,7 @@ function Step5Legal({
             type="text"
             value={data.copyright_owner}
             onChange={(e) => setData((prev) => ({ ...prev, copyright_owner: e.target.value }))}
+            onKeyDown={onEnter}
             placeholder="e.g., Your Name or Company LLC"
             className="input-field w-full"
           />
