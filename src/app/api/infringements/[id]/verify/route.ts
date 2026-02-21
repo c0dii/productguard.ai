@@ -155,25 +155,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         try {
           console.log('[Evidence Capture] Starting background evidence capture for', infringement.source_url);
 
-          // Page capture + GHL tracking run in parallel
-          const [pageCapture] = await Promise.all([
+          // Page capture + GHL tracking run in parallel.
+          // Use allSettled so GHL failure doesn't prevent evidence capture.
+          const results = await Promise.allSettled([
             capturePageEvidence(infringement.source_url, user.id, id),
             // GHL tracking in parallel
             (async () => {
               if (!user.email) return;
-              try {
-                const { data: verifiedInfringements } = await supabase
-                  .from('infringements')
-                  .select('id', { count: 'exact', head: true })
-                  .eq('user_id', user.id)
-                  .not('verified_by_user_at', 'is', null);
+              const { data: verifiedInfringements } = await supabase
+                .from('infringements')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .not('verified_by_user_at', 'is', null);
 
-                await trackInfringementVerified(user.id, user.email, id, verifiedInfringements?.length || 1);
-              } catch (ghlError) {
-                console.error('[GHL Events] Error tracking verification:', ghlError);
-              }
+              await trackInfringementVerified(user.id, user.email, id, verifiedInfringements?.length || 1);
             })(),
           ]);
+
+          if (results[1].status === 'rejected') {
+            console.error('[GHL Events] Error tracking verification:', results[1].reason);
+          }
+
+          if (results[0].status === 'rejected') {
+            throw results[0].reason; // Let the outer catch handle evidence capture failure
+          }
+
+          const pageCapture = results[0].value;
 
           // Build cryptographic hash of all evidence
           const evidenceData = JSON.stringify({

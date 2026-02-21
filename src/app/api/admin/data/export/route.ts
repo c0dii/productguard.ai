@@ -138,7 +138,8 @@ export async function GET(request: Request) {
         'Content-Disposition': `attachment; filename="productguard-${source}-${new Date().toISOString().slice(0, 10)}.csv"`,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error('[Admin Export] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -44,13 +44,17 @@ export async function POST(req: NextRequest) {
     await pauseSubscription(subscription.stripe_subscription_id, resumeDate);
 
     // Update local DB with pause info
-    await supabase
+    const { error: updateError } = await supabase
       .from('subscriptions')
       .update({
         paused_at: new Date().toISOString(),
         resume_at: resumeDate.toISOString(),
       })
       .eq('stripe_subscription_id', subscription.stripe_subscription_id);
+
+    if (updateError) {
+      console.error('Error updating subscription pause record:', updateError);
+    }
 
     return NextResponse.json({
       success: true,

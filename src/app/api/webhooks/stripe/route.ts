@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient();
 
+  let hasCriticalError = false;
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
 
         if (profileError) {
           console.error('Error updating profile:', profileError);
+          hasCriticalError = true;
           break;
         }
 
@@ -85,9 +88,10 @@ export async function POST(req: NextRequest) {
 
         if (subError) {
           console.error('Error creating subscription:', subError);
+          hasCriticalError = true;
         }
 
-        console.log(`✅ Subscription created for user ${userId}: ${planTier}`);
+        console.log(`Subscription created for user ${userId}: ${planTier}`);
 
         // Track in GHL
         try {
@@ -152,7 +156,11 @@ export async function POST(req: NextRequest) {
           console.error('Error updating subscription:', subError);
         }
 
-        console.log(`✅ Subscription updated for user ${userId}: ${status}${subscription.cancel_at_period_end ? ' (canceling at period end)' : ''}`);
+        if (subError) {
+          hasCriticalError = true;
+        }
+
+        console.log(`Subscription updated for user ${userId}: ${status}${subscription.cancel_at_period_end ? ' (canceling at period end)' : ''}`);
 
         // Track plan upgrade in GHL (only if plan actually changed and subscription is active)
         if (status === 'active' && !subscription.cancel_at_period_end) {
@@ -204,7 +212,11 @@ export async function POST(req: NextRequest) {
           console.error('Error updating subscription:', subError);
         }
 
-        console.log(`✅ Subscription canceled for user ${userId}`);
+        if (profileError || subError) {
+          hasCriticalError = true;
+        }
+
+        console.log(`Subscription canceled for user ${userId}`);
 
         // Track in GHL
         try {
@@ -238,7 +250,7 @@ export async function POST(req: NextRequest) {
           console.error('Error updating subscription on invoice paid:', error);
         }
 
-        console.log(`✅ Invoice paid for subscription ${subscriptionId}`);
+        console.log(`Invoice paid for subscription ${subscriptionId}`);
         break;
       }
 
@@ -260,7 +272,7 @@ export async function POST(req: NextRequest) {
           console.error('Error updating subscription on payment failed:', error);
         }
 
-        console.log(`⚠️ Payment failed for subscription ${subscriptionId}`);
+        console.log(`Payment failed for subscription ${subscriptionId}`);
 
         // Send payment failure notification to user
         try {
@@ -296,6 +308,13 @@ export async function POST(req: NextRequest) {
 
       default:
         console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    // Return 500 on critical DB failures so Stripe retries the webhook
+    if (hasCriticalError) {
+      await systemLogger.logWebhook('stripe', event.type, 'failure', `Stripe webhook DB error: ${event.type}`, { provider: 'stripe', event_type: event.type, event_id: event.id });
+      await systemLogger.flush();
+      return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
     }
 
     await systemLogger.logWebhook('stripe', event.type, 'success', `Stripe webhook processed: ${event.type}`, { provider: 'stripe', event_type: event.type, event_id: event.id });

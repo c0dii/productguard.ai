@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { processQueue } from '@/lib/dmca/queue-processor';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * POST /api/dmca/process-queue
@@ -13,7 +14,10 @@ export async function POST(request: NextRequest) {
   try {
     // Auth: accept cron secret OR authenticated user
     const cronSecret = request.headers.get('x-cron-secret');
-    const isCron = cronSecret && cronSecret === process.env.CRON_SECRET;
+    const expected = process.env.CRON_SECRET || '';
+    const isCron = cronSecret && expected &&
+      cronSecret.length === expected.length &&
+      timingSafeEqual(Buffer.from(cronSecret), Buffer.from(expected));
 
     if (!isCron) {
       const supabase = await createClient();

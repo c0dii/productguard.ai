@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
   }
 
-  await admin
+  const { error: updateError } = await admin
     .from('profiles')
     .update({
       email_unsubscribe_all: true,
@@ -172,6 +172,11 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', profile.id);
+
+  if (updateError) {
+    console.error('Error unsubscribing user:', updateError);
+    return NextResponse.json({ error: 'Failed to unsubscribe' }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, message: 'Unsubscribed successfully' });
 }

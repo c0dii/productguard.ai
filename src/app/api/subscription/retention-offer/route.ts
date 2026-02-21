@@ -54,10 +54,14 @@ export async function POST(req: NextRequest) {
     await applyRetentionDiscount(subscription.stripe_subscription_id, couponId);
 
     // Mark that retention offer has been used
-    await supabase
+    const { error: updateError } = await supabase
       .from('subscriptions')
       .update({ retention_offer_used: true })
       .eq('stripe_subscription_id', subscription.stripe_subscription_id);
+
+    if (updateError) {
+      console.error('Error marking retention offer as used:', updateError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
