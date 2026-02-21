@@ -148,6 +148,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                   </dd>
                 </div>
               )}
+              {product.brand_name && (
+                <div>
+                  <dt className="text-xs text-pg-text-muted">Brand / Creator</dt>
+                  <dd className="text-sm text-pg-text mt-1">{product.brand_name}</dd>
+                </div>
+              )}
               {product.keywords && product.keywords.length > 0 && (
                 <div>
                   <dt className="text-xs text-pg-text-muted mb-2">Keywords</dt>
@@ -160,6 +166,48 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                         {keyword}
                       </span>
                     ))}
+                  </dd>
+                </div>
+              )}
+              {product.negative_keywords && product.negative_keywords.length > 0 && (
+                <div>
+                  <dt className="text-xs text-pg-text-muted mb-2">Negative Keywords</dt>
+                  <dd className="flex flex-wrap gap-2">
+                    {product.negative_keywords.map((kw: string) => (
+                      <span
+                        key={kw}
+                        className="px-2 py-1 bg-red-500/10 text-xs rounded border border-red-500/20 text-red-400"
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              )}
+              {product.whitelist_domains && product.whitelist_domains.length > 0 && (
+                <div>
+                  <dt className="text-xs text-pg-text-muted mb-2">Whitelist Domains</dt>
+                  <dd className="flex flex-wrap gap-2">
+                    {product.whitelist_domains.map((d: string) => (
+                      <span
+                        key={d}
+                        className="px-2 py-1 bg-green-500/10 text-xs rounded border border-green-500/20 text-green-400"
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              )}
+              {(product.copyright_owner || product.copyright_number) && (
+                <div>
+                  <dt className="text-xs text-pg-text-muted">Copyright</dt>
+                  <dd className="text-sm text-pg-text mt-1">
+                    {product.copyright_owner}
+                    {product.copyright_owner && product.copyright_number && ' — '}
+                    {product.copyright_number && (
+                      <span className="text-pg-text-muted">#{product.copyright_number}</span>
+                    )}
                   </dd>
                 </div>
               )}
