@@ -32,36 +32,36 @@ export default async function AdminSubscriptionsPage({
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Subscription Management</h1>
-        <p className="text-pg-text-muted">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">Subscription Management</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">
           Monitor and manage all user subscriptions
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Subscriptions</p>
-          <p className="text-3xl font-bold">{subscriptions?.length || 0}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{subscriptions?.length || 0}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Active</p>
-          <p className="text-3xl font-bold text-pg-accent">{activeCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-accent">{activeCount}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Canceled</p>
-          <p className="text-3xl font-bold text-red-400">{canceledCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-400">{canceledCount}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Past Due</p>
-          <p className="text-3xl font-bold text-pg-warning">{pastDueCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-warning">{pastDueCount}</p>
         </Card>
       </div>
 
       {/* Filters */}
       <Card className="mb-6">
-        <form method="GET" className="flex gap-4">
+        <form method="GET" className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <select
             name="status"
             defaultValue={params.status || 'all'}
@@ -91,9 +91,9 @@ export default async function AdminSubscriptionsPage({
           subscriptions.map((sub: any) => (
             <Link key={sub.id} href={`/admin/users/${sub.user_id}`}>
               <Card className="hover:border-pg-accent transition-colors cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                       <span className="text-lg font-bold">
                         {sub.profiles?.email?.charAt(0).toUpperCase() || '?'}
                       </span>
@@ -137,8 +137,8 @@ export default async function AdminSubscriptionsPage({
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <p className="text-sm font-mono text-pg-text-muted mb-1">
+                  <div className="text-left sm:text-right">
+                    <p className="text-xs sm:text-sm font-mono text-pg-text-muted mb-1 truncate">
                       {sub.stripe_subscription_id}
                     </p>
                     <p className="text-xs text-pg-text-muted">

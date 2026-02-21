@@ -74,9 +74,9 @@ export default function ExportPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Export Data</h1>
-        <p className="text-pg-text-muted">Download log data as CSV or JSON for external analysis</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Export Data</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Download log data as CSV or JSON for external analysis</p>
       </div>
 
       <Card className="max-w-2xl">
@@ -118,7 +118,7 @@ export default function ExportPage() {
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {showLogLevelFilter && (
               <div>
                 <label className="block text-sm font-medium text-pg-text mb-2">Log Level</label>

@@ -24,7 +24,7 @@ export function ScanVerdictSummary({
         <span className="text-xs text-pg-text-muted">{totalScans} scans total</span>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-6">
         <div className="flex items-center gap-2">
           <span className="inline-block w-3 h-3 rounded-full bg-green-400" />
           <span className="text-sm font-medium text-green-400">{successCount}</span>
@@ -40,7 +40,7 @@ export function ScanVerdictSummary({
           <span className="text-sm font-medium text-red-400">{failureCount}</span>
           <span className="text-xs text-pg-text-muted">Failed</span>
         </div>
-        <div className="ml-auto">
+        <div className="sm:ml-auto">
           <span className={`text-lg font-bold ${
             successRate >= 90 ? 'text-green-400' : successRate >= 70 ? 'text-yellow-400' : 'text-red-400'
           }`}>

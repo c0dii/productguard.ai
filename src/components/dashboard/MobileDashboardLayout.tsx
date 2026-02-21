@@ -30,7 +30,8 @@ export function MobileDashboardLayout({ profile, children, badgeCounts }: Mobile
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="lg:hidden fixed top-3 left-3 z-50 p-2.5 rounded-lg bg-pg-surface backdrop-blur-sm border border-pg-border text-pg-text hover:bg-pg-surface-light transition-all duration-300 min-w-[44px] min-h-[44px] flex items-center justify-center"
-        aria-label="Toggle menu"
+        aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={sidebarOpen}
       >
         {sidebarOpen ? (
           <svg
@@ -68,6 +69,7 @@ export function MobileDashboardLayout({ profile, children, badgeCounts }: Mobile
         <div
           className="lg:hidden fixed inset-0 bg-black/60 dark:bg-black/60 backdrop-blur-sm z-30"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 

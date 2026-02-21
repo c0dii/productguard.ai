@@ -20,35 +20,35 @@ export default async function AdminInfringementsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Infringements</h1>
-        <p className="text-pg-text-muted">All detected piracy infringements</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">Infringements</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">All detected piracy infringements</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Detected</p>
-          <p className="text-3xl font-bold">{stats.total}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{stats.total}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Active</p>
-          <p className="text-3xl font-bold text-pg-danger">{stats.active}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-danger">{stats.active}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Removed</p>
-          <p className="text-3xl font-bold text-pg-accent">{stats.removed}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-accent">{stats.removed}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Critical</p>
-          <p className="text-3xl font-bold text-red-500">{stats.critical}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-500">{stats.critical}</p>
         </Card>
       </div>
 
       <div className="space-y-3">
         {infringements?.map((inf: any) => (
           <Card key={inf.id}>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Badge
                     variant="default"

@@ -46,20 +46,20 @@ export default async function AdminOverviewPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Admin Overview</h1>
-        <p className="text-pg-text-muted">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Admin Overview</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">
           Business intelligence and system health monitoring
         </p>
       </div>
 
       {/* Revenue Metrics */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold mb-4">💰 Revenue</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">💰 Revenue</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card>
             <p className="text-sm text-pg-text-muted mb-1">Monthly Recurring Revenue</p>
-            <p className="text-3xl font-bold text-pg-accent">
+            <p className="text-2xl sm:text-3xl font-bold text-pg-accent">
               {formatCurrency(revenueStats?.mrr_usd || 0)}
             </p>
             <p className="text-xs text-pg-text-muted mt-1">/month</p>
@@ -67,7 +67,7 @@ export default async function AdminOverviewPage() {
 
           <Card>
             <p className="text-sm text-pg-text-muted mb-1">Annual Recurring Revenue</p>
-            <p className="text-3xl font-bold text-pg-accent">
+            <p className="text-2xl sm:text-3xl font-bold text-pg-accent">
               {formatCurrency(revenueStats?.arr_usd || 0)}
             </p>
             <p className="text-xs text-pg-text-muted mt-1">/year</p>
@@ -75,7 +75,7 @@ export default async function AdminOverviewPage() {
 
           <Card>
             <p className="text-sm text-pg-text-muted mb-1">Active Subscriptions</p>
-            <p className="text-3xl font-bold">
+            <p className="text-2xl sm:text-3xl font-bold">
               {subscriptionStats?.active_subscriptions || 0}
             </p>
             <p className="text-xs text-pg-text-muted mt-1">
@@ -86,12 +86,12 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* User Metrics */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold mb-4">👥 Users</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">👥 Users</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <p className="text-sm text-pg-text-muted mb-1">Total Users</p>
-            <p className="text-3xl font-bold">{userStats?.total_users || 0}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{userStats?.total_users || 0}</p>
             <p className="text-xs text-pg-text-muted mt-1">
               +{userStats?.new_users_7d || 0} this week
             </p>
@@ -106,7 +106,7 @@ export default async function AdminOverviewPage() {
 
           <Card>
             <p className="text-sm text-pg-text-muted mb-1">Paid Users</p>
-            <p className="text-3xl font-bold text-pg-accent">
+            <p className="text-2xl sm:text-3xl font-bold text-pg-accent">
               {(userStats?.starter_users || 0) +
                 (userStats?.pro_users || 0) +
                 (userStats?.business_users || 0)}
@@ -120,7 +120,7 @@ export default async function AdminOverviewPage() {
 
           <Card>
             <p className="text-sm text-pg-text-muted mb-1">New This Month</p>
-            <p className="text-3xl font-bold text-pg-accent">
+            <p className="text-2xl sm:text-3xl font-bold text-pg-accent">
               {userStats?.new_users_30d || 0}
             </p>
           </Card>
@@ -128,7 +128,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Activity Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Scans */}
         <Card>
           <h3 className="text-lg font-bold mb-4">🔍 Scans</h3>
@@ -232,7 +232,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Recent Users */}
         <Card>
           <h3 className="text-lg font-bold mb-4">👥 Recent Users</h3>

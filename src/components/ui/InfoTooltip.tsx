@@ -15,8 +15,10 @@ export function InfoTooltip({ content }: InfoTooltipProps) {
         onClick={() => setIsVisible(!isVisible)}
         className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full border border-pg-text-muted text-pg-text-muted hover:border-pg-accent hover:text-pg-accent transition-colors text-xs"
         type="button"
+        aria-label="More information"
+        aria-expanded={isVisible}
       >
-        ?
+        <span aria-hidden="true">?</span>
       </button>
       {isVisible && (
         <>

@@ -87,17 +87,17 @@ export default async function AdminUserDetailPage({
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8">
         <Link
           href="/admin/users"
           className="text-sm text-pg-accent hover:underline mb-4 inline-block"
         >
           ← Back to Users
         </Link>
-        <h1 className="text-3xl font-bold mb-2">User Details</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">User Details</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* User Info */}
         <div className="lg:col-span-2 space-y-6">
           {/* Profile Info */}

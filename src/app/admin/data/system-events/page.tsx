@@ -67,14 +67,14 @@ export default async function SystemEventsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">System Events</h1>
-        <p className="text-pg-text-muted">Monitor cron jobs, webhooks, and email sends</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">System Events</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Monitor cron jobs, webhooks, and email sends</p>
       </div>
 
       {/* Cron Job Status Grid */}
-      <h2 className="text-xl font-bold mb-4">Cron Job Status</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Cron Job Status</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         {cronJobStatus.map(job => (
           <Card key={job.name}>
             <div className="flex items-center justify-between mb-2">
@@ -110,31 +110,31 @@ export default async function SystemEventsPage() {
       </div>
 
       {/* 24h Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Webhooks (24h)</p>
-          <p className="text-3xl font-bold">{recentWebhooks.length}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{recentWebhooks.length}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Webhook Failures</p>
-          <p className="text-3xl font-bold text-red-400">
+          <p className="text-2xl sm:text-3xl font-bold text-red-400">
             {recentWebhooks.filter(l => l.status === 'failure').length}
           </p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Emails Sent (24h)</p>
-          <p className="text-3xl font-bold">{recentEmails.length}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{recentEmails.length}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Email Failures</p>
-          <p className="text-3xl font-bold text-red-400">
+          <p className="text-2xl sm:text-3xl font-bold text-red-400">
             {recentEmails.filter(l => l.status === 'failure').length}
           </p>
         </Card>
       </div>
 
       {/* Event Timeline */}
-      <h2 className="text-xl font-bold mb-4">Event Timeline</h2>
+      <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Event Timeline</h2>
       <SystemEventViewer events={allEvents} />
     </div>
   );

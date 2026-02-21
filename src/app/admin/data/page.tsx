@@ -49,9 +49,9 @@ export default async function DataOverviewPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">System Health Overview</h1>
-        <p className="text-pg-text-muted">Real-time monitoring across all ProductGuard services (24h window)</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">System Health Overview</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Real-time monitoring across all ProductGuard services (24h window)</p>
       </div>
 
       {/* Critical Alert Banner */}
@@ -81,22 +81,22 @@ export default async function DataOverviewPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Events (24h)</p>
-          <p className="text-3xl font-bold">{totalLogs}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{totalLogs}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Failures (24h)</p>
-          <p className="text-3xl font-bold text-red-400">{totalFailures}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-400">{totalFailures}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Unresolved Errors</p>
-          <p className="text-3xl font-bold text-yellow-400">{unresolvedErrorCount || 0}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-yellow-400">{unresolvedErrorCount || 0}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">API Cost (24h)</p>
-          <p className="text-3xl font-bold text-pg-accent">${totalCost.toFixed(2)}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-accent">${totalCost.toFixed(2)}</p>
         </Card>
       </div>
 

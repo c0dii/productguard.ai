@@ -37,28 +37,28 @@ export default async function ErrorTrackingPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Error Tracking</h1>
-        <p className="text-pg-text-muted">Track, investigate, and resolve system errors</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">Error Tracking</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Track, investigate, and resolve system errors</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Unresolved Errors</p>
-          <p className={`text-3xl font-bold ${unresolvedCount > 0 ? 'text-red-400' : 'text-green-400'}`}>
+          <p className={`text-2xl sm:text-3xl font-bold ${unresolvedCount > 0 ? 'text-red-400' : 'text-green-400'}`}>
             {unresolvedCount}
           </p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Critical Alerts</p>
-          <p className={`text-3xl font-bold ${criticalCount > 0 ? 'text-red-400' : 'text-green-400'}`}>
+          <p className={`text-2xl sm:text-3xl font-bold ${criticalCount > 0 ? 'text-red-400' : 'text-green-400'}`}>
             {criticalCount}
           </p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Resolved</p>
-          <p className="text-3xl font-bold text-green-400">{resolvedCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-400">{resolvedCount}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Error Sources</p>

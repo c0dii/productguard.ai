@@ -12,6 +12,7 @@ interface AdminSidebarProps {
     full_name: string | null;
   };
   alertCounts?: AdminAlertCounts | null;
+  onNavigate?: () => void;
 }
 
 const scansSubItems = [
@@ -29,7 +30,7 @@ const dataSubItems = [
   { href: '/admin/data/export', label: 'Export' },
 ];
 
-export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
+export function AdminSidebar({ profile, alertCounts, onNavigate }: AdminSidebarProps) {
   const pathname = usePathname();
   const isScansActive = pathname.startsWith('/admin/scans');
   const [scansOpen, setScansOpen] = useState(isScansActive);
@@ -54,7 +55,7 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
   const criticalAlerts = alertCounts?.critical_count || 0;
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-pg-surface border-r border-pg-border flex flex-col">
+    <aside className="w-64 min-h-screen bg-pg-surface border-r border-pg-border flex flex-col">
       {/* Logo & Badge */}
       <div className="p-6 border-b border-pg-border">
         <Link href="/admin" className="flex items-center gap-3 mb-4">
@@ -77,6 +78,7 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             className={`
               block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors
               ${
@@ -120,6 +122,7 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
                   className={`
                     block px-3 py-2 rounded-lg text-xs font-medium transition-colors
                     ${
@@ -177,6 +180,7 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
                   className={`
                     block px-3 py-2 rounded-lg text-xs font-medium transition-colors
                     ${
@@ -196,6 +200,7 @@ export function AdminSidebar({ profile, alertCounts }: AdminSidebarProps) {
         <div className="pt-4 border-t border-pg-border mt-4">
           <Link
             href="/dashboard"
+            onClick={onNavigate}
             className="block px-4 py-2.5 rounded-lg text-sm font-medium text-pg-text-muted hover:bg-pg-surface-light hover:text-pg-text transition-colors"
           >
             {'\u2190'} Back to User Dashboard

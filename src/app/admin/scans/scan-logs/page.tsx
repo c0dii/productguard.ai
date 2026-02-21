@@ -81,9 +81,9 @@ export default async function DataScanLogsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Scan Logs</h1>
-        <p className="text-pg-text-muted">Monitor scan engine activity, errors, and self-healing events</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">Scan Logs</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Monitor scan engine activity, errors, and self-healing events</p>
       </div>
 
       {/* Scan Verdict Summary (7-day) */}
@@ -95,22 +95,22 @@ export default async function DataScanLogsPage() {
       />
 
       {/* 24h Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Logs (24h)</p>
-          <p className="text-3xl font-bold">{stats.totalLogs}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{stats.totalLogs}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Errors (24h)</p>
-          <p className="text-3xl font-bold text-pg-danger">{stats.errorCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-danger">{stats.errorCount}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Self-Healed (24h)</p>
-          <p className="text-3xl font-bold text-yellow-400">{stats.selfHealCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-yellow-400">{stats.selfHealCount}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Unique Scans (24h)</p>
-          <p className="text-3xl font-bold text-pg-accent">{stats.uniqueScans}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-accent">{stats.uniqueScans}</p>
         </Card>
       </div>
 

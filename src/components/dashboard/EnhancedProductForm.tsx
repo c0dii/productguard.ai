@@ -21,6 +21,7 @@ export function EnhancedProductForm({
   userId,
 }: EnhancedProductFormProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // URL Fetching state
   const [productUrl, setProductUrl] = useState('');
@@ -79,27 +80,33 @@ export function EnhancedProductForm({
     file_hash: product?.file_hash || '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
-    // If AI data exists and is pending approval, set last_analyzed_at to now
-    const analysisTimestamp = aiExtractedData
-      ? (aiDataPendingApproval ? new Date().toISOString() : lastAnalyzedAt)
-      : null;
+    setIsSaving(true);
+    try {
+      // If AI data exists and is pending approval, set last_analyzed_at to now
+      const analysisTimestamp = aiExtractedData
+        ? (aiDataPendingApproval ? new Date().toISOString() : lastAnalyzedAt)
+        : null;
 
-    onSave({
-      ...formData,
-      keywords: filterGenericKeywords(formData.keywords),
-      ai_extracted_data: aiExtractedData,
-      product_images: productImages,
-      full_text_content: fullTextContent,
-      last_analyzed_at: analysisTimestamp,
-    });
+      await onSave({
+        ...formData,
+        keywords: filterGenericKeywords(formData.keywords),
+        ai_extracted_data: aiExtractedData,
+        product_images: productImages,
+        full_text_content: fullTextContent,
+        last_analyzed_at: analysisTimestamp,
+      });
 
-    // Clear pending approval flag after save
-    setAiDataPendingApproval(false);
-    if (aiExtractedData && aiDataPendingApproval) {
-      setLastAnalyzedAt(new Date().toISOString());
+      // Clear pending approval flag after save
+      setAiDataPendingApproval(false);
+      if (aiExtractedData && aiDataPendingApproval) {
+        setLastAnalyzedAt(new Date().toISOString());
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -476,6 +483,7 @@ export function EnhancedProductForm({
             <input
               type="text"
               required
+              maxLength={255}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
@@ -616,11 +624,12 @@ export function EnhancedProductForm({
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
+                maxLength={1000}
                 className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
                 placeholder="Describe your product..."
               />
               <p className="text-xs text-pg-text-muted mt-1">
-                Used in takedown notices. Keep it concise and factual.
+                Used in takedown notices. Keep it concise and factual. ({formData.description.length}/1000)
               </p>
             </div>
           </div>
@@ -792,9 +801,10 @@ export function EnhancedProductForm({
       <div className="flex gap-3 pt-4 border-t border-pg-border">
         <button
           type="submit"
-          className="px-6 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium transition-colors"
+          disabled={isSaving}
+          className="px-6 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {product ? 'Update Product' : 'Create Product'}
+          {isSaving ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
         </button>
         <button
           type="button"

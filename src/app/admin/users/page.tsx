@@ -33,16 +33,16 @@ export default async function AdminUsersPage({
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-white">User Management</h1>
-        <p className="text-gray-400">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-white">User Management</h1>
+        <p className="text-sm sm:text-base text-gray-400">
           Search, view, and manage user accounts
         </p>
       </div>
 
       {/* Filters */}
-      <div className="mb-6 p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-        <form method="GET" className="flex gap-4">
+      <div className="mb-6 p-4 sm:p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <form method="GET" className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <input
             type="text"
             name="search"
@@ -50,20 +50,22 @@ export default async function AdminUsersPage({
             defaultValue={params.search}
             className="input-field flex-1"
           />
-          <select
-            name="plan"
-            defaultValue={params.plan || 'all'}
-            className="input-field w-48"
-          >
-            <option value="all">All Plans</option>
-            <option value="scout">Scout (Free)</option>
-            <option value="starter">Starter</option>
-            <option value="pro">Pro</option>
-            <option value="business">Business</option>
-          </select>
-          <button type="submit" className="btn-glow px-6">
-            Search
-          </button>
+          <div className="flex gap-3">
+            <select
+              name="plan"
+              defaultValue={params.plan || 'all'}
+              className="input-field flex-1 sm:w-48 sm:flex-none"
+            >
+              <option value="all">All Plans</option>
+              <option value="scout">Scout (Free)</option>
+              <option value="starter">Starter</option>
+              <option value="pro">Pro</option>
+              <option value="business">Business</option>
+            </select>
+            <button type="submit" className="btn-glow px-6 whitespace-nowrap">
+              Search
+            </button>
+          </div>
         </form>
       </div>
 
@@ -79,16 +81,16 @@ export default async function AdminUsersPage({
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400">
                     User
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400 hidden md:table-cell">
                     Email
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400">
                     Plan
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400 hidden sm:table-cell">
                     Status
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400">
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-400 hidden lg:table-cell">
                     Joined
                   </th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-gray-400">
@@ -132,7 +134,7 @@ export default async function AdminUsersPage({
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden md:table-cell">
                       <span className="text-sm text-gray-400 font-mono">
                         {user.email}
                       </span>
@@ -153,7 +155,7 @@ export default async function AdminUsersPage({
                         {user.plan_tier}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden sm:table-cell">
                       {user.subscriptions?.[0] ? (
                         <Badge
                           variant="default"
@@ -171,7 +173,7 @@ export default async function AdminUsersPage({
                         <span className="text-xs text-gray-400">No subscription</span>
                       )}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden lg:table-cell">
                       <span className="text-sm text-gray-400">
                         {new Date(user.created_at).toLocaleDateString()}
                       </span>

@@ -483,14 +483,14 @@ export default function MarketingDashboard({
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Marketing Command Center</h1>
-        <p className="text-pg-text-muted">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Marketing Command Center</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">
           Discover piracy, review prospects, and control outreach pipeline
         </p>
       </div>
 
       {/* Quick Stats Bar */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <Card>
           <div className="text-2xl font-bold">{stats.total}</div>
           <div className="text-xs text-pg-text-muted">Total Prospects</div>
@@ -518,7 +518,7 @@ export default function MarketingDashboard({
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-pg-border">
+      <div className="flex gap-1 mb-6 border-b border-pg-border overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -595,7 +595,7 @@ export default function MarketingDashboard({
                 />
               </div>
 
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-0 sm:min-w-[200px]">
                 <label className="block text-xs text-pg-text-muted mb-1">Search</label>
                 <input
                   type="text"
@@ -1074,11 +1074,11 @@ export default function MarketingDashboard({
             <h2 className="text-lg font-bold mb-4">Safety Nets</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <div className="text-3xl font-bold text-pg-accent">{stats.exclusions}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-pg-accent">{stats.exclusions}</div>
                 <div className="text-sm text-pg-text-muted">Exclusions (existing customers, brands, domains)</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-yellow-400">{stats.suppressions}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-yellow-400">{stats.suppressions}</div>
                 <div className="text-sm text-pg-text-muted">Suppressions (bounced, unsubscribed, complained)</div>
               </div>
             </div>
@@ -1093,8 +1093,8 @@ export default function MarketingDashboard({
                 const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
                 const meta = STATUS_LABELS[stage];
                 return (
-                  <div key={stage} className="flex items-center gap-4">
-                    <div className="w-32 text-sm text-pg-text-muted shrink-0">{meta?.label ?? stage}</div>
+                  <div key={stage} className="flex items-center gap-2 sm:gap-4">
+                    <div className="w-20 sm:w-32 text-xs sm:text-sm text-pg-text-muted shrink-0">{meta?.label ?? stage}</div>
                     <div className="flex-1 bg-pg-surface-light rounded-full h-6 overflow-hidden">
                       <div
                         className="h-full bg-pg-accent rounded-full transition-all flex items-center justify-end pr-2"

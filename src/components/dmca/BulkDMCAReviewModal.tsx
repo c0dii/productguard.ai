@@ -146,12 +146,12 @@ export function BulkDMCAReviewModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="bulk-dmca-title">
       <Card className="max-w-3xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto rounded-b-none sm:rounded-b-2xl">
         {/* Header */}
         <div className="flex items-start justify-between mb-4 pb-4 border-b border-pg-border">
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-pg-text">
+            <h2 id="bulk-dmca-title" className="text-lg sm:text-xl font-bold text-pg-text">
               Bulk DMCA Takedown
             </h2>
             <div className="flex items-center gap-2 mt-2">
@@ -176,8 +176,8 @@ export function BulkDMCAReviewModal({
               ))}
             </div>
           </div>
-          <button onClick={onClose} className="text-pg-text-muted hover:text-pg-text transition-colors p-2 -mr-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={onClose} aria-label="Close" className="text-pg-text-muted hover:text-pg-text transition-colors p-2 -mr-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

@@ -46,34 +46,34 @@ export default async function ApiLogsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">API Logs</h1>
-        <p className="text-pg-text-muted">Monitor external API calls: OpenAI, Serper, WHOIS, Resend</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">API Logs</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Monitor external API calls: OpenAI, Serper, WHOIS, Resend</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Calls (24h)</p>
-          <p className="text-3xl font-bold">{totalCalls}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{totalCalls}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Failed (24h)</p>
-          <p className="text-3xl font-bold text-red-400">{failedCalls}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-400">{failedCalls}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Failure Rate</p>
-          <p className={`text-3xl font-bold ${failureRate > 10 ? 'text-red-400' : failureRate > 5 ? 'text-yellow-400' : 'text-green-400'}`}>
+          <p className={`text-2xl sm:text-3xl font-bold ${failureRate > 10 ? 'text-red-400' : failureRate > 5 ? 'text-yellow-400' : 'text-green-400'}`}>
             {failureRate}%
           </p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Avg Latency</p>
-          <p className="text-3xl font-bold">{avgLatency}<span className="text-sm text-pg-text-muted">ms</span></p>
+          <p className="text-2xl sm:text-3xl font-bold">{avgLatency}<span className="text-sm text-pg-text-muted">ms</span></p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Cost (24h)</p>
-          <p className="text-3xl font-bold text-pg-accent">${totalCost.toFixed(3)}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-accent">${totalCost.toFixed(3)}</p>
         </Card>
       </div>
 

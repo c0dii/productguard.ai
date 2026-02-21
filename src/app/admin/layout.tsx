@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { MobileAdminLayout } from '@/components/admin/MobileAdminLayout';
 import type { AdminAlertCounts } from '@/types';
 
 export default async function AdminLayout({
@@ -44,11 +44,8 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-pg-bg">
-      <AdminSidebar profile={profile} alertCounts={alertCounts} />
-      <main className="flex-1 p-8 ml-64">
-        {children}
-      </main>
-    </div>
+    <MobileAdminLayout profile={profile} alertCounts={alertCounts}>
+      {children}
+    </MobileAdminLayout>
   );
 }

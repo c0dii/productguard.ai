@@ -33,28 +33,28 @@ export default async function DmcaLogsPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">DMCA Logs</h1>
-        <p className="text-pg-text-muted">Track DMCA notice generation, submission, and status</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-2xl sm:text-3xl font-bold mb-2">DMCA Logs</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">Track DMCA notice generation, submission, and status</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Total Submissions</p>
-          <p className="text-3xl font-bold">{dmcaSubmissionLogs.length}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{dmcaSubmissionLogs.length}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">Recent (24h)</p>
-          <p className="text-3xl font-bold text-pg-accent">{recentSubmissions.length}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-pg-accent">{recentSubmissions.length}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">System Events</p>
-          <p className="text-3xl font-bold">{dmcaSystemLogs.length}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{dmcaSystemLogs.length}</p>
         </Card>
         <Card>
           <p className="text-sm text-pg-text-muted mb-1">System Events (24h)</p>
-          <p className="text-3xl font-bold">{recentSystemLogs.length}</p>
+          <p className="text-2xl sm:text-3xl font-bold">{recentSystemLogs.length}</p>
         </Card>
       </div>
 

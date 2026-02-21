@@ -70,6 +70,7 @@ export function DataTable<TData>({
           <input
             type="search"
             placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
             value={globalFilter ?? ''}
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 transition-colors"
@@ -88,6 +89,12 @@ export function DataTable<TData>({
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
+                      scope="col"
+                      aria-sort={
+                        header.column.getIsSorted() === 'asc' ? 'ascending'
+                          : header.column.getIsSorted() === 'desc' ? 'descending'
+                          : header.column.getCanSort() ? 'none' : undefined
+                      }
                       className="px-4 py-3 text-left text-sm font-semibold text-pg-text border-b border-pg-border"
                     >
                       {header.isPlaceholder ? null : (
@@ -97,6 +104,14 @@ export function DataTable<TData>({
                               ? 'flex items-center gap-2 cursor-pointer select-none hover:text-cyan-400 transition-colors'
                               : ''
                           }
+                          role={header.column.getCanSort() ? 'button' : undefined}
+                          tabIndex={header.column.getCanSort() ? 0 : undefined}
+                          onKeyDown={header.column.getCanSort() ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              header.column.getToggleSortingHandler()?.(e);
+                            }
+                          } : undefined}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
@@ -177,9 +192,10 @@ export function DataTable<TData>({
             <button
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
+              aria-label="First page"
               className="px-3 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text disabled:opacity-50 disabled:cursor-not-allowed hover:bg-pg-surface-light hover:border-cyan-500 transition-all"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               </svg>
             </button>
@@ -235,9 +251,10 @@ export function DataTable<TData>({
             <button
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
+              aria-label="Last page"
               className="px-3 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text disabled:opacity-50 disabled:cursor-not-allowed hover:bg-pg-surface-light hover:border-cyan-500 transition-all"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
             </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, type ReactNode } from 'react';
+import { useEffect, useCallback, useRef, type ReactNode } from 'react';
 
 interface SlideOverProps {
   isOpen: boolean;
@@ -17,6 +17,9 @@ const WIDTH_CLASSES = {
 };
 
 export function SlideOver({ isOpen, onClose, title, children, width = 'lg' }: SlideOverProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
   const handleEsc = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -26,8 +29,14 @@ export function SlideOver({ isOpen, onClose, title, children, width = 'lg' }: Sl
 
   useEffect(() => {
     if (isOpen) {
+      triggerRef.current = document.activeElement as HTMLElement;
       document.addEventListener('keydown', handleEsc);
       document.body.style.overflow = 'hidden';
+      // Move focus into the panel
+      setTimeout(() => panelRef.current?.focus(), 0);
+    } else {
+      // Return focus to trigger element
+      triggerRef.current?.focus();
     }
     return () => {
       document.removeEventListener('keydown', handleEsc);
@@ -43,22 +52,29 @@ export function SlideOver({ isOpen, onClose, title, children, width = 'lg' }: Sl
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Panel */}
       <div
-        className={`fixed inset-y-0 right-0 z-50 w-full ${WIDTH_CLASSES[width]} bg-pg-surface border-l border-pg-border shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="slideover-title"
+        tabIndex={-1}
+        className={`fixed inset-y-0 right-0 z-50 w-full ${WIDTH_CLASSES[width]} bg-pg-surface border-l border-pg-border shadow-2xl flex flex-col transition-transform duration-300 ease-in-out focus:outline-none ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-pg-border shrink-0">
-          <h2 className="text-lg font-bold text-pg-text truncate pr-4">{title}</h2>
+          <h2 id="slideover-title" className="text-lg font-bold text-pg-text truncate pr-4">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-pg-text-muted hover:text-pg-text hover:bg-pg-surface-light transition-colors shrink-0"
+            aria-label="Close panel"
+            className="p-1.5 rounded-lg text-pg-text-muted hover:text-pg-text hover:bg-pg-surface-light transition-colors shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

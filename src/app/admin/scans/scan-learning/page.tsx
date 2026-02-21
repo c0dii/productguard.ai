@@ -99,9 +99,9 @@ export default async function ScanLearningPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Scan Learning System</h1>
-        <p className="text-pg-text-muted">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Scan Learning System</h1>
+        <p className="text-sm sm:text-base text-pg-text-muted">
           Track precision per query category. User verification (confirm/reject) trains
           the system to learn which search strategies find real infringements.
         </p>
@@ -127,7 +127,7 @@ export default async function ScanLearningPage() {
       )}
 
       {/* Overall Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <Card className="p-4 text-center">
           <p className="text-2xl font-bold">{totalResults}</p>
           <p className="text-xs text-pg-text-muted">Total Results</p>
