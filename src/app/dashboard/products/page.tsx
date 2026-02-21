@@ -31,13 +31,17 @@ export default function ProductsPage() {
 
   const supabase = createClient();
 
-  // Check for ?edit=<id> URL param on mount (from product detail Edit button)
+  // Check for URL params on mount: ?edit=<id> or ?wizard=1
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('edit');
+    const openWizard = params.get('wizard');
     if (editId) {
       setPendingEditId(editId);
-      // Clean up URL without triggering navigation
+      window.history.replaceState({}, '', '/dashboard/products');
+    }
+    if (openWizard === '1') {
+      setShowWizard(true);
       window.history.replaceState({}, '', '/dashboard/products');
     }
   }, []);
@@ -638,9 +642,24 @@ export default function ProductsPage() {
       <ProductWizard
         isOpen={showWizard}
         onClose={() => setShowWizard(false)}
-        onComplete={(product) => {
+        onComplete={async (product) => {
           setShowWizard(false);
-          setPendingEditId(product.id);
+          // Auto-trigger first scan and redirect to scan progress page
+          try {
+            const res = await fetch('/api/scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ product_id: product.id }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              window.location.href = `/dashboard/scans/${data.scan_id}`;
+              return;
+            }
+          } catch (err) {
+            console.error('[Onboarding] Auto-scan failed:', err);
+          }
+          // Fallback: if scan fails (rate limit, plan exceeded), show products list
           fetchProducts();
         }}
         userId={userId}

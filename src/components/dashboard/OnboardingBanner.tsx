@@ -50,7 +50,7 @@ export function OnboardingBanner({ productCount, hasScanRun }: OnboardingBannerP
                 <span><span className="font-semibold text-pg-accent">4.</span> Send takedowns</span>
               </div>
               <Link
-                href="/dashboard/products"
+                href="/dashboard/products?wizard=1"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-pg-accent text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
               >
                 Add Your First Product

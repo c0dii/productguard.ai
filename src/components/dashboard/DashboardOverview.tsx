@@ -7,6 +7,7 @@ import { ThreatLandscape } from '@/components/dashboard/ThreatLandscape';
 import { ActivityTimeline } from '@/components/dashboard/ActivityTimeline';
 import { QuickActionsBar } from '@/components/dashboard/QuickActionsBar';
 import { ContextualBottomZone } from '@/components/dashboard/ContextualBottomZone';
+import { OnboardingBanner } from '@/components/dashboard/OnboardingBanner';
 import { OnboardingCard } from '@/components/dashboard/OnboardingCard';
 import type { DashboardData } from '@/types';
 
@@ -20,6 +21,76 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
       ? Math.max(0, data.stats.takedownsSent - data.stats.activeThreats)
       : 0;
 
+  const isNewUser = data.productCount === 0;
+
+  // Focused welcome layout for brand-new users (no products yet)
+  if (isNewUser) {
+    return (
+      <div>
+        {/* Welcome header */}
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-pg-text">Welcome to ProductGuard</h1>
+          <p className="text-sm text-pg-text-muted mt-1">
+            Let's protect your digital products from piracy
+          </p>
+        </div>
+
+        {/* Onboarding banner — front and center for new users */}
+        <OnboardingBanner productCount={0} hasScanRun={false} />
+
+        {/* Stat cards preview — shows the grid that will fill in */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <StatCard
+            label="Products"
+            value={0}
+            icon={<span>&#x1F4E6;</span>}
+            color="text-pg-accent"
+            href="/dashboard/products"
+          />
+          <StatCard
+            label="Needs Review"
+            value={0}
+            icon={<span>&#x26A0;&#xFE0F;</span>}
+            color="text-yellow-400"
+            href="/dashboard/infringements"
+          />
+          <StatCard
+            label="Active Threats"
+            value={0}
+            icon={<span>&#x1F6A8;</span>}
+            color="text-pg-danger"
+            href="/dashboard/infringements"
+          />
+          <StatCard
+            label="Takedowns Sent"
+            value={0}
+            icon={<span>&#x26A1;</span>}
+            color="text-green-400"
+            href="/dashboard/takedowns"
+          />
+        </div>
+
+        {/* Profile completion card */}
+        {!data.profileComplete && (
+          <div className="mb-6">
+            <OnboardingCard
+              fullName={data.userProfile.fullName}
+              phone={data.userProfile.phone}
+              address={data.userProfile.address}
+              dmcaReplyEmail={data.userProfile.dmcaReplyEmail}
+            />
+          </div>
+        )}
+
+        {/* Quick actions for navigation */}
+        <div className="mb-6">
+          <QuickActionsBar />
+        </div>
+      </div>
+    );
+  }
+
+  // Full dashboard for returning users with products
   return (
     <div>
       {/* Header */}
