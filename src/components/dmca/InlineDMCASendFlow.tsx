@@ -147,13 +147,14 @@ export function InlineDMCASendFlow({
           infringement_id: infringementId,
           notice_content: editedBody,
           notice_subject: editedSubject,
-          recipient_email: editedRecipientEmail,
+          recipient_email: editedRecipientEmail || '',
           recipient_name: editedRecipientName,
           provider_name: target.provider.name,
           target_type: target.type,
           infringement_types: infringementTypes,
           signature_name: signatureName,
           cc_emails: ccList,
+          web_form_submission: !editedRecipientEmail && target.provider.prefersWebForm,
         }),
       });
 
@@ -365,7 +366,7 @@ export function InlineDMCASendFlow({
               {/* Recipient Email */}
               <div>
                 <label className="block text-xs font-medium text-pg-text mb-1">
-                  Send DMCA Notice To <span className="text-pg-danger">*</span>
+                  Send DMCA Notice To {!target.provider.prefersWebForm && <span className="text-pg-danger">*</span>}
                 </label>
                 <input
                   type="email"
@@ -381,8 +382,33 @@ export function InlineDMCASendFlow({
                 )}
               </div>
 
-              {/* Web form link */}
-              {notice.recipient_form_url && (
+              {/* Web form guidance — prominent when no email exists */}
+              {target.provider.prefersWebForm && notice.recipient_form_url && (
+                <div className={`p-3 rounded-lg border ${!editedRecipientEmail ? 'bg-amber-500/10 border-amber-500/30' : 'bg-blue-500/10 border-blue-500/30'}`}>
+                  {!editedRecipientEmail ? (
+                    <>
+                      <p className="text-xs font-semibold text-pg-text mb-1">
+                        {target.provider.name} only accepts DMCA notices via web form
+                      </p>
+                      <p className="text-xs text-pg-text-muted mb-2">
+                        Copy your notice from the next step, then submit it through their form. You can also enter an email address above if you have one.
+                      </p>
+                    </>
+                  ) : (
+                    <span className="text-xs text-pg-text-muted">This provider also accepts web form submissions: </span>
+                  )}
+                  <a
+                    href={notice.recipient_form_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-pg-accent hover:underline font-semibold"
+                  >
+                    Open {target.provider.name} Form →
+                  </a>
+                </div>
+              )}
+              {/* Non-web-form providers with a form link */}
+              {!target.provider.prefersWebForm && notice.recipient_form_url && (
                 <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
                   <span className="text-xs text-pg-text-muted">This provider also accepts web form submissions: </span>
                   <a
@@ -429,7 +455,7 @@ export function InlineDMCASendFlow({
               <div className="p-3 rounded bg-pg-bg border border-pg-border">
                 <p className="text-xs font-semibold text-pg-text mb-2">Delivery Summary</p>
                 <p className="text-xs text-pg-text-muted">
-                  <strong>To:</strong> {editedRecipientName} &lt;{editedRecipientEmail || '(not set)'}&gt;
+                  <strong>To:</strong> {editedRecipientName} {editedRecipientEmail ? `<${editedRecipientEmail}>` : '(via web form)'}
                 </p>
                 {(ccSelf || ccEmails) && (
                   <p className="text-xs text-pg-text-muted">
@@ -445,7 +471,7 @@ export function InlineDMCASendFlow({
 
             <div className="flex justify-between pt-3 border-t border-pg-border">
               <Button variant="secondary" onClick={() => setStep(1)}>← Back</Button>
-              <Button onClick={() => setStep(3)} disabled={!editedRecipientEmail}>
+              <Button onClick={() => setStep(3)} disabled={!editedRecipientEmail && !target.provider.prefersWebForm}>
                 Next: Review & Send →
               </Button>
             </div>
@@ -601,6 +627,8 @@ export function InlineDMCASendFlow({
                     </svg>
                     Sending...
                   </span>
+                ) : !editedRecipientEmail && target.provider.prefersWebForm ? (
+                  'Mark as Submitted via Web Form'
                 ) : (
                   'Send DMCA Notice'
                 )}
