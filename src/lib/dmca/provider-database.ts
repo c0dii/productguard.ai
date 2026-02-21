@@ -367,6 +367,9 @@ const URL_PATTERNS: Array<{ pattern: RegExp; providerId: string }> = [
   { pattern: /scribd\.com/i, providerId: 'scribd' },
   { pattern: /github\.com/i, providerId: 'github' },
   { pattern: /pastebin\.com/i, providerId: 'pastebin' },
+  { pattern: /amazon\.com/i, providerId: 'amazon' },
+  { pattern: /ebay\.com/i, providerId: 'ebay' },
+  { pattern: /patreon\.com/i, providerId: 'patreon' },
   // Google search results should match last (catch-all for google.* domains)
   { pattern: /google\./i, providerId: 'google' },
 ];
