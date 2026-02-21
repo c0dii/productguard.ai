@@ -57,9 +57,14 @@ export async function GET(request: NextRequest) {
   if (minConfidence) query = query.gte('confidence_score', parseFloat(minConfidence));
   if (maxConfidence) query = query.lte('confidence_score', parseFloat(maxConfidence));
   if (search) {
-    query = query.or(
-      `product_name.ilike.%${search}%,owner_email.ilike.%${search}%,company_name.ilike.%${search}%`
-    );
+    // Sanitize search input to prevent PostgREST filter injection
+    // Characters like , . ( ) can break out of ilike values in .or() filter strings
+    const sanitized = search.replace(/[,.()"'\\]/g, '');
+    if (sanitized.length > 0) {
+      query = query.or(
+        `product_name.ilike.%${sanitized}%,owner_email.ilike.%${sanitized}%,company_name.ilike.%${sanitized}%`
+      );
+    }
   }
 
   const { data: prospects, count, error } = await query

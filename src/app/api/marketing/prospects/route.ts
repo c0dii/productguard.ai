@@ -13,7 +13,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 // ── GET: Load prospect data ─────────────────────────────────
 
@@ -22,6 +22,12 @@ export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
   if (!id) {
     return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+  }
+
+  // Validate UUID format to prevent enumeration
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    return NextResponse.json({ error: 'Invalid id format' }, { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -46,9 +52,17 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    // Require authentication — derive user_id from session, not request body
+    const authClient = await createClient();
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
     const body = await req.json();
-    const { prospect_id, event, user_id } = body;
+    const { prospect_id, event } = body;
+    const user_id = user.id; // Always use session user, never trust client-supplied user_id
 
     if (!prospect_id || !event) {
       return NextResponse.json(

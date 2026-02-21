@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/server';
 import { getProductScanStatus, formatTimeAgo } from '@/lib/scan-history';
 import { InfringementTrendChart } from '@/components/dashboard/InfringementTrendChart';
 import { PendingVerificationList } from '@/components/dashboard/PendingVerificationList';
@@ -64,8 +63,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   // Fetch timeline data for the chart (last 30 days of verified infringements)
   let timelineData: ProductTimelineData[] = [];
   try {
-    const adminClient = createAdminClient();
-    const { data: timeline } = await adminClient
+    const { data: timeline } = await supabase
       .from('product_infringement_timeline')
       .select('*')
       .eq('product_id', id)

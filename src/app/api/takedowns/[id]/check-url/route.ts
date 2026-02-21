@@ -55,10 +55,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     // If URL is removed, update infringement status
     if (urlStatus === 'removed' && takedown.infringement_id) {
-      await supabase
+      const { error: infringementUpdateError } = await supabase
         .from('infringements')
         .update({ status: 'removed' })
         .eq('id', takedown.infringement_id);
+
+      if (infringementUpdateError) {
+        console.error('[URL Check] Error updating infringement status:', infringementUpdateError);
+      }
     }
 
     return NextResponse.json({
