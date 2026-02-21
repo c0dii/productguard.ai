@@ -64,7 +64,7 @@ export function EnhancedProductForm({
     // Search Config
     keywords: product?.keywords || [],
     negative_keywords: product?.negative_keywords || [],
-    min_price_threshold: product?.min_price_threshold || null,
+    min_price_threshold: null,
 
     // Authorized Sales
     whitelist_domains: product?.whitelist_domains || [],
@@ -585,57 +585,65 @@ export function EnhancedProductForm({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-pg-text mb-2">
-            Product URL
-          </label>
-          <input
-            type="url"
-            value={formData.url}
-            onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-            className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
-            placeholder="https://example.com/product"
-          />
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Left column: URL + Description */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-pg-text mb-2">
+                Product URL
+              </label>
+              <input
+                type="url"
+                value={formData.url}
+                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
+                placeholder="https://example.com/product"
+              />
+            </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-pg-text">
-              Description
-            </label>
-            {aiExtractedData?.product_description && aiExtractedData?.extraction_metadata?.model !== 'scrape-fallback' && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">
-                AI Generated
-              </span>
-            )}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-pg-text">
+                  Description
+                </label>
+                {aiExtractedData?.product_description && aiExtractedData?.extraction_metadata?.model !== 'scrape-fallback' && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">
+                    AI Generated
+                  </span>
+                )}
+              </div>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
+                placeholder="Describe your product..."
+              />
+              <p className="text-xs text-pg-text-muted mt-1">
+                This description is used in DMCA takedown notices. Keep it concise and factual.
+              </p>
+            </div>
           </div>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={3}
-            className="w-full px-4 py-2 rounded-lg bg-pg-surface border border-pg-border text-pg-text placeholder:text-pg-text-muted focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-20"
-            placeholder="Describe your product..."
-          />
-          <p className="text-xs text-pg-text-muted mt-1">
-            This description is used in DMCA takedown notices. Keep it concise and factual.
-          </p>
+
+          {/* Right column: Alt Names + Unique IDs */}
+          <div className="space-y-4">
+            <TagInput
+              value={formData.alternative_names}
+              onChange={(names) => setFormData({ ...formData, alternative_names: names })}
+              label="Alternative Names / Aliases"
+              placeholder="e.g., Product Name v2, ProductName, PN"
+              helpText="Add variations of your product name for better search coverage"
+            />
+
+            <TagInput
+              value={formData.unique_identifiers}
+              onChange={(ids) => setFormData({ ...formData, unique_identifiers: ids })}
+              label="Unique Identifiers"
+              placeholder="e.g., ISBN-123456, COURSE-789"
+              helpText="Serial numbers, ISBNs, course IDs, or other unique identifiers"
+            />
+          </div>
         </div>
-
-        <TagInput
-          value={formData.alternative_names}
-          onChange={(names) => setFormData({ ...formData, alternative_names: names })}
-          label="Alternative Names / Aliases"
-          placeholder="e.g., Product Name v2, ProductName, PN"
-          helpText="Add variations of your product name for better search coverage"
-        />
-
-        <TagInput
-          value={formData.unique_identifiers}
-          onChange={(ids) => setFormData({ ...formData, unique_identifiers: ids })}
-          label="Unique Identifiers"
-          placeholder="e.g., ISBN-123456, COURSE-789"
-          helpText="Serial numbers, ISBNs, course IDs, or other unique identifiers"
-        />
       </div>
 
       {/* Section 3: Search Configuration */}
@@ -660,28 +668,6 @@ export function EnhancedProductForm({
           helpText="Keywords to exclude from results to reduce false positives"
         />
 
-        <div>
-          <label className="block text-sm font-medium text-pg-text mb-2">
-            Minimum Price Alert Threshold (%)
-          </label>
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={formData.min_price_threshold || 50}
-              onChange={(e) => setFormData({ ...formData, min_price_threshold: parseFloat(e.target.value) })}
-              className="flex-1"
-            />
-            <span className="text-pg-text font-semibold min-w-[60px]">
-              {formData.min_price_threshold || 50}%
-            </span>
-          </div>
-          <p className="text-xs text-pg-text-muted mt-1">
-            Flag listings below this percentage of your retail price as suspicious
-          </p>
-        </div>
       </div>
 
       {/* Section 4: Authorized Sales */}
@@ -690,29 +676,31 @@ export function EnhancedProductForm({
           Authorized Sales Channels
         </h3>
 
-        <TagInput
-          value={formData.whitelist_domains}
-          onChange={(domains) => setFormData({ ...formData, whitelist_domains: domains })}
-          label="Whitelist Domains"
-          placeholder="e.g., gumroad.com, udemy.com"
-          helpText="Authorized domains to exclude from infringement detection"
-        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TagInput
+            value={formData.whitelist_domains}
+            onChange={(domains) => setFormData({ ...formData, whitelist_domains: domains })}
+            label="Whitelist Domains"
+            placeholder="e.g., gumroad.com, udemy.com"
+            helpText="Authorized domains to exclude from detection"
+          />
 
-        <TagInput
-          value={formData.whitelist_urls}
-          onChange={(urls) => setFormData({ ...formData, whitelist_urls: urls })}
-          label="Approved URLs"
-          placeholder="e.g., https://gumroad.com/l/my-product"
-          helpText="Specific URLs you own that should never trigger infringement alerts. URLs are auto-added when you use 'This Is My Approved URL' during review."
-        />
+          <TagInput
+            value={formData.whitelist_urls}
+            onChange={(urls) => setFormData({ ...formData, whitelist_urls: urls })}
+            label="Approved URLs"
+            placeholder="e.g., https://gumroad.com/l/my-product"
+            helpText="URLs that should never trigger alerts"
+          />
 
-        <TagInput
-          value={formData.authorized_sellers}
-          onChange={(sellers) => setFormData({ ...formData, authorized_sellers: sellers })}
-          label="Official Sales Platforms"
-          placeholder="e.g., Udemy, Teachable, Amazon"
-          helpText="Authorized platforms where your product is sold"
-        />
+          <TagInput
+            value={formData.authorized_sellers}
+            onChange={(sellers) => setFormData({ ...formData, authorized_sellers: sellers })}
+            label="Official Sales Platforms"
+            placeholder="e.g., Udemy, Teachable, Amazon"
+            helpText="Authorized platforms where your product is sold"
+          />
+        </div>
       </div>
 
       {/* Section 5: Advanced (Collapsible) */}
