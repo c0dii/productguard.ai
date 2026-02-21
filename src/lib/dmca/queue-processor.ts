@@ -112,6 +112,7 @@ export async function processQueue(options?: { limit?: number }): Promise<Proces
           agentName: item.recipient_name || 'DMCA Agent',
           requirements: '',
           prefersWebForm: false,
+          verified: false,
         };
 
         // Send the email

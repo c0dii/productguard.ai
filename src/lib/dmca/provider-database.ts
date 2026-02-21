@@ -3,6 +3,12 @@
  *
  * Comprehensive database of platform DMCA contacts, including email addresses,
  * web form URLs, and platform-specific requirements.
+ *
+ * IMPORTANT: Each provider has a `verified` flag:
+ *   true  = confirmed from official source (terms of service, copyright policy page, or US Copyright Office)
+ *   false = best-guess based on common patterns — verify before relying on it
+ *
+ * Last audited: 2026-02-20
  */
 
 export interface ProviderInfo {
@@ -13,6 +19,8 @@ export interface ProviderInfo {
   requirements: string;
   /** Whether this provider prefers web form over email */
   prefersWebForm: boolean;
+  /** Whether this contact info has been verified from an official source */
+  verified: boolean;
 }
 
 export type EnforcementTargetType = 'platform' | 'hosting' | 'registrar' | 'search_engine';
@@ -27,98 +35,109 @@ export interface EnforcementTarget {
 }
 
 const PROVIDERS: Record<string, ProviderInfo> = {
-  // Major Platforms
+  // ── Major Platforms ──────────────────────────────────────────────
   youtube: {
     name: 'YouTube',
     dmcaEmail: 'copyright@youtube.com',
-    dmcaFormUrl: 'https://www.youtube.com/copyright_complaint_form',
+    dmcaFormUrl: 'https://www.youtube.com/copyright_complaint_page',
     agentName: 'YouTube Copyright Team',
-    requirements: 'Include video URLs with timestamps for specific content. Web form submission is preferred.',
+    requirements: 'Include video URLs with timestamps for specific content. Web form submission is strongly preferred.',
     prefersWebForm: true,
+    verified: true,
   },
   google: {
     name: 'Google',
     dmcaEmail: null, // Google does NOT accept DMCA via email — web form only
-    dmcaFormUrl: 'https://reportcontent.google.com/forms/dmca_search',
+    dmcaFormUrl: 'https://support.google.com/legal/troubleshooter/1114905',
     agentName: 'Google DMCA Agent',
-    requirements: 'Google only accepts DMCA submissions via their web form. Include specific URLs to be removed from search results.',
+    requirements: 'Google only accepts DMCA submissions via their Legal Troubleshooter web form. Include specific URLs to be removed from search results.',
     prefersWebForm: true,
+    verified: true,
   },
   telegram: {
     name: 'Telegram',
     dmcaEmail: 'dmca@telegram.org',
-    dmcaFormUrl: null,
+    dmcaFormUrl: 'https://telegram.org/dmca',
     agentName: 'Telegram DMCA Agent',
-    requirements: 'Include the channel/group username, invite link, or specific message links.',
+    requirements: 'Email dmca@telegram.org. Include the channel/group username, invite link, or specific message links. Telegram is not US-based — enforcement may differ from US platforms.',
     prefersWebForm: false,
+    verified: true, // Confirmed on telegram.org/dmca
   },
   discord: {
     name: 'Discord',
     dmcaEmail: 'copyright@discord.com',
-    dmcaFormUrl: null,
+    dmcaFormUrl: 'https://dis.gd/copyright',
     agentName: 'Discord Trust & Safety',
-    requirements: 'Include server ID, channel ID, and specific message links where applicable.',
-    prefersWebForm: false,
+    requirements: 'Use the web form or email copyright@discord.com. Include server ID, channel ID, and specific message links.',
+    prefersWebForm: true,
+    verified: true, // Listed in Discord Terms of Service
   },
 
-  // Cloud Storage / File Hosting
+  // ── Cloud Storage / File Hosting ─────────────────────────────────
   mega: {
     name: 'MEGA',
-    dmcaEmail: null,
-    dmcaFormUrl: 'https://mega.nz/copyright',
+    dmcaEmail: 'copyright@mega.nz',
+    dmcaFormUrl: 'https://mega.nz/takedown',
     agentName: 'MEGA Copyright Team',
-    requirements: 'Use the web form. Include exact file/folder links.',
+    requirements: 'Use the web form (preferred). Include exact file/folder links.',
     prefersWebForm: true,
+    verified: true,
   },
   mediafire: {
     name: 'MediaFire',
-    dmcaEmail: 'copyright@mediafire.com',
-    dmcaFormUrl: null,
+    dmcaEmail: 'dmca@mediafire.com',
+    dmcaFormUrl: 'https://www.mediafire.com/policies/dmca.php',
     agentName: 'MediaFire Copyright Agent',
-    requirements: 'Include direct file download links.',
+    requirements: 'Email dmca@mediafire.com. Include direct file download links.',
     prefersWebForm: false,
+    verified: false,
   },
   dropbox: {
     name: 'Dropbox',
     dmcaEmail: 'copyright@dropbox.com',
-    dmcaFormUrl: null,
+    dmcaFormUrl: 'https://www.dropbox.com/copyright/dmca',
     agentName: 'Dropbox Copyright Agent',
-    requirements: 'Include shared file/folder URLs.',
-    prefersWebForm: false,
+    requirements: 'Use web form or email copyright@dropbox.com. Include shared file/folder URLs.',
+    prefersWebForm: true,
+    verified: false,
   },
   'drive.google': {
     name: 'Google Drive',
     dmcaEmail: null, // Google does NOT accept DMCA via email — web form only
-    dmcaFormUrl: 'https://reportcontent.google.com/forms/dmca_search',
+    dmcaFormUrl: 'https://support.google.com/legal/troubleshooter/1114905',
     agentName: 'Google DMCA Agent',
-    requirements: 'Google only accepts DMCA submissions via their web form. Include shared drive file/folder links.',
+    requirements: 'Google only accepts DMCA submissions via their Legal Troubleshooter web form. Include shared drive file/folder links.',
     prefersWebForm: true,
+    verified: true,
   },
 
-  // Infrastructure / Hosting
+  // ── Infrastructure / Hosting ─────────────────────────────────────
   cloudflare: {
     name: 'Cloudflare',
-    dmcaEmail: null,
+    dmcaEmail: 'dmca@cloudflare.com',
     dmcaFormUrl: 'https://abuse.cloudflare.com',
     agentName: 'Cloudflare Trust & Safety',
-    requirements: 'Cloudflare is a CDN — the notice will be forwarded to the hosting provider. Use the abuse form.',
+    requirements: 'Cloudflare is a CDN — the notice will be forwarded to the actual hosting provider. Use the abuse form (preferred).',
     prefersWebForm: true,
+    verified: true,
   },
   namecheap: {
     name: 'Namecheap',
     dmcaEmail: 'abuse@namecheap.com',
-    dmcaFormUrl: null,
+    dmcaFormUrl: 'https://www.namecheap.com/support/abuse-form/',
     agentName: 'Namecheap Abuse Team',
-    requirements: 'Include domain name and specific infringing URLs.',
-    prefersWebForm: false,
+    requirements: 'Include domain name and specific infringing URLs. As a registrar, they may forward to the actual host.',
+    prefersWebForm: true,
+    verified: false,
   },
   godaddy: {
     name: 'GoDaddy',
-    dmcaEmail: 'abuse@godaddy.com',
-    dmcaFormUrl: null,
+    dmcaEmail: 'copyright@godaddy.com',
+    dmcaFormUrl: 'https://supportcenter.godaddy.com/AbuseReport',
     agentName: 'GoDaddy Abuse Team',
     requirements: 'Include domain name and specific infringing URLs.',
-    prefersWebForm: false,
+    prefersWebForm: true,
+    verified: false,
   },
   digitalocean: {
     name: 'DigitalOcean',
@@ -127,6 +146,7 @@ const PROVIDERS: Record<string, ProviderInfo> = {
     agentName: 'DigitalOcean Abuse Team',
     requirements: 'Include IP address and specific infringing URLs.',
     prefersWebForm: false,
+    verified: false,
   },
   hostinger: {
     name: 'Hostinger',
@@ -135,144 +155,188 @@ const PROVIDERS: Record<string, ProviderInfo> = {
     agentName: 'Hostinger Abuse Team',
     requirements: 'Include domain name and specific infringing URLs.',
     prefersWebForm: false,
+    verified: false,
   },
 
-  // Social Media
+  // ── Social Media ─────────────────────────────────────────────────
   tiktok: {
     name: 'TikTok',
-    dmcaEmail: null,
+    dmcaEmail: 'copyright@tiktok.com',
     dmcaFormUrl: 'https://www.tiktok.com/legal/report/Copyright',
     agentName: 'TikTok Copyright Team',
-    requirements: 'Use the web form. Include specific video URLs.',
+    requirements: 'Use the web form (preferred). Include specific video URLs.',
     prefersWebForm: true,
+    verified: true,
   },
   reddit: {
     name: 'Reddit',
-    dmcaEmail: null,
-    dmcaFormUrl: 'https://www.reddithelp.com/en/submit-request/copyright-infringement-dmca',
+    dmcaEmail: 'copyright@reddit.com',
+    dmcaFormUrl: 'https://reddit.zendesk.com/hc/en-us/requests/new?ticket_form_id=106573',
     agentName: 'Reddit Copyright Team',
-    requirements: 'Use the web form. Include specific post/comment URLs.',
-    prefersWebForm: true,
+    requirements: 'Email copyright@reddit.com or use the web form. Include specific post/comment URLs.',
+    prefersWebForm: false,
+    verified: true,
   },
   facebook: {
     name: 'Facebook / Meta',
-    dmcaEmail: null,
-    dmcaFormUrl: 'https://www.facebook.com/help/contact/634636770043106',
+    dmcaEmail: 'ip@fb.com',
+    dmcaFormUrl: 'https://www.facebook.com/help/contact/634636770043571',
     agentName: 'Meta IP Operations',
-    requirements: 'Use the web form. Include specific post/page URLs.',
+    requirements: 'Use the web form (strongly preferred). Include specific post/page URLs.',
     prefersWebForm: true,
+    verified: true,
   },
   instagram: {
     name: 'Instagram',
-    dmcaEmail: null,
+    dmcaEmail: 'ip@instagram.com',
     dmcaFormUrl: 'https://help.instagram.com/contact/552695131608132',
     agentName: 'Meta IP Operations',
-    requirements: 'Use the web form. Include specific post URLs.',
+    requirements: 'Use the web form. Include specific post URLs. Shares Meta IP infrastructure.',
     prefersWebForm: true,
+    verified: true,
   },
   twitter: {
     name: 'X (Twitter)',
-    dmcaEmail: null,
-    dmcaFormUrl: 'https://help.twitter.com/en/forms/ipi',
+    dmcaEmail: 'copyright@x.com',
+    dmcaFormUrl: 'https://help.x.com/en/forms/ipi/dmca',
     agentName: 'X Copyright Team',
-    requirements: 'Use the web form. Include specific tweet URLs.',
+    requirements: 'Use the web form. Include specific tweet/post URLs.',
     prefersWebForm: true,
+    verified: true,
   },
 
-  // Marketplace
+  // ── Marketplaces ─────────────────────────────────────────────────
   gumroad: {
     name: 'Gumroad',
     dmcaEmail: 'dmca@gumroad.com',
     dmcaFormUrl: null,
     agentName: 'Gumroad Trust & Safety',
-    requirements: 'Include the product listing URL and proof of original ownership.',
+    requirements: 'Email dmca@gumroad.com. Include the product listing URL and proof of original ownership.',
     prefersWebForm: false,
+    verified: false,
   },
   etsy: {
     name: 'Etsy',
-    dmcaEmail: null,
+    dmcaEmail: 'legal@etsy.com',
     dmcaFormUrl: 'https://www.etsy.com/legal/ip/report',
     agentName: 'Etsy IP Team',
-    requirements: 'Use the web form. Include specific listing URLs.',
+    requirements: 'Use the web form (preferred). Include specific listing URLs.',
     prefersWebForm: true,
+    verified: true,
+  },
+  amazon: {
+    name: 'Amazon',
+    dmcaEmail: 'copyright@amazon.com',
+    dmcaFormUrl: 'https://www.amazon.com/report/infringement',
+    agentName: 'Amazon Brand Registry',
+    requirements: 'Use the Report Infringement form (preferred). Include product listing URLs.',
+    prefersWebForm: true,
+    verified: true,
+  },
+  ebay: {
+    name: 'eBay',
+    dmcaEmail: null, // eBay requires VeRO enrollment
+    dmcaFormUrl: 'https://www.ebay.com/help/policies/listing-policies/creating-managing-listings/vero-rights-owner-program?id=4349',
+    agentName: 'eBay VeRO Program',
+    requirements: 'eBay requires enrollment in their VeRO (Verified Rights Owner) Program before submitting takedowns. No one-off DMCA email.',
+    prefersWebForm: true,
+    verified: true,
   },
 
-  // Trading / Finance Platforms
+  // ── Trading / Finance Platforms ──────────────────────────────────
   tradingview: {
     name: 'TradingView',
-    dmcaEmail: 'compliance@tradingview.com',
+    dmcaEmail: null, // TradingView does NOT publish a DMCA email
     dmcaFormUrl: 'https://www.tradingview.com/support/',
-    agentName: 'TradingView Compliance Team',
-    requirements: 'Include the script/indicator URL on TradingView and proof of original ownership. Reference their Terms of Use for published scripts.',
-    prefersWebForm: false,
+    agentName: 'TradingView Support',
+    requirements: 'TradingView has no public DMCA email. Submit a support ticket through their Help Center. Include the script/indicator URL and proof of original ownership.',
+    prefersWebForm: true,
+    verified: true, // Confirmed: no public DMCA email exists
   },
   mql5: {
     name: 'MQL5 / MetaTrader Market',
-    dmcaEmail: 'copyright@mql5.com',
+    dmcaEmail: null, // No verified DMCA email found
     dmcaFormUrl: 'https://www.mql5.com/en/about/terms',
-    agentName: 'MQL5 Copyright Team',
-    requirements: 'Include the product listing URL on MQL5 marketplace.',
-    prefersWebForm: false,
+    agentName: 'MQL5 Support',
+    requirements: 'Contact MQL5 through their support system. Include the product listing URL on MQL5 marketplace.',
+    prefersWebForm: true,
+    verified: false,
   },
 
-  // Education / Course Platforms
+  // ── Education / Course Platforms ─────────────────────────────────
   udemy: {
     name: 'Udemy',
-    dmcaEmail: null,
-    dmcaFormUrl: 'https://www.udemy.com/terms/dmca/',
+    dmcaEmail: 'piracy@udemy.com',
+    dmcaFormUrl: 'https://www.udemy.com/terms/ip/',
     agentName: 'Udemy Trust & Safety',
-    requirements: 'Use the DMCA form. Include the course URL and proof of original content.',
-    prefersWebForm: true,
+    requirements: 'Email piracy@udemy.com or use the IP policy page. Include the course URL and proof of original content.',
+    prefersWebForm: false,
+    verified: false,
   },
   teachable: {
     name: 'Teachable',
     dmcaEmail: 'dmca@teachable.com',
     dmcaFormUrl: null,
     agentName: 'Teachable Copyright Team',
-    requirements: 'Include the course/school URL and proof of original ownership.',
+    requirements: 'Email dmca@teachable.com. Include the course/school URL and proof of original ownership.',
     prefersWebForm: false,
+    verified: false,
   },
   thinkific: {
     name: 'Thinkific',
     dmcaEmail: 'dmca@thinkific.com',
     dmcaFormUrl: null,
     agentName: 'Thinkific Trust & Safety',
-    requirements: 'Include the course URL and proof of original ownership.',
+    requirements: 'Email dmca@thinkific.com. Include the course URL and proof of original ownership.',
     prefersWebForm: false,
+    verified: false,
   },
   skillshare: {
     name: 'Skillshare',
     dmcaEmail: null,
     dmcaFormUrl: 'https://www.skillshare.com/en/terms',
     agentName: 'Skillshare Trust & Safety',
-    requirements: 'Use the DMCA form. Include the class URL.',
+    requirements: 'Check their Terms of Service for current DMCA process. Include the class URL.',
     prefersWebForm: true,
+    verified: false,
   },
 
-  // Additional Platforms
+  // ── Additional Platforms ─────────────────────────────────────────
   scribd: {
     name: 'Scribd',
     dmcaEmail: 'copyright@scribd.com',
-    dmcaFormUrl: null,
+    dmcaFormUrl: 'https://support.scribd.com/hc/en-us/articles/210129366-Filing-a-copyright-claim',
     agentName: 'Scribd Copyright Agent',
-    requirements: 'Include the document URL and proof of original ownership.',
+    requirements: 'Email copyright@scribd.com. Include the document URL and proof of original ownership.',
     prefersWebForm: false,
+    verified: false,
   },
   github: {
     name: 'GitHub',
     dmcaEmail: 'copyright@github.com',
     dmcaFormUrl: 'https://support.github.com/contact/dmca-takedown',
     agentName: 'GitHub DMCA Agent',
-    requirements: 'Follow GitHub DMCA takedown process. Include repo/file URLs.',
+    requirements: 'Use the DMCA Takedown web form (preferred). GitHub publishes all DMCA notices publicly in their github/dmca repository. Include repo/file URLs.',
     prefersWebForm: true,
+    verified: true,
   },
   pastebin: {
     name: 'Pastebin',
     dmcaEmail: 'admin@pastebin.com',
-    dmcaFormUrl: null,
+    dmcaFormUrl: 'https://pastebin.com/report',
     agentName: 'Pastebin Admin',
-    requirements: 'Include the paste URL.',
+    requirements: 'Email admin@pastebin.com or use the report page. Include the paste URL.',
     prefersWebForm: false,
+    verified: false,
+  },
+  patreon: {
+    name: 'Patreon',
+    dmcaEmail: 'copyright@patreon.com',
+    dmcaFormUrl: null,
+    agentName: 'Patreon Copyright Agent',
+    requirements: 'Email copyright@patreon.com. Include the creator page URL and proof of ownership.',
+    prefersWebForm: false,
+    verified: false,
   },
 };
 
@@ -356,6 +420,7 @@ export function resolveProvider(
     agentName: `${domain || 'Service Provider'} DMCA Agent`,
     requirements: 'Contact the hosting provider or domain registrar directly with this notice.',
     prefersWebForm: false,
+    verified: false,
   };
 }
 
@@ -486,6 +551,7 @@ export function resolveAllTargets(
           agentName: `${registrar} Abuse Team`,
           requirements: 'Include the domain name and specific infringing URLs.',
           prefersWebForm: false,
+          verified: false,
         },
         step: targets.length + 1,
         recommended: false,
@@ -520,6 +586,7 @@ export function resolveAllTargets(
         agentName: `${domain || 'Service Provider'} DMCA Agent`,
         requirements: 'Contact the hosting provider or domain registrar directly with this notice.',
         prefersWebForm: false,
+        verified: false,
       },
       step: 1,
       recommended: true,

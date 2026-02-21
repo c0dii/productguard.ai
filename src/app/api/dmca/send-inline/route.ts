@@ -92,6 +92,7 @@ export async function POST(request: Request) {
       agentName: recipient_name || 'DMCA Agent',
       requirements: '',
       prefersWebForm: false,
+      verified: false,
     };
 
     // Send the DMCA notice via Resend
