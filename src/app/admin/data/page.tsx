@@ -30,14 +30,20 @@ export default async function DataOverviewPage() {
     .in('log_level', ['error', 'fatal'])
     .is('resolved_at', null);
 
+  // Fetch cost from periodic snapshots (aggregated by cron, not per-call)
+  const { data: costRows } = await supabase
+    .from('cost_snapshots')
+    .select('total_cost_usd')
+    .gte('period_end', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
   // Build per-source stats map
   const statsMap = new Map<string, SystemHealthStats>();
   for (const row of healthStats) {
     statsMap.set(row.log_source, row);
   }
 
-  // Calculate totals
-  const totalCost = healthStats.reduce((sum, s) => sum + (s.total_cost_usd || 0), 0);
+  // Calculate totals (cost from snapshots, rest from live stats)
+  const totalCost = (costRows || []).reduce((sum, r) => sum + (r.total_cost_usd || 0), 0);
   const totalFailures = healthStats.reduce((sum, s) => sum + s.failure_count, 0);
   const totalLogs = healthStats.reduce((sum, s) => sum + s.total_count, 0);
 
@@ -115,6 +121,7 @@ export default async function DataOverviewPage() {
           stats={getStats('api_call')}
           href="/admin/data/api-logs"
           showCost
+          snapshotCostUsd={totalCost}
         />
         <ServiceHealthCard
           title="Scrape Engine"
@@ -171,12 +178,14 @@ function ServiceHealthCard({
   stats,
   href,
   showCost,
+  snapshotCostUsd,
 }: {
   title: string;
   icon: string;
   stats?: SystemHealthStats;
   href: string;
   showCost?: boolean;
+  snapshotCostUsd?: number;
 }) {
   const successRate = stats && stats.total_count > 0
     ? Math.round((stats.success_count / stats.total_count) * 100)
@@ -237,9 +246,9 @@ function ServiceHealthCard({
           </div>
         </div>
 
-        {showCost && stats?.total_cost_usd !== null && stats?.total_cost_usd !== undefined && (
+        {showCost && snapshotCostUsd !== undefined && (
           <div className="mt-2 pt-2 border-t border-pg-border text-center">
-            <p className="text-sm font-bold text-pg-accent">${stats.total_cost_usd.toFixed(2)}</p>
+            <p className="text-sm font-bold text-pg-accent">${snapshotCostUsd.toFixed(2)}</p>
             <p className="text-xs text-pg-text-muted">Cost (24h)</p>
           </div>
         )}

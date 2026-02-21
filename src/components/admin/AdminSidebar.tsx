@@ -44,6 +44,7 @@ export function AdminSidebar({ profile, alertCounts, onNavigate }: AdminSidebarP
     { href: '/admin/infringements', label: 'Infringements', icon: '\u26a0\ufe0f' },
     { href: '/admin/takedowns', label: 'Takedowns', icon: '\ud83d\udce7' },
     { href: '/admin/marketing', label: 'Marketing', icon: '\ud83d\udce3' },
+    { href: '/admin/intelligence', label: 'Intelligence', icon: '\ud83e\udde0' },
   ];
 
   const isActive = (href: string, exact: boolean = false) => {

@@ -914,3 +914,62 @@ export interface DashboardData {
     dmcaReplyEmail: string | null;
   };
 }
+
+// ============================================================================
+// CUSTOMER INTELLIGENCE TYPES
+// ============================================================================
+
+export interface CustomerProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  company_name: string | null;
+  plan_tier: PlanTier;
+  created_at: string;
+  // Usage
+  product_count: number;
+  scan_count: number;
+  infringement_count: number;
+  takedown_count: number;
+  last_scan_at: string | null;
+  // Costs (30d)
+  total_cost_30d: number;
+  scan_cost_30d: number;
+  email_cost_30d: number;
+  // Computed
+  mrr: number;
+  margin: number; // mrr - total_cost_30d
+  health_score: number;
+  health_status: 'healthy' | 'at_risk' | 'inactive';
+  // Subscription
+  subscription_status: string | null;
+}
+
+export interface IntelligenceOverview {
+  mrr: number;
+  arr: number;
+  active_customers: number;
+  total_customers: number;
+  total_cost_30d: number;
+  avg_margin: number;
+  health_distribution: {
+    healthy: number;
+    at_risk: number;
+    inactive: number;
+  };
+  tier_breakdown: Array<{
+    tier: PlanTier;
+    count: number;
+    revenue: number;
+    cost: number;
+    margin: number;
+  }>;
+}
+
+export interface CostBreakdown {
+  scan_serper: number;
+  scan_ai_filter: number;
+  scan_whois: number;
+  email_send: number;
+  total: number;
+}

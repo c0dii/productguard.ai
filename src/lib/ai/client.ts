@@ -106,15 +106,13 @@ export async function generateCompletion<T = any>(
     const promptTokens = response.usage?.prompt_tokens || 0;
     const completionTokens = response.usage?.completion_tokens || 0;
     const totalTokens = response.usage?.total_tokens || 0;
-    const costUsd = estimateCost(promptTokens, completionTokens, model);
-
-    // Log to system_logs
+    // Log to system_logs (token counts only — cost is aggregated periodically by cron)
     await systemLogger.log({
       log_source: 'api_call',
       log_level: 'info',
       operation: `openai.chat.${model}`,
       status: 'success',
-      message: `OpenAI ${model} completed in ${processingTimeMs}ms (${totalTokens} tokens, $${costUsd.toFixed(4)})`,
+      message: `OpenAI ${model} completed in ${processingTimeMs}ms (${totalTokens} tokens)`,
       duration_ms: processingTimeMs,
       context: {
         provider: 'openai' as const,
@@ -122,7 +120,6 @@ export async function generateCompletion<T = any>(
         tokens_used: totalTokens,
         prompt_tokens: promptTokens,
         completion_tokens: completionTokens,
-        cost_usd: costUsd,
       },
     });
 

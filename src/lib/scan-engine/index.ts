@@ -14,6 +14,7 @@ import { trackFirstScan, trackScanCompleted, trackHighSeverityInfringement } fro
 import { fetchIntelligenceForScan, optimizeSearchQueryFromIntelligence, type IntelligenceData } from '@/lib/intelligence/intelligence-engine';
 import { notifyHighSeverityInfringement, notifyScanComplete, notifyScanError } from '@/lib/notifications/email';
 import { systemLogger } from '@/lib/logging/system-logger';
+import { logCostEvent, costEventLogger } from '@/lib/cost/usage-events';
 import crypto from 'crypto';
 
 /**
@@ -288,6 +289,12 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
         ai_fallback_count: aiResult.fallbackCount,
         ai_cost_usd: parseFloat(estimateFilteringCost(resultsToProcess.length).toFixed(4)),
         ai_savings_usd: parseFloat(estimateFilteringCost(aiFilteringSaved).toFixed(4)),
+      });
+
+      // Log per-user cost event for AI filtering
+      await logCostEvent(product.user_id, 'scan_ai_filter', resultsToProcess.length, {
+        scan_id: scanId,
+        product_id: product.id,
       });
 
       // CRITICAL: Warn if OpenAI is failing and fallback is being used
@@ -828,6 +835,13 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
             infringementId: '', // Not yet inserted, will have ID after insert
           });
         }
+
+        // Log per-user email cost (1 scan complete + up to 3 P0 alerts)
+        const emailsSent = 1 + Math.min(highSeverityInfringements.length, 3);
+        await logCostEvent(product.user_id, 'email_send', emailsSent, {
+          scan_id: scanId,
+          templates: ['scan_complete', ...highSeverityInfringements.slice(0, 3).map(() => 'high_severity_alert')],
+        });
       }
     } catch (error) {
       logger.error('notification', `Error sending email notifications: ${error instanceof Error ? error.message : String(error)}`, 'EMAIL_FAIL', {
@@ -855,6 +869,17 @@ export async function scanProduct(scanId: string, product: Product): Promise<voi
       },
     });
     await systemLogger.flush();
+
+    // Log per-user cost event for WHOIS lookups (1 per processed infringement)
+    if (deduplicatedResults.length > 0) {
+      await logCostEvent(product.user_id, 'scan_whois', deduplicatedResults.length, {
+        scan_id: scanId,
+        product_id: product.id,
+      });
+    }
+
+    // Flush cost events alongside other loggers
+    await costEventLogger.flush();
 
     // Final flush — persist all buffered logs
     await logger.flush();
@@ -1193,6 +1218,14 @@ async function runTieredSearch(
     api_calls_used: client.used,
     api_calls_remaining: client.remaining,
   });
+
+  // Log per-user cost event for SERP API calls
+  if (client.used > 0) {
+    await logCostEvent(product.user_id, 'scan_serper', client.used, {
+      scan_id: scanId,
+      product_id: product.id,
+    });
+  }
 
   // Diagnostic: Log Serper API health so errors are visible in scan logs
   const diag = client.diagnostics;

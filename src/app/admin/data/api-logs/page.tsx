@@ -38,10 +38,12 @@ export default async function ApiLogsPage() {
   const avgLatency = recentLogs.length > 0
     ? Math.round(recentLogs.reduce((sum, l) => sum + (l.duration_ms || 0), 0) / recentLogs.length)
     : 0;
-  const totalCost = recentLogs.reduce((sum, l) => {
-    const cost = (l.context as Record<string, unknown>)?.cost_usd;
-    return sum + (typeof cost === 'number' ? cost : 0);
-  }, 0);
+  // Cost from periodic snapshots (aggregated by cron, not per-call)
+  const { data: costRows } = await supabase
+    .from('cost_snapshots')
+    .select('total_cost_usd')
+    .gte('period_end', twentyFourHoursAgo);
+  const totalCost = (costRows || []).reduce((sum, r) => sum + (r.total_cost_usd || 0), 0);
   const failureRate = totalCalls > 0 ? Math.round((failedCalls / totalCalls) * 100) : 0;
 
   return (
