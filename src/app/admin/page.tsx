@@ -273,7 +273,7 @@ export default async function AdminOverviewPage() {
                 <div>
                   <p className="font-semibold text-sm">{scan.profiles?.email}</p>
                   <p className="text-xs text-pg-text-muted">
-                    {scan.results_count || 0} infringements found
+                    {scan.infringement_count || 0} infringements found
                   </p>
                 </div>
                 <div className="text-right">

@@ -56,7 +56,7 @@ export default async function AdminUsersPage({
             className="input-field w-48"
           >
             <option value="all">All Plans</option>
-            <option value="free">Free</option>
+            <option value="scout">Scout (Free)</option>
             <option value="starter">Starter</option>
             <option value="pro">Pro</option>
             <option value="business">Business</option>

@@ -87,7 +87,7 @@ export default async function AdminScansPage() {
                   Product: {scan.products?.name || 'Unknown'}
                 </p>
                 <p className="text-sm text-pg-text-muted">
-                  {scan.results_count || 0} infringements found
+                  {scan.infringement_count || 0} infringements found
                 </p>
               </div>
               <div className="text-right">

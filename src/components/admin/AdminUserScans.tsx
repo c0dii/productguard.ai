@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 interface Scan {
   id: string;
   status: string;
-  results_count?: number;
+  infringement_count?: number;
   created_at: string;
   archived_at?: string | null;
 }
@@ -62,7 +62,7 @@ export function AdminUserScans({ scans }: { scans: Scan[] }) {
                     )}
                   </span>
                   <span className="text-pg-text-muted">
-                    {scan.results_count || 0} results
+                    {scan.infringement_count || 0} results
                   </span>
                 </div>
                 <p className="text-xs text-pg-text-muted">

@@ -123,7 +123,8 @@ export default async function DashboardPage() {
     // ── Timeline: 3 parallel queries merged in JS ────────────────────
     supabase
       .from('status_transitions')
-      .select('id, infringement_id, to_status, created_at, infringements!inner(source_url, products!inner(name))')
+      .select('id, infringement_id, to_status, created_at, infringements!inner(source_url, user_id, products!inner(name))')
+      .eq('infringements.user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10),
     supabase

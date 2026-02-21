@@ -97,11 +97,12 @@ export default async function ScanDetailsPage({ params }: { params: Promise<{ id
       .eq('product_id', productId)
       .eq('status', 'removed')
       .order('created_at', { ascending: false }),
-    // Total infringement count for this product (all statuses)
+    // Total infringement count for this product (excludes false_positive and archived)
     supabase
       .from('infringements')
       .select('id', { count: 'exact', head: true })
-      .eq('product_id', productId),
+      .eq('product_id', productId)
+      .not('status', 'in', '("false_positive","archived")'),
   ]);
 
   // How many NEW infringements this specific scan found
