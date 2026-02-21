@@ -62,7 +62,7 @@ export function ReassignProductButton({
         setProducts(otherProducts);
       } catch (err: any) {
         console.error('Error fetching products:', err);
-        setError('Failed to load products');
+        setError('Couldn\'t load your products. Please try again.');
       } finally {
         setIsFetchingProducts(false);
       }
@@ -100,7 +100,7 @@ export function ReassignProductButton({
       }, 1500);
     } catch (err: any) {
       console.error('Error reassigning infringement:', err);
-      setError(err.message || 'Failed to reassign. Please try again.');
+      setError(err.message || 'Couldn\'t reassign this infringement. Please try again.');
     } finally {
       setIsLoading(false);
     }

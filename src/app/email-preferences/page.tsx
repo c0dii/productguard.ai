@@ -50,7 +50,7 @@ function EmailPreferencesContent() {
         if (res.status === 401) {
           setError('Invalid or expired link. Please log in to manage your preferences.');
         } else {
-          setError('Failed to load preferences.');
+          setError('Couldn\'t load your preferences. Please refresh the page.');
         }
         setLoading(false);
         return;
@@ -60,7 +60,7 @@ function EmailPreferencesContent() {
       setEmail(data.email);
       setPrefs(data.preferences);
     } catch {
-      setError('Failed to load preferences.');
+      setError('Couldn\'t load your preferences. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -87,10 +87,10 @@ function EmailPreferencesContent() {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       } else {
-        alert('Failed to save preferences.');
+        alert('Couldn\'t save your preferences. Please try again.');
       }
     } catch {
-      alert('Failed to save preferences.');
+      alert('Couldn\'t save your preferences. Please try again.');
     } finally {
       setSaving(false);
     }

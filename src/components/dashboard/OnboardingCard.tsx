@@ -17,7 +17,7 @@ export function OnboardingCard({ fullName, phone, address, dmcaReplyEmail }: Onb
     { label: 'Full name set', done: !!fullName },
     { label: 'Physical address added', done: !!address },
     { label: 'Phone number added', done: !!phone },
-    { label: 'DMCA reply email set', done: !!dmcaReplyEmail },
+    { label: 'Takedown reply email set', done: !!dmcaReplyEmail },
   ];
 
   const completedCount = checks.filter((c) => c.done).length;
@@ -33,9 +33,9 @@ export function OnboardingCard({ fullName, phone, address, dmcaReplyEmail }: Onb
     <div className="mb-6 sm:mb-8 p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-pg-surface backdrop-blur-sm border border-pg-accent/30">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 mb-4">
         <div>
-          <h2 className="text-base sm:text-lg font-bold text-pg-text mb-1">Complete Your Setup</h2>
+          <h2 className="text-base sm:text-lg font-bold text-pg-text mb-1">Finish Your Profile</h2>
           <p className="text-xs sm:text-sm text-pg-text-muted">
-            Fill in your DMCA contact details so you can generate and send takedown notices.
+            Add your contact info so we can generate legally valid takedown notices on your behalf.
           </p>
         </div>
         <Link

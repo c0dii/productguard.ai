@@ -44,8 +44,8 @@ export function ThreatLandscape({ platformBreakdown, detectionTrend }: ThreatLan
       {total === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-sm text-pg-text-muted text-center">
-            No threats detected yet.<br />
-            Run a scan to see platform breakdown.
+            No threats found yet.<br />
+            This chart fills in as scans detect piracy across platforms.
           </p>
         </div>
       ) : (

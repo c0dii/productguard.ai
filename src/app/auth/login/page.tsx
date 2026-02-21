@@ -34,7 +34,7 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Something went wrong on our end. Please try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function LoginPage() {
         setError(error.message);
       }
     } catch (err) {
-      setError('Failed to initiate Google login');
+      setError('Couldn\'t connect to Google. Please try again or use email instead.');
     }
   };
 
@@ -78,7 +78,7 @@ export default function LoginPage() {
             </span>
           </Link>
           <h1 className="text-3xl font-bold mb-2 text-white">Welcome Back</h1>
-          <p className="text-gray-400">Log in to your ProductGuard account</p>
+          <p className="text-gray-400">Log in to check on your products</p>
         </div>
 
         {/* Login Form */}

@@ -150,7 +150,7 @@ export function EnforcementPlan({
       });
     } catch (err: any) {
       console.error('Error generating DMCA notice:', err);
-      setError(err.message || 'Failed to generate DMCA notice');
+      setError(err.message || 'Couldn\'t generate the notice. Please try again.');
     } finally {
       setGeneratingFor(null);
     }

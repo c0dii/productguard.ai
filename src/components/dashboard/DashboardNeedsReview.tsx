@@ -38,10 +38,10 @@ export function DashboardNeedsReview({ infringements, totalPending }: DashboardN
         router.refresh();
       } else {
         const error = await response.json();
-        alert(`Failed to ${action}: ${error.error}`);
+        alert(`Couldn't complete that action: ${error.error}`);
       }
     } catch {
-      alert(`Failed to ${action} infringement. Please try again.`);
+      alert('Something went wrong. Please try again.');
     } finally {
       setProcessingId(null);
     }

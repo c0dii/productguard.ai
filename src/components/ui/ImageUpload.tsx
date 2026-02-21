@@ -67,7 +67,7 @@ export function ImageUpload({
       onChange(publicUrl);
     } catch (err: any) {
       console.error('Error uploading image:', err);
-      setError(err.message || 'Failed to upload image');
+      setError(err.message || 'Couldn\'t upload the image. Please try a smaller file.');
     } finally {
       setUploading(false);
     }

@@ -58,7 +58,7 @@ export function ProfileEditForm({ profile, onSaved }: ProfileEditFormProps) {
       onSaved();
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || 'Failed to save changes');
+      setError(err.message || 'Couldn\'t save your changes. Please try again.');
     } finally {
       setLoading(false);
     }

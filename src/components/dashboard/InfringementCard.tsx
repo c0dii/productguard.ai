@@ -51,14 +51,14 @@ export function InfringementCard({ infringement, productPrice, isResolved = fals
       });
 
       if (response.ok) {
-        alert('DMCA notice generated! Check the Takedowns page to send it.');
+        alert('Takedown notice created. Head to the Takedowns page to review and send it.');
         router.refresh();
       } else {
-        alert('Failed to generate DMCA notice');
+        alert('Couldn\'t generate the notice. Please try again.');
       }
     } catch (error) {
       console.error('Error sending DMCA:', error);
-      alert('Error generating DMCA notice');
+      alert('Couldn\'t generate the notice. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +74,11 @@ export function InfringementCard({ infringement, productPrice, isResolved = fals
       if (response.ok) {
         router.refresh();
       } else {
-        alert('Failed to mark as resolved');
+        alert('Couldn\'t update this infringement. Please try again.');
       }
     } catch (error) {
       console.error('Error marking resolved:', error);
-      alert('Error marking as resolved');
+      alert('Couldn\'t update this infringement. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -94,11 +94,11 @@ export function InfringementCard({ infringement, productPrice, isResolved = fals
       if (response.ok) {
         router.refresh();
       } else {
-        alert('Failed to reopen infringement');
+        alert('Couldn\'t reopen this infringement. Please try again.');
       }
     } catch (error) {
       console.error('Error reopening:', error);
-      alert('Error reopening infringement');
+      alert('Couldn\'t reopen this infringement. Please try again.');
     } finally {
       setIsLoading(false);
     }

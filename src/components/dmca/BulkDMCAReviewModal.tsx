@@ -75,7 +75,7 @@ export function BulkDMCAReviewModal({
           setSignatureName(data.contact.full_name);
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to generate bulk notices');
+        setError(err.message || 'Couldn\'t generate the notices. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -134,7 +134,7 @@ export function BulkDMCAReviewModal({
 
       onSubmitted(data.batch_id);
     } catch (err: any) {
-      setSubmitError(err.message || 'Failed to submit');
+      setSubmitError(err.message || 'Couldn\'t submit the notices. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

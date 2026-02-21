@@ -38,16 +38,16 @@ export function OnboardingBanner({ productCount, hasScanRun }: OnboardingBannerP
           {!hasProducts ? (
             <>
               <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-2">
-                Welcome to ProductGuard!
+                Let's find out if your work is being pirated
               </h3>
               <p className="text-sm text-pg-text-muted mb-4">
-                Protect your digital products in 4 simple steps:
+                Get started in 4 quick steps:
               </p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-pg-text-muted mb-4">
                 <span><span className="font-semibold text-pg-accent">1.</span> Add your product</span>
                 <span><span className="font-semibold text-pg-accent">2.</span> Run a scan</span>
-                <span><span className="font-semibold text-pg-accent">3.</span> Review threats</span>
-                <span><span className="font-semibold text-pg-accent">4.</span> Send takedown notices</span>
+                <span><span className="font-semibold text-pg-accent">3.</span> Review what we find</span>
+                <span><span className="font-semibold text-pg-accent">4.</span> Send takedowns</span>
               </div>
               <Link
                 href="/dashboard/products"
@@ -59,10 +59,10 @@ export function OnboardingBanner({ productCount, hasScanRun }: OnboardingBannerP
           ) : (
             <>
               <h3 className="text-base sm:text-lg font-semibold text-pg-text mb-2">
-                You're almost there!
+                Your product is ready — time to scan
               </h3>
               <p className="text-sm text-pg-text-muted mb-4">
-                Run your first scan to start detecting infringements of your products.
+                Run your first scan to see if anyone is sharing your work without permission.
               </p>
               <Link
                 href="/dashboard/products"

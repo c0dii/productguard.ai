@@ -89,7 +89,7 @@ export function CancelRetentionFlow({
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to cancel subscription');
+      if (!response.ok) throw new Error(data.error || 'Couldn\'t cancel right now. Please try again in a moment.');
 
       setPeriodEnd(data.periodEnd);
       onViewChange('cancel_success');
@@ -112,7 +112,7 @@ export function CancelRetentionFlow({
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to apply discount');
+      if (!response.ok) throw new Error(data.error || 'Couldn\'t apply the discount. Please try again.');
 
       onPlanChanged();
       onClose();
@@ -134,7 +134,7 @@ export function CancelRetentionFlow({
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to pause subscription');
+      if (!response.ok) throw new Error(data.error || 'Couldn\'t pause your account. Please try again.');
 
       onPlanChanged();
       onClose();
@@ -156,7 +156,7 @@ export function CancelRetentionFlow({
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to downgrade');
+      if (!response.ok) throw new Error(data.error || 'Couldn\'t switch your plan. Please try again.');
 
       if (data.action === 'checkout' && data.url) {
         window.location.href = data.url;
@@ -184,7 +184,7 @@ export function CancelRetentionFlow({
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to delete account');
+      if (!response.ok) throw new Error(data.error || 'Couldn\'t delete your account. Please contact support.');
 
       onAccountDeleted?.();
     } catch (err: any) {
@@ -428,8 +428,8 @@ export function CancelRetentionFlow({
             <p className="text-sm text-yellow-300/80 mb-2">After that date:</p>
             <ul className="text-sm text-yellow-300/80 space-y-1 ml-4 list-disc">
               <li>You&apos;ll be downgraded to the free Scout plan</li>
-              <li>Product monitoring will stop (limited to 1 product, 1 scan/mo)</li>
-              <li>One-click DMCA, cease &amp; desist, and automated monitoring will be disabled</li>
+              <li>Monitoring drops to 1 product and 1 scan per month</li>
+              <li>One-click takedowns, automated scanning, and enforcement tools will be disabled</li>
               <li>Your existing data (products, scans, infringements) will be <strong>preserved</strong></li>
             </ul>
           </div>

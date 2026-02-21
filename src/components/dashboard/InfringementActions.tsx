@@ -37,11 +37,11 @@ export function InfringementActions({
       if (response.ok) {
         router.push(productId ? `/dashboard/products/${productId}` : '/dashboard/infringements');
       } else {
-        alert('Failed to mark as not a threat');
+        alert('Couldn\'t update this item. Please try again.');
       }
     } catch (error) {
       console.error('Error marking as not a threat:', error);
-      alert('Error marking as not a threat');
+      alert('Couldn\'t update this item. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -57,11 +57,11 @@ export function InfringementActions({
       if (response.ok) {
         router.refresh();
       } else {
-        alert('Failed to reopen infringement');
+        alert('Couldn\'t reopen this infringement. Please try again.');
       }
     } catch (error) {
       console.error('Error reopening:', error);
-      alert('Error reopening infringement');
+      alert('Couldn\'t reopen this infringement. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -88,11 +88,11 @@ export function InfringementActions({
         router.refresh();
       } else {
         const error = await response.json();
-        alert(`Failed to ${action}: ${error.error}`);
+        alert(`Couldn't complete that action: ${error.error}`);
       }
     } catch (error) {
       console.error(`Error ${action}ing infringement:`, error);
-      alert(`Failed to ${action} infringement. Please try again.`);
+      alert('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
       setVerifyAction(null);

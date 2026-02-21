@@ -122,7 +122,7 @@ export function TakedownActions({
         router.refresh();
         setShowSendDialog(false);
       } else {
-        alert('Failed to send DMCA notice');
+        alert('Couldn\'t send the notice. Please try again.');
       }
     } catch (error) {
       console.error('Send error:', error);
@@ -178,7 +178,7 @@ export function TakedownActions({
         alert(`URL Status: ${data.url_status}\n\nThe page will refresh to show updated status.`);
         router.refresh();
       } else {
-        alert('Failed to check URL status');
+        alert('Couldn\'t check the URL status. Please try again.');
       }
     } catch (error) {
       console.error('URL check error:', error);

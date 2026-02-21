@@ -22,7 +22,7 @@ export function DashboardSidebar({ profile, onNavigate, badgeCounts }: Dashboard
     { name: 'Products', href: '/dashboard/products', icon: '📦', badge: 0 },
     { name: 'Scans', href: '/dashboard/scans', icon: '🔍', badge: 0 },
     { name: 'Infringements', href: '/dashboard/infringements', icon: '🚨', badge: badgeCounts?.infringements ?? 0 },
-    { name: 'Ready for Takedown', href: '/dashboard/ready-for-takedown', icon: '📋', badge: badgeCounts?.readyForTakedown ?? 0 },
+    { name: 'Ready to Send', href: '/dashboard/ready-for-takedown', icon: '📋', badge: badgeCounts?.readyForTakedown ?? 0 },
     { name: 'Takedowns', href: '/dashboard/takedowns', icon: '⚡', badge: 0 },
     { name: 'Settings', href: '/dashboard/settings', icon: '⚙️', badge: 0 },
   ];

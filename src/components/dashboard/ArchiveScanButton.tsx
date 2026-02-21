@@ -14,7 +14,7 @@ export function ArchiveScanButton({ scanId }: { scanId: string }) {
     if (response.ok) {
       router.push('/dashboard/scans');
     } else {
-      alert('Failed to archive scan');
+      alert('Couldn\'t archive this scan. Please try again.');
       setLoading(false);
     }
   };

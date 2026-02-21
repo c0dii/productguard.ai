@@ -55,16 +55,16 @@ export function ProtectionScoreHero({
 
 function buildSummary(score: number, activeThreats: number, removedCount: number): string {
   if (activeThreats === 0 && removedCount === 0) {
-    return 'No threats detected yet. Run a scan to start monitoring.';
+    return 'No threats found yet. Add a product and run a scan to get started.';
   }
   if (activeThreats === 0) {
-    return `All clear! ${removedCount} threat${removedCount !== 1 ? 's' : ''} successfully removed.`;
+    return `All clear! ${removedCount} threat${removedCount !== 1 ? 's' : ''} taken down successfully.`;
   }
   if (score >= 80) {
-    return `${activeThreats} active threat${activeThreats !== 1 ? 's' : ''} detected. Your protection is strong.`;
+    return `${activeThreats} active threat${activeThreats !== 1 ? 's' : ''} found, but your protection is strong.`;
   }
   if (score >= 60) {
-    return `${activeThreats} active threat${activeThreats !== 1 ? 's' : ''} need${activeThreats === 1 ? 's' : ''} attention. Review and take action.`;
+    return `${activeThreats} active threat${activeThreats !== 1 ? 's' : ''} need${activeThreats === 1 ? 's' : ''} your attention. Review and send takedowns.`;
   }
-  return `${activeThreats} active threat${activeThreats !== 1 ? 's' : ''} putting your revenue at risk. Immediate action recommended.`;
+  return `${activeThreats} active threat${activeThreats !== 1 ? 's' : ''} putting your revenue at risk. Take action now.`;
 }

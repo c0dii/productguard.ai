@@ -111,7 +111,7 @@ export function SubscriptionWizard({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to change plan');
+        throw new Error(data.error || 'Couldn\'t update your plan. Please try again.');
       }
 
       if (data.action === 'checkout' && data.url) {
@@ -125,7 +125,7 @@ export function SubscriptionWizard({
       setConfirmAction(null);
       onPlanChanged();
     } catch (err: any) {
-      setError(err.message || 'Failed to change plan');
+      setError(err.message || 'Couldn\'t update your plan. Please try again.');
     } finally {
       setLoading(null);
     }
@@ -138,10 +138,10 @@ export function SubscriptionWizard({
       if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
-        setError(data.error || 'Failed to access billing portal');
+        setError(data.error || 'Couldn\'t open the billing portal. Please try again.');
       }
     } catch {
-      setError('Failed to access billing portal');
+      setError('Couldn\'t open the billing portal. Please try again.');
     }
   };
 

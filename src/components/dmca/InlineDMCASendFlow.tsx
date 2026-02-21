@@ -56,7 +56,7 @@ interface InlineDMCASendFlowProps {
 
 type FlowStep = 1 | 2 | 3;
 
-const STEP_LABELS = ['Type', 'Delivery', 'Review & Send'];
+const STEP_LABELS = ['Infringement', 'Delivery', 'Review & Send'];
 
 export function InlineDMCASendFlow({
   notice,
@@ -160,14 +160,14 @@ export function InlineDMCASendFlow({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send DMCA notice');
+        throw new Error(data.error || 'Couldn\'t send the notice. Check the recipient email and try again.');
       }
 
       setSentTakedownId(data.takedown.id);
       setSentAt(data.takedown.sent_at);
       onSent(data.takedown.id);
     } catch (err: any) {
-      setSendError(err.message || 'Failed to send DMCA notice');
+      setSendError(err.message || 'Couldn\'t send the notice. Check the recipient email and try again.');
     } finally {
       setIsSending(false);
     }
@@ -344,7 +344,7 @@ export function InlineDMCASendFlow({
         {step === 2 && !isSent && (
           <div>
             <p className="text-sm text-pg-text-muted mb-4">
-              Configure where and how the DMCA notice will be delivered.
+              Confirm where the notice should be sent. We auto-detect the right contact when possible.
             </p>
 
             <div className="space-y-4 mb-6">
@@ -545,8 +545,11 @@ export function InlineDMCASendFlow({
                   <p className="text-xs font-semibold text-pg-text mb-0.5">
                     I certify under penalty of perjury <span className="text-pg-danger">*</span>
                   </p>
+                  <p className="text-[11px] text-pg-text mb-1 font-medium">
+                    You&apos;re confirming that you own this content and that it&apos;s being used without permission.
+                  </p>
                   <p className="text-[11px] text-pg-text-muted leading-relaxed">
-                    I certify under penalty of perjury that: (1) I am authorized to act on behalf of the copyright owner,
+                    Specifically: (1) I am authorized to act on behalf of the copyright owner,
                     (2) the information provided is accurate, (3) I have a good faith belief the use is not authorized, and
                     (4) this electronic signature is my legally binding signature.
                   </p>
@@ -564,6 +567,9 @@ export function InlineDMCASendFlow({
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-pg-text mb-0.5">
                     Limitation of liability <span className="text-pg-danger">*</span>
+                  </p>
+                  <p className="text-[11px] text-pg-text mb-1 font-medium">
+                    ProductGuard helps you send notices — but you&apos;re responsible for the claims in them.
                   </p>
                   <p className="text-[11px] text-pg-text-muted leading-relaxed">
                     I acknowledge that ProductGuard.ai provides tools for generating and sending DMCA notices but does not
@@ -612,9 +618,9 @@ export function InlineDMCASendFlow({
               </svg>
             </div>
 
-            <h3 className="text-lg font-bold text-pg-text mb-2">DMCA Notice Sent</h3>
+            <h3 className="text-lg font-bold text-pg-text mb-2">Notice Sent Successfully</h3>
             <p className="text-sm text-pg-text-muted mb-1">
-              Your DMCA takedown notice has been sent to <strong className="text-pg-text">{target.provider.name}</strong>
+              Your takedown notice is on its way to <strong className="text-pg-text">{target.provider.name}</strong>.
             </p>
             <p className="text-xs text-pg-text-muted mb-6">
               {editedRecipientEmail} &middot; {sentAt ? new Date(sentAt).toLocaleDateString() : 'Just now'}
@@ -630,7 +636,7 @@ export function InlineDMCASendFlow({
             </div>
 
             <p className="text-xs text-pg-text-muted mt-4">
-              Allow {target.deadline_days || 7} days for a response before escalating to the next target.
+              Most providers respond within {target.deadline_days || 7} days. We&apos;ll track the status for you.
             </p>
           </div>
         )}

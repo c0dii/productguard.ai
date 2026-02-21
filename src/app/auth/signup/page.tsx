@@ -41,7 +41,7 @@ export default function SignupPage() {
         setSuccess(true);
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Something went wrong on our end. Please try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ export default function SignupPage() {
         setError(error.message);
       }
     } catch (err) {
-      setError('Failed to initiate Google signup');
+      setError('Couldn\'t connect to Google. Please try again or use email instead.');
     }
   };
 
@@ -77,10 +77,9 @@ export default function SignupPage() {
         <div className="w-full max-w-md text-center">
           <div className="p-8 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10">
             <div className="text-6xl mb-4">✉️</div>
-            <h1 className="text-2xl font-bold mb-2 text-white">Check Your Email</h1>
+            <h1 className="text-2xl font-bold mb-2 text-white">Check Your Inbox</h1>
             <p className="text-gray-400 mb-6">
-              We've sent a confirmation link to <strong className="text-white">{email}</strong>. Click the link in the
-              email to activate your account.
+              We sent a confirmation link to <strong className="text-white">{email}</strong>. Click it to activate your account and start scanning.
             </p>
             <Link
               href="/auth/login"

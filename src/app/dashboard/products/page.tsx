@@ -184,7 +184,7 @@ export default function ProductsPage() {
 
         if (updateError) {
           console.error('Update error:', updateError);
-          alert('Failed to update product: ' + updateError.message);
+          alert('Couldn\'t update the product: ' + updateError.message);
           return;
         }
 
@@ -206,7 +206,7 @@ export default function ProductsPage() {
           if (response.status === 403 && result.hint) {
             alert(`${result.error}\n\n${result.hint}`);
           } else {
-            alert('Failed to create product: ' + (result.error || 'Unknown error'));
+            alert('Couldn\'t create the product: ' + (result.error || 'Unknown error'));
           }
           return;
         }
@@ -220,7 +220,7 @@ export default function ProductsPage() {
       await fetchProducts();
     } catch (err: any) {
       console.error('Form submit error:', err);
-      alert('An error occurred: ' + err.message);
+      alert('Something went wrong: ' + err.message);
     }
   };
 
@@ -235,7 +235,7 @@ export default function ProductsPage() {
 
       if (error) {
         console.error('Delete error:', error);
-        alert('Failed to delete product: ' + error.message);
+        alert('Couldn\'t delete the product: ' + error.message);
       } else {
         alert('Product deleted successfully!');
         fetchProducts();
@@ -249,7 +249,7 @@ export default function ProductsPage() {
       if (response.ok) {
         fetchProducts();
       } else {
-        alert('Failed to archive product');
+        alert('Couldn\'t archive the product. Please try again.');
       }
     }
   };
@@ -259,7 +259,7 @@ export default function ProductsPage() {
     if (response.ok) {
       fetchProducts();
     } else {
-      alert('Failed to unarchive product');
+      alert('Couldn\'t unarchive the product. Please try again.');
     }
   };
 
@@ -279,11 +279,11 @@ export default function ProductsPage() {
         // Redirect to scan detail page to monitor progress
         window.location.href = `/dashboard/scans/${data.scan_id}`;
       } else {
-        alert(data.error || 'Failed to start scan');
+        alert(data.error || 'Couldn\'t start the scan. Please try again.');
       }
     } catch (error) {
       console.error('Scan error:', error);
-      alert('Failed to start scan');
+      alert('Couldn\'t start the scan. Please try again.');
     }
   };
 

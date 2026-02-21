@@ -410,11 +410,11 @@ export function TakedownForm({
         }
       } else {
         const error = await response.json();
-        alert(`Failed to create takedown: ${error.error}`);
+        alert(`Couldn't create the takedown: ${error.error}`);
       }
     } catch (error) {
       console.error('Error creating takedown:', error);
-      alert('Failed to create takedown. Please try again.');
+      alert('Couldn\'t create the takedown. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

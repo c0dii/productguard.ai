@@ -51,7 +51,7 @@ export function DMCAQuickSetup({ onComplete, onCancel }: DMCAQuickSetupProps) {
 
       onComplete();
     } catch (err: any) {
-      setError(err.message || 'Failed to save profile');
+      setError(err.message || 'Couldn\'t save your profile. Please try again.');
     } finally {
       setSaving(false);
     }

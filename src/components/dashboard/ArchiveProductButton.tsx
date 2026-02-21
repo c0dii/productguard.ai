@@ -14,7 +14,7 @@ export function ArchiveProductButton({ productId }: { productId: string }) {
     if (response.ok) {
       router.push('/dashboard/products');
     } else {
-      alert('Failed to archive product');
+      alert('Couldn\'t archive this product. Please try again.');
       setLoading(false);
     }
   };

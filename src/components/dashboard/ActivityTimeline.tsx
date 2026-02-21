@@ -27,7 +27,7 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
 
       {events.length === 0 ? (
         <p className="text-xs text-pg-text-muted py-4 text-center">
-          No activity yet. Run a scan to get started.
+          No activity yet. Your scan results, verifications, and takedowns will appear here.
         </p>
       ) : (
         <>

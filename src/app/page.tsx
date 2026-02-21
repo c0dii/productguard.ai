@@ -8,10 +8,10 @@ export default function HomePage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly');
 
   const plans = [
-    { tier: 'scout' as const, name: 'Scout', description: 'Perfect for testing' },
-    { tier: 'starter' as const, name: 'Starter', description: 'For solo creators', popular: true },
-    { tier: 'pro' as const, name: 'Pro', description: 'For growing businesses' },
-    { tier: 'business' as const, name: 'Business', description: 'For enterprises' },
+    { tier: 'scout' as const, name: 'Scout', description: 'Try it free — no card needed' },
+    { tier: 'starter' as const, name: 'Starter', description: 'For solo creators protecting their work', popular: true },
+    { tier: 'pro' as const, name: 'Pro', description: 'For creators with multiple products' },
+    { tier: 'business' as const, name: 'Business', description: 'For teams and agencies' },
   ];
 
   return (
@@ -83,7 +83,7 @@ export default function HomePage() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-8">
               <span className="w-2 h-2 rounded-full bg-green-400"></span>
-              <span className="text-sm text-gray-300">Protecting 500+ Digital Creators</span>
+              <span className="text-sm text-gray-300">AI-Powered Piracy Protection for Creators</span>
             </div>
 
             {/* Headline */}
@@ -96,8 +96,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto">
-              AI-powered monitoring detects unauthorized copies across 50+ platforms. Protect your
-              courses, software, and digital products automatically.
+              Find stolen copies of your courses, software, and digital products across 50+ platforms — then take them down with one click.
             </p>
 
             {/* CTA Buttons */}
@@ -196,10 +195,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-bold mb-6">
-              Powerful Protection Features
+              Find It. Flag It. Take It Down.
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Everything you need to detect, track, and remove pirated copies
+              Everything you need to detect piracy and protect your revenue
             </p>
           </div>
 
@@ -208,32 +207,32 @@ export default function HomePage() {
               {
                 icon: '🔍',
                 title: 'Automated Scanning',
-                description: 'Monitor Google, Telegram, Discord, and 50+ platforms 24/7 for unauthorized copies',
+                description: 'We scan Google, Telegram, Discord, torrents, and 50+ platforms so you don\'t have to',
               },
               {
                 icon: '🤖',
                 title: 'AI-Powered Detection',
-                description: 'Smart algorithms identify piracy patterns and product name variations',
+                description: 'Our AI spots piracy patterns, name variations, and sneaky repackaging others miss',
               },
               {
                 icon: '📧',
-                title: 'One-Click DMCA',
-                description: 'Generate and send legal takedown notices in seconds',
+                title: 'One-Click Takedowns',
+                description: 'Generate and send legally compliant DMCA notices in seconds — not hours',
               },
               {
                 icon: '💬',
                 title: 'Telegram Monitoring',
-                description: 'Track channels where 40% of digital product piracy happens',
+                description: 'Track the channels where 40% of digital product piracy actually happens',
               },
               {
                 icon: '📊',
-                title: 'Revenue Analytics',
-                description: 'Calculate exactly how much money piracy costs you monthly',
+                title: 'Revenue Impact',
+                description: 'See exactly how much piracy is costing you — and how much you\'ve recovered',
               },
               {
                 icon: '⚡',
                 title: 'Real-Time Alerts',
-                description: 'Instant email notifications when new threats are detected',
+                description: 'Get notified the moment a new unauthorized copy appears',
               },
             ].map((feature, i) => (
               <div
@@ -258,15 +257,15 @@ export default function HomePage() {
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-bold mb-6">How It Works</h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Three simple steps to protect your digital products
+              From setup to takedown in under 5 minutes
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {[
-              { step: '01', title: 'Add Products', desc: 'Tell us what digital products you want to protect' },
-              { step: '02', title: 'AI Scans Web', desc: 'Our AI monitors 50+ platforms for unauthorized copies' },
-              { step: '03', title: 'Take Action', desc: 'Send DMCA takedowns with one click or track over time' },
+              { step: '01', title: 'Add Your Product', desc: 'Paste your product URL and we\'ll auto-fill the details — name, price, keywords, everything' },
+              { step: '02', title: 'We Scan the Web', desc: 'Our AI searches 50+ platforms for unauthorized copies, torrents, and leaked downloads' },
+              { step: '03', title: 'Take It Down', desc: 'Review what we found, then send DMCA takedown notices with one click' },
             ].map((item, i) => (
               <div key={i} className="relative">
                 <div className="absolute -top-6 -left-6 text-9xl font-bold text-white/5 select-none">
@@ -291,7 +290,7 @@ export default function HomePage() {
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-bold mb-6">Trusted by Creators</h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              See what digital product creators say about ProductGuard.ai
+              Hear from creators who stopped losing revenue to piracy
             </p>
           </div>
 
@@ -362,8 +361,8 @@ export default function HomePage() {
       <section id="pricing" className="py-24 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-5xl md:text-6xl font-bold mb-6">Simple Pricing</h2>
-            <p className="text-xl text-gray-400 mb-8">Choose the plan that fits your needs</p>
+            <h2 className="text-5xl md:text-6xl font-bold mb-6">Simple, Transparent Pricing</h2>
+            <p className="text-xl text-gray-400 mb-8">Start free. Upgrade when you're ready for more protection.</p>
 
             {/* Billing Toggle */}
             <div className="inline-flex items-center gap-4 p-1 rounded-full bg-white/5 backdrop-blur-sm border border-white/10">
@@ -476,7 +475,7 @@ export default function HomePage() {
             Ready to Protect Your Revenue?
           </h2>
           <p className="text-xl text-gray-400 mb-10">
-            Join 500+ creators protecting their digital products with ProductGuard.ai
+            Every day you wait, pirates are profiting from your work. Start scanning for free.
           </p>
           <Link
             href="/auth/signup"

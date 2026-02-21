@@ -169,7 +169,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
       syncWhitelistFromUrl(result.url || data.url);
     } catch (error: any) {
       console.error('Scrape error:', error);
-      setScrapeError(error.message || 'Failed to analyze page. You can enter details manually.');
+      setScrapeError(error.message || 'Couldn\'t analyze that page. You can enter details manually below.');
     } finally {
       setIsScraping(false);
     }
@@ -226,7 +226,7 @@ export function ProductWizard({ isOpen, onClose, onComplete, userId, initialUrl 
       onComplete({ id: result.id, name: result.name });
     } catch (err: any) {
       console.error('Error creating product:', err);
-      setSaveError(err.message || 'Failed to create product. Please try again.');
+      setSaveError(err.message || 'Couldn\'t save the product. Please try again.');
     } finally {
       setIsSaving(false);
     }

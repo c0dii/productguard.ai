@@ -36,7 +36,7 @@ export function ExportReportButton({ scanId, productName }: ExportReportButtonPr
       document.body.removeChild(a);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Failed to export report. Please try again.');
+      alert('Couldn\'t export the report. Please try again.');
     } finally {
       setIsExporting(false);
     }

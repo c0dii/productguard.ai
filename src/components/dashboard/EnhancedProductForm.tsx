@@ -154,7 +154,7 @@ export function EnhancedProductForm({
       setTimeout(() => setFetchSuccess(false), 3000);
     } catch (error: any) {
       console.error('Error fetching product details:', error);
-      setFetchError(error.message || 'Failed to fetch product details. Please enter manually.');
+      setFetchError(error.message || 'Couldn\'t pull details from that URL. You can enter them manually below.');
     } finally {
       setIsFetching(false);
     }
@@ -163,7 +163,7 @@ export function EnhancedProductForm({
   // Refresh AI Analysis (24-hour cooldown)
   const handleRefreshAI = async () => {
     if (!formData.url) {
-      alert('Product URL is required to refresh AI analysis');
+      alert('Add a product URL first so we know what to analyze.');
       return;
     }
 
@@ -205,7 +205,7 @@ export function EnhancedProductForm({
 
     } catch (error: any) {
       console.error('Error refreshing AI analysis:', error);
-      setFetchError(error.message || 'Failed to refresh AI analysis');
+      setFetchError(error.message || 'Couldn\'t refresh the analysis. Try again in a few minutes.');
     } finally {
       setIsRefreshingAI(false);
     }
@@ -238,7 +238,7 @@ export function EnhancedProductForm({
             <h3 className="text-lg font-semibold text-pg-text">Quick Setup</h3>
           </div>
           <p className="text-sm text-pg-text-muted">
-            Enter your product page URL to automatically extract details like title, description, price, and images.
+            Paste your product page URL and we&apos;ll pull in the title, description, price, and images automatically.
           </p>
 
           <div className="flex gap-3">
@@ -278,7 +278,7 @@ export function EnhancedProductForm({
 
           {fetchSuccess && (
             <div className="p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-400 text-sm">
-              ✅ Product details fetched successfully! Review and edit below.
+              Details pulled in successfully. Review and edit below.
             </div>
           )}
         </div>
@@ -327,7 +327,7 @@ export function EnhancedProductForm({
 
           {aiDataPendingApproval && (
             <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
-              ℹ️ Review and edit the AI-extracted data below. Hover over any item to remove it. Click "Save Product" to approve this data for use in scans.
+              Review the AI-extracted data below. Hover over any item to remove it. Click &quot;Save Product&quot; to approve.
             </div>
           )}
 
@@ -455,8 +455,8 @@ export function EnhancedProductForm({
 
           <p className="text-sm text-gray-700 font-medium mt-4 border-t border-gray-200 pt-4">
             {aiDataPendingApproval ?
-              'This data will be saved and used for infringement detection once you save the product' :
-              '✓ This AI data has been approved and will be used to detect infringements with high accuracy'
+              'This data will be used for detection once you save the product.' :
+              'Approved — this data is active and improving your scan results.'
             }
           </p>
         </div>
@@ -620,7 +620,7 @@ export function EnhancedProductForm({
                 placeholder="Describe your product..."
               />
               <p className="text-xs text-pg-text-muted mt-1">
-                This description is used in DMCA takedown notices. Keep it concise and factual.
+                Used in takedown notices. Keep it concise and factual.
               </p>
             </div>
           </div>

@@ -33,11 +33,11 @@ export function ProductActions({ product }: ProductActionsProps) {
         router.push(`/dashboard/scans/${data.scan_id}`);
       } else {
         const error = await response.json();
-        alert(`Failed to start scan: ${error.error}`);
+        alert(`Couldn't start the scan: ${error.error}`);
       }
     } catch (error) {
       console.error('Scan error:', error);
-      alert('Failed to start scan. Please try again.');
+      alert('Couldn\'t start the scan. Please try again.');
     } finally {
       setScanning(false);
     }

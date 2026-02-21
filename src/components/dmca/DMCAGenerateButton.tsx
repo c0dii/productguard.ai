@@ -48,7 +48,7 @@ export function DMCAGenerateButton({
       setQuality(data.quality || null);
     } catch (err: any) {
       console.error('Error generating DMCA notice:', err);
-      setError(err.message || 'Failed to generate DMCA notice. Please try again.');
+      setError(err.message || 'Couldn\'t generate the notice. Please try again.');
     } finally {
       setIsGenerating(false);
     }
